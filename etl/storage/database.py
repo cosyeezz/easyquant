@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 @Time    : 2023/11/18 11:07
-@Author  : zhamsocho
+@Author  : dane
 @File    : database.py
 @Description :
 数据库连接管理、会话管理以及高性能数据入库的实现。
