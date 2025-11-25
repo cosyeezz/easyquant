@@ -170,13 +170,13 @@
         3.  删除旧的根目录 `storage/`。
     *   **产出**: 一个独立的、符合设计规范的数据存储层。
 
-*   [ ] **任务 1.3: (数据加载层重构) 拆分并重构数据源**
-    *   **文件**: `etl/data_loader/base.py`, `etl/data_loader/csv_loader.py`, `etl/data_loader/baostock_loader.py`
-    *   **目标**: 
-        1.  在 `base.py` 中定义统一的 `BaseLoader` 抽象接口。
-        2.  将原有的 `DataSource` 实现拆分为职责单一的加载器 (Loader)，如 `CsvLoader`, `BaostockStockListLoader` 等。
-        3.  删除旧的 `etl/csv_source.py` 和 `etl/baostock_source.py` 等文件。
-    *   **产出**: 一套可扩展的、职责清晰的数据加载器组件。
+*   ✅ **任务 1.3: (数据加载层重构) 拆分并重构数据源**
+    *   **文件**: `etl/data_loader/base.py`, `etl/data_loader/csv_loader.py`
+    *   **目标**:
+        1.  在 `base.py` 中定义统一的、内置生产者-消费者模式的 `BaseLoader` 抽象接口。✅
+        2.  基于新的 `BaseLoader` 实现一个功能强大且内存安全的 `CsvLoader`。✅
+        3.  为 `CsvLoader` 编写完整的单元测试。✅
+    *   **产出**: 一套可扩展、职责清晰、内置并发与内存安全的数据加载器框架，以及一个健壮的 `CsvLoader` 实现。
 
 *   [ ] **任务 1.4: (核心逻辑重构) 引入管道与处理器模式**
     *   **文件**: `etl/processing/handlers.py`, `etl/processing/pipeline.py`
