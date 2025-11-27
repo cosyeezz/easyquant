@@ -1,23 +1,24 @@
-from typing import List, Any
+from typing import List, Any, Callable, Union
 import asyncio
 import logging
+import inspect
 from .base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
-import inspect
+HandlerType = Union[BaseHandler, Callable[[Any], Any]]
 
 class Pipeline:
     """
     一个异步处理管道，按顺序执行一系列的处理器 (Handler)。
 
-    该管道接收一系列 BaseHandler 的实例，并依次调用它们的 handle 方法。
+    该管道接收一系列 Handler (BaseHandler 实例或可调用对象)，并依次调用它们。
     它能自动识别 handle 方法是同步还是异步，并以正确的方式调用。
     """
-    def __init__(self, handlers: List[BaseHandler]):
+    def __init__(self, handlers: List[HandlerType]):
         """
         初始化一个处理管道。
-        :param handlers: 一个由 BaseHandler 实例组成的列表。
+        :param handlers: 一个由 Handler 组成的列表。
         """
         if not handlers:
             raise ValueError("处理器列表不能为空")
@@ -27,7 +28,7 @@ class Pipeline:
         """
         异步执行管道中的所有处理器。
 
-        会检查每个 handle 方法是同步还是异步：
+        会检查每个 handler 是同步还是异步：
         - 如果是异步 (async def)，则用 await 调用。
         - 如果是同步 (def)，则直接调用。
 
@@ -38,11 +39,17 @@ class Pipeline:
         data = initial_data
         try:
             for handler in self._handlers:
-                handle_method = handler.handle
-                if inspect.iscoroutinefunction(handle_method):
-                    data = await handle_method(data)
+                # 确定调用哪个方法/函数
+                if isinstance(handler, BaseHandler):
+                    func = handler.handle
                 else:
-                    data = handle_method(data)
+                    func = handler
+
+                # 检查是否为协程函数
+                if inspect.iscoroutinefunction(func):
+                    data = await func(data)
+                else:
+                    data = func(data)
             return data
         except Exception as e:
             logger.error(f"管道在处理数据 '{initial_data}' 时出错: {e}", exc_info=True)
