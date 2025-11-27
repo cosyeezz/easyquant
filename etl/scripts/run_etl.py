@@ -7,13 +7,13 @@ import os
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-from easyquant.etl.data_loader.csv_loader import CsvLoader
-from easyquant.etl.processing.pipeline import Pipeline
+from etl.data_loader.csv_loader import CsvLoader
+from etl.processing.pipeline import Pipeline
 # 具体的 Handler 实现需要被重新创建
-# from easyquant.etl.processing.handlers import ... 
-from easyquant.etl.storage.database import DatabaseManager
-from easyquant.config import DATABASE_URL
-from easyquant.etl.scheduler import Scheduler
+# from etl.processing.handlers import ... 
+# from etl.storage.database import DatabaseManager
+from config import DATABASE_URL
+from etl.scheduler import Scheduler
 
 def create_pipeline() -> Pipeline:
     """
@@ -49,10 +49,19 @@ async def main():
     parser = argparse.ArgumentParser(description="运行ETL任务")
     parser.add_argument("--data-dir", type=str, required=True, help="包含CSV文件的目录路径")
     parser.add_argument("--max-workers", type=int, default=os.cpu_count(), help="最大工作进程数")
+    parser.add_argument("--force", action="store_true", help="强制执行ETL，忽略幂等性检查")
     args = parser.parse_args()
 
+    # TODO: Task 1.7 - 幂等性检查
+    # if not args.force:
+    #     # 检查 etl_metadata 表，判断数据源是否已处理
+    #     # 计算数据源哈希值，与数据库中记录对比
+    #     # 如果已处理且哈希值相同，则跳过
+    #     logging.info("幂等性检查: 数据源未变化，跳过ETL处理")
+    #     return
+
     # 1. 初始化数据加载器
-    loader = CsvLoader(data_dir_path=Path(args.data_dir))
+    loader = CsvLoader(path=args.data_dir)
     
     # 2. 创建调度器
     #    我们传递 create_pipeline 工厂函数，而不是一个 pipeline 实例
@@ -64,6 +73,9 @@ async def main():
 
     # 3. 运行调度器
     await scheduler.run()
+
+    # TODO: Task 1.7 - 更新元数据表
+    # 成功后，更新 etl_metadata 表，记录处理时间和哈希值
 
     logging.info("ETL任务完成。")
 

@@ -31,7 +31,17 @@ def _run_pipeline_task(pipeline_factory: Callable[[], Pipeline], item: Any) -> A
 class Scheduler:
     """
     顶层调度器，负责连接所有组件并驱动整个ETL过程。
-    它实现“宏观多进程并行，微观异步并发”的核心模型。
+    它实现"宏观多进程并行，微观异步并发"的核心模型。
+    
+    性能优化特性 (Task 1.8):
+    - 多进程并行: 使用 ProcessPoolExecutor 充分利用多核CPU
+    - 异步IO: 每个进程内部使用 asyncio 提高IO密集型任务效率
+    - 独立资源: 每个进程拥有独立的 Pipeline 和数据库连接，避免资源竞争
+    
+    未来优化方向:
+    - TODO: 引入 Numba JIT 编译加速计算密集型因子计算
+    - TODO: 使用共享内存或 Ray 框架优化大数据量传输
+    - TODO: 实现动态任务调度，优先处理小文件
     """
 
     def __init__(

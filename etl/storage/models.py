@@ -6,6 +6,8 @@ from sqlalchemy import (
     BigInteger,
     String,
     Date,
+    DateTime,
+    TEXT,
     DECIMAL,
     Boolean,
     UniqueConstraint,
@@ -15,6 +17,27 @@ from sqlalchemy.orm import declarative_base
 
 # 创建所有模型共享的声明式基类
 Base = declarative_base()
+
+class EtlMetadata(Base):
+    """
+    ETL 元数据表，用于记录数据源的处理状态，实现幂等性。
+    """
+    __tablename__ = 'etl_metadata'
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True, comment='自增ID')
+    source_name = Column(String(255), nullable=False, comment='数据源名称')
+    source_hash = Column(String(64), nullable=False, comment='数据源文件的哈希值(MD5或SHA256)')
+    last_processed_at = Column(DateTime, nullable=False, comment='最后处理时间')
+    status = Column(String(50), comment='处理状态: success, failed, processing')
+    error_message = Column(TEXT, comment='错误信息(如果有)')
+    
+    __table_args__ = (
+        UniqueConstraint('source_name', 'source_hash', name='uk_source_hash'),
+        Index('idx_source_name', 'source_name'),
+    )
+
+    def __repr__(self):
+        return f"<EtlMetadata(source_name='{self.source_name}', hash='{self.source_hash}')>"
 
 class StockDailyData(Base):
     """
