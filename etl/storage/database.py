@@ -65,22 +65,22 @@ async def bulk_insert_df(df: pd.DataFrame, table_name: str):
     columns = list(df.columns)
 
     async with async_engine.connect() as conn:
-        try:
-            # 获取底层的 asyncpg 连接
-            raw_conn = await conn.get_raw_connection()
-            
-            # 使用 asyncpg 的 copy_records_to_table 方法
-            await raw_conn.copy_records_to_table(
-                table_name,
-                records=records,
-                columns=columns,
-                timeout=60  # 设置一个合理的超时时间
-            )
-            # 注意：asyncpg 的 copy 操作是自动提交的，无需手动 commit
-            logger.info(f"成功向表 '{table_name}' 插入 {len(df)} 条数据。")
-        except Exception as e:
-            # 尽管 copy 是自动提交的，但如果发生异常，连接状态可能需要回滚
-            await conn.rollback()
-            logger.error(f"向表 '{table_name}' 批量插入数据失败: {e}", exc_info=True)
-            raise
+        # 使用 conn.begin() 启动一个显式事务，确保操作的原子性
+        async with conn.begin():
+            try:
+                # 获取底层的 asyncpg 连接
+                raw_conn = await conn.get_raw_connection()
+                
+                # 使用 asyncpg 的 copy_records_to_table 方法
+                await raw_conn.copy_records_to_table(
+                    table_name,
+                    records=records,
+                    columns=columns,
+                    timeout=60  # 设置一个合理的超时时间
+                )
+                logger.info(f"成功向表 '{table_name}' 插入 {len(df)} 条数据。")
+            except Exception as e:
+                # conn.begin() 会在异常时自动回滚事务
+                logger.error(f"向表 '{table_name}' 批量插入数据失败: {e}", exc_info=True)
+                raise
 

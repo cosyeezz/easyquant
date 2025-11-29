@@ -74,6 +74,7 @@ class BaseLoader(abc.ABC):
             
         except Exception:
             logger.exception("获取数据源列表时发生未预料的异常")
+            raise  # 重新抛出异常，让上层调用者知道发生了严重错误
         finally:
             await self.queue.put(None)  # 确保在任何情况下都能发送结束信号
 

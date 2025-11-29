@@ -52,14 +52,6 @@ async def main():
     parser.add_argument("--force", action="store_true", help="强制执行ETL，忽略幂等性检查")
     args = parser.parse_args()
 
-    # TODO: Task 1.7 - 幂等性检查
-    # if not args.force:
-    #     # 检查 etl_metadata 表，判断数据源是否已处理
-    #     # 计算数据源哈希值，与数据库中记录对比
-    #     # 如果已处理且哈希值相同，则跳过
-    #     logging.info("幂等性检查: 数据源未变化，跳过ETL处理")
-    #     return
-
     # 1. 初始化数据加载器
     loader = CsvLoader(path=args.data_dir)
     
@@ -68,7 +60,8 @@ async def main():
     scheduler = Scheduler(
         loader=loader,
         pipeline_factory=create_pipeline,
-        max_workers=args.max_workers
+        max_workers=args.max_workers,
+        force_run=args.force  # 将 --force 参数传递给调度器
     )
 
     # 3. 运行调度器

@@ -1,47 +1,72 @@
 import asyncio
-from concurrent.futures import ProcessPoolExecutor
-from typing import Callable, Any
 import logging
+from typing import Callable, Any, List, Optional
+import os
+
+import ray
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
 
 from .data_loader.base import BaseLoader
 from .processing.pipeline import Pipeline
+from .storage.idempotency import IdempotencyChecker
+from config import DATABASE_URL  # 假设您的数据库URL在config.py中
 
 logger = logging.getLogger(__name__)
 
-def _run_pipeline_task(pipeline_factory: Callable[[], Pipeline], item: Any) -> Any:
+
+@ray.remote
+class PipelineExecutor:
     """
-    一个独立的顶层函数，用于在子进程中执行任务。
-    它会创建一个新的Pipeline实例并运行它。
+    一个 Ray Actor，用于在独立的进程中安全地初始化数据库连接并执行ETL任务。
     
-    注意: 此函数必须在模块的顶层，以便能够被子进程正确地序列化和调用。
-    
-    :param pipeline_factory: 用于创建Pipeline实例的工厂函数。
-    :param item: 要处理的数据项 (例如，一个文件路径)。
-    :return: Pipeline运行的结果。
+    通过使用 Actor，我们可以确保每个 worker 进程只创建一个数据库引擎实例，
+    极大地提高了性能和资源利用率。
     """
-    try:
-        pipeline = pipeline_factory()
-        # 每个子进程都有自己的事件循环，因此在这里使用 asyncio.run
-        return asyncio.run(pipeline.run(item))
-    except Exception as e:
-        logger.error(f"子进程在处理 '{item}' 时发生错误: {e}", exc_info=True)
-        # 可以选择重新抛出异常，或返回一个错误标记
-        raise
+    def __init__(self, pipeline_factory: Callable[[], Pipeline]):
+        # 每个 Actor (worker 进程) 只在初始化时创建一次数据库引擎和会话工厂
+        self.engine = create_async_engine(DATABASE_URL)
+        self.AsyncSessionFactory = sessionmaker(self.engine, expire_on_commit=False, class_=AsyncSession)
+        self.pipeline_factory = pipeline_factory
+
+    async def process_item(self, item: Any) -> Any:
+        """
+        处理单个数据项的核心异步方法。
+        """
+        async with self.AsyncSessionFactory() as session:
+            try:
+                # 1. 运行核心的 Pipeline 逻辑
+                pipeline = self.pipeline_factory()
+                result = await pipeline.run(item)
+                
+                # 2. Pipeline 成功后，更新幂等性记录
+                idempotency_checker = IdempotencyChecker(session)
+                await idempotency_checker.mark_as_processed(item)
+                
+                return result
+            except Exception as e:
+                logger.error(f"Ray worker 在处理 '{item}' 时发生严重错误: {e}", exc_info=True)
+                # 发生错误时，不更新记录，以便下次可以重试
+                raise
+
+
+def default_task_sorter(items: List[Any]) -> List[Any]:
+    """默认的任务排序策略：按文件从小到大的顺序排序。"""
+    if not items:
+        return items
+    first_item = items[0]
+    if isinstance(first_item, str) and os.path.exists(first_item):
+        try:
+            return sorted(items, key=lambda p: os.path.getsize(p) if isinstance(p, str) and os.path.exists(p) else float('inf'))
+        except Exception as e:
+            logger.warning(f"默认排序器按文件大小排序失败，返回原始顺序。错误: {e}")
+            return items
+    return items
+
 
 class Scheduler:
     """
-    顶层调度器，负责连接所有组件并驱动整个ETL过程。
-    它实现"宏观多进程并行，微观异步并发"的核心模型。
-    
-    性能优化特性 (Task 1.8):
-    - 多进程并行: 使用 ProcessPoolExecutor 充分利用多核CPU
-    - 异步IO: 每个进程内部使用 asyncio 提高IO密集型任务效率
-    - 独立资源: 每个进程拥有独立的 Pipeline 和数据库连接，避免资源竞争
-    
-    未来优化方向:
-    - TODO: 引入 Numba JIT 编译加速计算密集型因子计算
-    - TODO: 使用共享内存或 Ray 框架优化大数据量传输
-    - TODO: 实现动态任务调度，优先处理小文件
+    顶层调度器，使用 Ray 进行并行处理，并集成了幂等性检查和可插拔的排序策略。
     """
 
     def __init__(
@@ -49,60 +74,76 @@ class Scheduler:
         loader: BaseLoader,
         pipeline_factory: Callable[[], Pipeline],
         max_workers: int = 4,
+        task_sorter: Optional[Callable[[List[Any]], List[Any]]] = default_task_sorter,
+        force_run: bool = False,
     ):
         """
         初始化调度器。
-
-        :param loader: 数据加载器实例，用于异步获取所有待处理的数据单元。
-        :param pipeline_factory: 一个无参数的函数 (工厂函数)，当调用它时，
-                                 会返回一个全新的、配置好的 Pipeline 实例。
-                                 这是实现多进程安全的关键，确保每个进程都有
-                                 自己的 Pipeline、Handler，以及独立的资源
-                                 (如数据库连接)。
-        :param max_workers: 并行执行的最大工作进程数。
+        :param force_run: (可选) 如果为 True，将绕过幂等性检查，强制处理所有任务。
         """
         self.loader = loader
         self.pipeline_factory = pipeline_factory
         self.max_workers = max_workers
+        self.task_sorter = task_sorter
+        self.force_run = force_run
+        
+        # Scheduler 主进程也需要自己的数据库连接来执行前置检查
+        self.engine = create_async_engine(DATABASE_URL)
+        self.AsyncSessionFactory = sessionmaker(self.engine, expire_on_commit=False, class_=AsyncSession)
+
+    async def _filter_processed_items(self, items: List[Any]) -> List[Any]:
+        """使用 IdempotencyChecker 过滤掉已经处理过的项目。"""
+        if self.force_run:
+            logger.warning("`force_run` 已启用，将跳过幂等性检查，处理所有数据项。")
+            return items
+
+        items_to_process = []
+        async with self.AsyncSessionFactory() as session:
+            checker = IdempotencyChecker(session)
+            # 使用 asyncio.gather 并发执行检查以提高效率
+            results = await asyncio.gather(*(checker.should_process(item) for item in items))
+            for item, should_process in zip(items, results):
+                if should_process:
+                    items_to_process.append(item)
+        return items_to_process
 
     async def run(self):
-        """
-        启动ETL调度流程。
-        1. 从 Loader 异步获取所有待处理项。
-        2. 创建一个进程池。
-        3. 将处理任务分发给池中的工作进程。
-        4. 异步等待所有任务完成。
-        """
+        """启动ETL调度流程。"""
+        if not ray.is_initialized():
+            ray.init(num_cpus=self.max_workers, ignore_reinit_error=True)
+
         logger.info("调度器启动，开始从加载器获取数据...")
-        
-        # 异步地从加载器收集所有项目
-        items_to_process = [item async for item in self.loader.load()]
-        
-        if not items_to_process:
+        all_items = [item async for item in self.loader.stream()]
+
+        if not all_items:
             logger.warning("没有从加载器获取到需要处理的数据。调度结束。")
             return
 
-        logger.info(f"数据加载完成，共 {len(items_to_process)} 个项目待处理。")
-        logger.info(f"将使用最多 {self.max_workers} 个工作进程进行并行处理。")
-
-        # 获取当前正在运行的事件循环
-        loop = asyncio.get_running_loop()
+        logger.info(f"加载器发现 {len(all_items)} 个数据项，开始进行幂等性检查...")
         
-        # 使用 ProcessPoolExecutor 来执行CPU密集型或需要隔离的任务
-        with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
-            # 为每个项目创建一个在 executor 中运行的任务
-            tasks = [
-                loop.run_in_executor(
-                    executor,
-                    _run_pipeline_task,
-                    self.pipeline_factory,
-                    item
-                )
-                for item in items_to_process
-            ]
-            
-            # 异步等待所有任务完成
-            results = await asyncio.gather(*tasks)
-            logger.info("所有ETL任务已在所有进程中完成。")
-            return results
+        # 1. 在分发前进行幂等性过滤
+        items_to_process = await self._filter_processed_items(all_items)
+        
+        if not items_to_process:
+            logger.info("所有数据项都已处理过，本次无任务执行。")
+            return
+
+        logger.info(f"幂等性检查完成，共 {len(items_to_process)} 个新项目待处理。")
+
+        if self.task_sorter:
+            items_to_process = self.task_sorter(items_to_process)
+
+        # 创建 Actor 池
+        actors = [PipelineExecutor.remote(self.pipeline_factory) for _ in range(self.max_workers)]
+        
+        task_refs = []
+        # 使用轮询 (round-robin) 策略将任务均匀分配给 Actor
+        for i, item in enumerate(items_to_process):
+            actor = actors[i % self.max_workers]
+            task_refs.append(actor.process_item.remote(item))
+
+        results = ray.get(task_refs)
+        logger.info("所有ETL任务已在所有 Ray 进程中完成。")
+        return results
+
 

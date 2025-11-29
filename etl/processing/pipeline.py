@@ -20,8 +20,6 @@ class Pipeline:
         初始化一个处理管道。
         :param handlers: 一个由 Handler 组成的列表。
         """
-        if not handlers:
-            raise ValueError("处理器列表不能为空")
         self._handlers = handlers
 
     async def run(self, initial_data: Any) -> Any:
@@ -36,6 +34,10 @@ class Pipeline:
         :param initial_data: 传递给第一个处理器的初始数据。
         :return: 最后一个处理器的返回值。
         """
+        # 如果没有定义处理器，直接返回原始数据
+        if not self._handlers:
+            return initial_data
+            
         data = initial_data
         try:
             for handler in self._handlers:

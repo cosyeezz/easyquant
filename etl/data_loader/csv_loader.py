@@ -20,12 +20,12 @@ class CsvLoader(BaseLoader):
     它只需实现如何获取CSV文件路径列表 (`_get_sources`) 和
     如何加载单个CSV文件 (`_load_one_source`) 的具体逻辑。
     """
-    def __init__(self, path: str, file_pattern: str = "*.csv", max_queue_size: int = 100, **kwargs):
+    def __init__(self, path: str, file_pattern: str = "**/*.csv", max_queue_size: int = 100, **kwargs):
         """
         初始化CSV加载器。
 
         :param path: 文件路径或文件夹路径。
-        :param file_pattern: 如果 `path` 是文件夹，则使用此glob模式匹配文件。
+        :param file_pattern: 如果 `path` 是文件夹，则使用此glob模式匹配文件 (默认支持递归搜索)。
         :param max_queue_size: 传递给基类的内部缓冲区大小。
         :param kwargs: 传递给 `pandas.read_csv` 的其他关键字参数。
         """
@@ -36,14 +36,14 @@ class CsvLoader(BaseLoader):
 
     async def _get_sources(self) -> List[str]:
         """
-        实现如何获取所有CSV文件的路径列表。
+        实现如何获取所有CSV文件的路径列表 (支持递归)。
         """
         if not os.path.exists(self.path):
             logger.warning(f"指定的路径不存在: {self.path}")
             return []
         if os.path.isfile(self.path):
             return [self.path]
-        return glob(os.path.join(self.path, self.file_pattern))
+        return glob(os.path.join(self.path, self.file_pattern), recursive=True)
 
     async def _load_one_source(self, source: str) -> pd.DataFrame:
         """
