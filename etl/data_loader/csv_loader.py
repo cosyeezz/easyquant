@@ -45,15 +45,18 @@ class CsvLoader(BaseLoader):
             return [self.path]
         return glob(os.path.join(self.path, self.file_pattern), recursive=True)
 
-    async def _load_one_source(self, source: str) -> pd.DataFrame:
+    async def load_one_source(self, source: str) -> pd.DataFrame:
         """
         实现如何从单个文件路径异步加载数据并返回DataFrame。
         """
         try:
-            async with aiofiles.open(source, mode='r', encoding='utf-8') as f:
-                content = await f.read()
-            # 使用 StringIO 避免再次写入磁盘，直接在内存中操作
-            return pd.read_csv(StringIO(content), **self.read_csv_kwargs)
+            # 使用 run_in_executor 将同步的 pandas 读取操作放入线程池执行
+            # 避免阻塞主事件循环，同时比 aiofiles + StringIO 更节省内存
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                None, 
+                lambda: pd.read_csv(source, **self.read_csv_kwargs)
+            )
         except Exception:
             # 记录错误但返回空DataFrame，以避免中断整个加载流程
             logger.warning(f"处理文件 {source} 失败", exc_info=True)

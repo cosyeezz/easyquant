@@ -61,7 +61,8 @@ async def bulk_insert_df(df: pd.DataFrame, table_name: str):
     logger.info(f"开始向表 '{table_name}' 批量插入 {len(df)} 条数据...")
     
     # 将 DataFrame 转换为元组列表，这是 copy_records_to_table 需要的格式
-    records = [tuple(x) for x in df.to_numpy()]
+    # 使用 itertuples(index=False, name=None) 比 to_numpy() 更节省内存
+    records = list(df.itertuples(index=False, name=None))
     columns = list(df.columns)
 
     async with async_engine.connect() as conn:

@@ -42,14 +42,23 @@ class BaseLoader(abc.ABC):
         raise NotImplementedError("子类必须实现 '_get_sources' 方法")
 
     @abc.abstractmethod
-    async def _load_one_source(self, source: any) -> pd.DataFrame:
+    async def load_one_source(self, source: any) -> pd.DataFrame:
         """
         [子类必须实现] 从单个数据源加载数据并返回 DataFrame。
+        
+        该方法现在是公开的，允许外部调度器（如 Ray Worker）直接调用它来加载数据。
 
         :param source: `_get_sources` 方法返回的列表中的单个元素。
         :return: 一个Pandas DataFrame。如果加载失败或无数据，应返回一个空的DataFrame。
         """
-        raise NotImplementedError("子类必须实现 '_load_one_source' 方法")
+        raise NotImplementedError("子类必须实现 'load_one_source' 方法")
+
+    async def get_sources(self) -> List[any]:
+        """
+        获取所有待加载的数据源标识。
+        公开方法，代理调用内部的 `_get_sources`。
+        """
+        return await self._get_sources()
 
     async def _producer(self):
         """
@@ -62,7 +71,15 @@ class BaseLoader(abc.ABC):
                 await self.queue.put(None) # 如果没有源，直接发送结束信号
                 return
 
-            tasks = [asyncio.create_task(self._load_one_source(src)) for src in sources]
+            # 使用 Semaphore 限制并发数量，防止一次性创建过多任务导致内存爆炸
+            # 默认并发数为 max_queue_size 的 2 倍，或者可以设置为固定值
+            sem = asyncio.Semaphore(self.queue.maxsize * 2)
+
+            async def bounded_load(src):
+                async with sem:
+                    return await self.load_one_source(src)
+
+            tasks = [asyncio.create_task(bounded_load(src)) for src in sources]
             
             for future in asyncio.as_completed(tasks):
                 try:

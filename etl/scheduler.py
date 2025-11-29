@@ -23,11 +23,12 @@ class PipelineExecutor:
     通过使用 Actor，我们可以确保每个 worker 进程只创建一个数据库引擎实例，
     极大地提高了性能和资源利用率。
     """
-    def __init__(self, pipeline_factory: Callable[[], Pipeline]):
+    def __init__(self, pipeline_factory: Callable[[], Pipeline], loader: BaseLoader):
         # 每个 Actor (worker 进程) 只在初始化时创建一次数据库引擎和会话工厂
         self.engine = create_async_engine(DATABASE_URL)
         self.AsyncSessionFactory = sessionmaker(self.engine, expire_on_commit=False, class_=AsyncSession)
         self.pipeline_factory = pipeline_factory
+        self.loader = loader
 
     async def process_item(self, item: Any) -> Any:
         """
@@ -35,9 +36,18 @@ class PipelineExecutor:
         """
         async with self.AsyncSessionFactory() as session:
             try:
-                # 1. 运行核心的 Pipeline 逻辑
+                # 1. 使用 Loader 加载数据 (例如从文件路径加载为 DataFrame)
+                # 这一步现在在 Worker 中并行执行，且与 Pipeline 逻辑解耦
+                data = await self.loader.load_one_source(item)
+                
+                # 如果加载结果为空，直接返回
+                if data is None or (isinstance(data, pd.DataFrame) and data.empty):
+                    logger.warning(f"数据源 '{item}' 加载为空，跳过处理。")
+                    return None
+
+                # 2. 运行核心的 Pipeline 逻辑 (处理 DataFrame)
                 pipeline = self.pipeline_factory()
-                result = await pipeline.run(item)
+                result = await pipeline.run(data)
                 
                 # 2. Pipeline 成功后，更新幂等性记录
                 idempotency_checker = IdempotencyChecker(session)
@@ -112,11 +122,13 @@ class Scheduler:
         if not ray.is_initialized():
             ray.init(num_cpus=self.max_workers, ignore_reinit_error=True)
 
-        logger.info("调度器启动，开始从加载器获取数据...")
-        all_items = [item async for item in self.loader.stream()]
+        logger.info("调度器启动，开始从加载器获取数据源列表...")
+        # 关键修正: 这里应该获取数据源列表 (如文件路径)，而不是直接加载所有数据
+        # 数据的加载和处理应该在 Ray worker 中并行进行
+        all_items = await self.loader.get_sources()
 
         if not all_items:
-            logger.warning("没有从加载器获取到需要处理的数据。调度结束。")
+            logger.warning("没有从加载器获取到需要处理的数据源。调度结束。")
             return
 
         logger.info(f"加载器发现 {len(all_items)} 个数据项，开始进行幂等性检查...")
@@ -134,7 +146,8 @@ class Scheduler:
             items_to_process = self.task_sorter(items_to_process)
 
         # 创建 Actor 池
-        actors = [PipelineExecutor.remote(self.pipeline_factory) for _ in range(self.max_workers)]
+        # 将 loader 传递给 worker，以便 worker 可以独立加载数据
+        actors = [PipelineExecutor.remote(self.pipeline_factory, self.loader) for _ in range(self.max_workers)]
         
         task_refs = []
         # 使用轮询 (round-robin) 策略将任务均匀分配给 Actor
