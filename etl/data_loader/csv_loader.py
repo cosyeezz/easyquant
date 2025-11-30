@@ -1,10 +1,12 @@
 # easyquant/etl/data_loader/csv_loader.py
 
+import asyncio
+import hashlib
 import os
 import logging
 import pandas as pd
 from glob import glob
-from typing import List
+from typing import List, Tuple
 import aiofiles
 from .base import BaseLoader
 from io import StringIO
@@ -61,3 +63,32 @@ class CsvLoader(BaseLoader):
             # 记录错误但返回空DataFrame，以避免中断整个加载流程
             logger.warning(f"处理文件 {source} 失败", exc_info=True)
             return pd.DataFrame()
+
+    async def get_source_metadata(self, source: str) -> Tuple[str, str]:
+        """
+        获取CSV文件的元数据用于幂等性检查。
+        
+        :param source: 文件路径
+        :return: (文件路径, SHA256哈希值)
+        :raises FileNotFoundError: 如果文件不存在
+        """
+        # 使用文件路径作为唯一标识符
+        identifier = source
+        
+        # 检查文件是否存在
+        if not os.path.exists(source):
+            raise FileNotFoundError(f"数据源文件不存在: {source}")
+        
+        # 异步计算文件的SHA256哈希值
+        sha256_hash = hashlib.sha256()
+        try:
+            async with aiofiles.open(source, "rb") as f:
+                while chunk := await f.read(4096):
+                    sha256_hash.update(chunk)
+            content_hash = sha256_hash.hexdigest()
+        except Exception as e:
+            logger.error(f"计算文件哈希失败: {source}, 错误: {e}")
+            raise
+        
+        return identifier, content_hash
+

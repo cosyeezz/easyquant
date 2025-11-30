@@ -1,9 +1,8 @@
-import hashlib
 import logging
-from typing import Any
-import aiofiles
+from enum import Enum
+from typing import Optional
 
-from sqlalchemy import select, func
+from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert
 
@@ -11,84 +10,148 @@ from etl.storage.models.etl_metadata import ETLMetadata
 
 logger = logging.getLogger(__name__)
 
+
+class ProcessingStatus(str, Enum):
+    """
+    ETL 数据源处理状态枚举。
+    """
+    PENDING = "pending"       # 待处理
+    PROCESSING = "processing" # 处理中（锁定状态）
+    COMPLETED = "completed"   # 已完成
+    FAILED = "failed"         # 处理失败
+    
+    @classmethod
+    def can_transition(cls, from_status: Optional[str], to_status: str) -> bool:
+        """检查状态转换是否合法"""
+        transitions = {
+            None: {cls.PENDING, cls.PROCESSING},
+            cls.PENDING: {cls.PROCESSING, cls.FAILED},
+            cls.PROCESSING: {cls.COMPLETED, cls.FAILED},
+            cls.FAILED: {cls.PROCESSING},
+            cls.COMPLETED: {cls.PROCESSING},
+        }
+        return to_status in transitions.get(from_status, set())
+
+
 class IdempotencyChecker:
     """
-    封装ETL幂等性检查和更新逻辑的服务。
+    ETL 幂等性检查器 - 使用 SQLAlchemy 表达式语言实现。
     """
 
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def _calculate_hash(self, file_path: str) -> str:
-        """计算文件的SHA256哈希值 (异步)。"""
-        sha256_hash = hashlib.sha256()
-        try:
-            async with aiofiles.open(file_path, "rb") as f:
-                while chunk := await f.read(4096):
-                    sha256_hash.update(chunk)
-            return sha256_hash.hexdigest()
-        except FileNotFoundError:
-            logger.error(f"计算哈希值失败：文件未找到 {file_path}")
-            return ""
-
-    async def should_process(self, item: Any) -> bool:
+    async def _get_record(self, identifier: str) -> Optional[ETLMetadata]:
         """
-        检查一个数据项（例如文件路径）是否应该被处理。
-
-        :param item: 数据项，当前实现只支持字符串类型的文件路径。
-        :return: 如果数据源是新的、内容已更改或从未成功处理过，则返回 True。
+        获取数据源的元数据记录。
         """
-        if not isinstance(item, str):
-            logger.debug(f"数据项 '{item}' 非字符串，默认需要处理。")
-            return True
-
-        file_path = item
-        current_hash = await self._calculate_hash(file_path)
-        if not current_hash:
-            return False # 文件不存在，不处理
-
-        # 查询数据库中是否存在该文件的记录
-        stmt = select(ETLMetadata).where(ETLMetadata.source_identifier == file_path)
+        stmt = select(ETLMetadata).where(
+            ETLMetadata.source_identifier == identifier
+        )
         result = await self.session.execute(stmt)
-        metadata_record = result.scalar_one_or_none()
+        return result.scalar_one_or_none()
 
-        if metadata_record is None:
-            logger.info(f"新文件，需要处理: {file_path}")
-            return True
-        
-        if metadata_record.source_hash != current_hash:
-            logger.info(f"文件内容已更新，需要重新处理: {file_path}")
-            return True
-        
-        logger.info(f"文件内容未变且已处理过，跳过: {file_path}")
-        return False
-
-    async def mark_as_processed(self, item: Any):
+    async def should_process(self, identifier: str, current_hash: str) -> bool:
         """
-        将一个数据项标记为已成功处理。
-
-        :param item: 数据项，当前实现只支持字符串类型的文件路径。
+        判断数据源是否需要处理。
         """
-        if not isinstance(item, str):
-            return # 只为文件路径记录元数据
-
-        file_path = item
-        current_hash = await self._calculate_hash(file_path)
         if not current_hash:
-            return
+            logger.debug(f"[{identifier}] 哈希为空，跳过处理")
+            return False
 
-        # 使用 PostgreSQL 的 "ON CONFLICT" 实现 Upsert (插入或更新)
+        record = await self._get_record(identifier)
+
+        # 新数据源
+        if record is None:
+            logger.debug(f"[{identifier}] 新数据源，需要处理")
+            return True
+
+        # 正在处理中
+        if record.status == ProcessingStatus.PROCESSING:
+            logger.debug(f"[{identifier}] 正在处理中，跳过")
+            return False
+
+        # 内容已变更
+        if record.source_hash != current_hash:
+            logger.debug(f"[{identifier}] 内容已更新，需要重新处理")
+            return True
+
+        # 已完成且内容未变
+        if record.status == ProcessingStatus.COMPLETED:
+            logger.debug(f"[{identifier}] 已完成且内容未变，跳过")
+            return False
+
+        # 失败或待处理状态
+        logger.debug(f"[{identifier}] 状态为 {record.status}，需要处理")
+        return True
+
+    async def acquire_lock(self, identifier: str, content_hash: str) -> bool:
+        """
+        尝试获取数据源的处理锁（原子操作）。
+        
+        使用 SQLAlchemy 构建 PostgreSQL UPSERT 语句。
+        """
+        if not content_hash:
+            logger.warning(f"[{identifier}] 内容哈希为空，无法获取锁")
+            return False
+
+        # 1. 构建 INSERT 语句
         stmt = insert(ETLMetadata).values(
-            source_identifier=file_path,
-            source_hash=current_hash
+            source_identifier=identifier,
+            source_hash=content_hash,
+            status=ProcessingStatus.PROCESSING
         )
-        
-        # 如果 source_identifier 已存在，则更新 source_hash 和 processed_at 字段
-        update_stmt = stmt.on_conflict_do_update(
+
+        # 2. 定义冲突更新逻辑 (ON CONFLICT DO UPDATE)
+        # 如果主键冲突，且当前状态不是 PROCESSING，则更新为 PROCESSING
+        stmt = stmt.on_conflict_do_update(
             index_elements=['source_identifier'],
-            set_=dict(source_hash=current_hash, processed_at=func.now())
+            set_={
+                'source_hash': content_hash,
+                'status': ProcessingStatus.PROCESSING
+            },
+            where=(ETLMetadata.status != ProcessingStatus.PROCESSING)
+        )
+
+        # 3. 执行并提交
+        result = await self.session.execute(stmt)
+        await self.session.commit()
+
+        success = result.rowcount > 0
+        if success:
+            logger.info(f"[{identifier}] ✓ 获取处理锁成功")
+        else:
+            logger.info(f"[{identifier}] ✗ 获取处理锁失败（已被锁定）")
+
+        return success
+
+    async def mark_completed(self, identifier: str):
+        """标记数据源处理完成。"""
+        await self._update_status(identifier, ProcessingStatus.COMPLETED)
+        logger.info(f"[{identifier}] ✓ 标记为已完成")
+
+    async def mark_failed(self, identifier: str, error_message: Optional[str] = None):
+        """标记数据源处理失败。"""
+        await self._update_status(identifier, ProcessingStatus.FAILED)
+        logger.warning(f"[{identifier}] ✗ 标记为失败")
+
+    async def _update_status(self, identifier: str, new_status: ProcessingStatus):
+        """更新数据源状态（内部方法）。"""
+        stmt = update(ETLMetadata).where(
+            ETLMetadata.source_identifier == identifier
+        ).values(
+            status=new_status,
+            processed_at=func.now() if new_status in {
+                ProcessingStatus.COMPLETED, 
+                ProcessingStatus.FAILED
+            } else None
         )
         
-        await self.session.execute(update_stmt)
-        await self.session.commit()
-        logger.info(f"已成功更新处理记录: {file_path}")
+        await self.session.execute(stmt)
+
+
+
+# 为了方便导入，保持原类名
+from sqlalchemy import func  # noqa: E402
+
+

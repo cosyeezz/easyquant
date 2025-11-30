@@ -22,6 +22,16 @@ class Pipeline:
         """
         self._handlers = handlers
 
+    @classmethod
+    def create(cls, handlers: List[HandlerType]) -> 'Pipeline':
+        """
+        创建一个 Pipeline 实例的工厂方法。
+        
+        :param handlers: 处理器列表
+        :return: Pipeline 实例
+        """
+        return cls(handlers)
+
     async def run(self, initial_data: Any) -> Any:
         """
         异步执行管道中的所有处理器。

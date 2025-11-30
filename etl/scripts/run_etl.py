@@ -55,23 +55,19 @@ async def main():
     # 1. 初始化数据加载器
     loader = CsvLoader(path=args.data_dir)
     
-    # 2. 创建调度器
-    #    我们传递 create_pipeline 工厂函数，而不是一个 pipeline 实例
-    scheduler = Scheduler(
+    # 2. 创建调度器，使用异步上下文管理器确保资源清理
+    async with Scheduler(
         loader=loader,
         pipeline_factory=create_pipeline,
         max_workers=args.max_workers,
-        force_run=args.force  # 将 --force 参数传递给调度器
-    )
-
-    # 3. 运行调度器
-    await scheduler.run()
-
-    # TODO: Task 1.7 - 更新元数据表
-    # 成功后，更新 etl_metadata 表，记录处理时间和哈希值
+        force_run=args.force
+    ) as scheduler:
+        # 3. 运行调度器
+        await scheduler.run()
 
     logging.info("ETL任务完成。")
 
 if __name__ == "__main__":
     # 在Windows上，多进程代码需要放在这个保护块内
     asyncio.run(main())
+

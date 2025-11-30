@@ -27,7 +27,18 @@ class BaseLoader(abc.ABC):
         :param max_queue_size: 内部处理队列的最大尺寸，用于内存管理和背压。
                                该队列用于存储已加载但尚未被消费的数据块。
         """
-        self.queue = asyncio.Queue(maxsize=max_queue_size)
+        self.max_queue_size = max_queue_size
+        self._queue = None  # 延迟初始化，避免序列化问题
+    
+    @property
+    def queue(self) -> asyncio.Queue:
+        """
+        延迟初始化队列。
+        这样做可以确保 BaseLoader 实例可以被 pickle 序列化（用于 Ray）。
+        """
+        if self._queue is None:
+            self._queue = asyncio.Queue(maxsize=self.max_queue_size)
+        return self._queue
 
     @abc.abstractmethod
     async def _get_sources(self) -> List[Any]:
@@ -52,6 +63,24 @@ class BaseLoader(abc.ABC):
         :return: 一个Pandas DataFrame。如果加载失败或无数据，应返回一个空的DataFrame。
         """
         raise NotImplementedError("子类必须实现 '_load_one_source' 方法")
+
+    @abc.abstractmethod
+    async def get_source_metadata(self, source: Any) -> Tuple[str, str]:
+        """
+        [子类必须实现] 获取数据源的元数据，用于幂等性检查。
+        
+        该方法由子类实现，根据数据源类型计算唯一标识符和内容哈希。
+        例如：
+        - 文件: 返回 (文件路径, SHA256哈希)
+        - API: 返回 (URL, 响应的ETag或时间戳)
+        - 数据库: 返回 (查询标识, 结果集checksum)
+        
+        :param source: `_get_sources` 方法返回的列表中的单个元素。
+        :return: (source_identifier, source_hash) 元组
+                 - source_identifier: 数据源的唯一标识符
+                 - source_hash: 数据源内容的哈希值或版本标识
+        """
+        raise NotImplementedError("子类必须实现 'get_source_metadata' 方法")
 
     async def get_sources(self) -> List[Any]:
         """
@@ -80,16 +109,18 @@ class BaseLoader(abc.ABC):
             sem = asyncio.Semaphore(self.queue.maxsize * 2)
 
             async def bounded_load(src):
+                """加载单个数据源，返回 (source, DataFrame) 元组"""
                 async with sem:
-                    return await self._load_one_source(src)
+                    df_loaded = await self._load_one_source(src)
+                    return src, df_loaded
 
             tasks = [asyncio.create_task(bounded_load(src)) for src in sources]
             
             for future in asyncio.as_completed(tasks):
                 try:
-                    df = await future
+                    source, df = await future
                     if df is not None and not df.empty:
-                        await self.queue.put((src, df))
+                        await self.queue.put((source, df))
                 except Exception:
                     logger.exception("加载单个数据源时发生未预料的异常")
             
@@ -109,11 +140,11 @@ class BaseLoader(abc.ABC):
         producer_task = asyncio.create_task(self._producer(sources))
 
         while True:
-            df = await self.queue.get()
-            if df is None: # 收到结束信号
+            item = await self.queue.get()
+            if item is None:  # 收到结束信号
                 break
             
-            yield df # df is actually (source, df) tuple now
+            yield item  # item 是 (source, DataFrame) 元组
             self.queue.task_done()
 
         await producer_task # 等待生产者任务完全结束

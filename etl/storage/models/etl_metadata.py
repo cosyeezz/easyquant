@@ -15,8 +15,12 @@ class ETLMetadata(Base):
     # 数据源内容的哈希值（例如 SHA256），用于检测内容是否变化
     source_hash = Column(String, nullable=False, comment="数据源内容的SHA256哈希值")
     
+    # 处理状态：pending(待处理), processing(处理中), completed(已完成), failed(失败)
+    status = Column(String, default='pending', index=True, nullable=False, comment="处理状态")
+    
     # 处理完成的时间戳
     processed_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), comment="处理完成时间")
 
     def __repr__(self):
-        return f"<ETLMetadata(source='{self.source_identifier}', hash='{self.source_hash[:10]}...')>"
+        return f"<ETLMetadata(source='{self.source_identifier}', hash='{self.source_hash[:10]}...', status='{self.status}')>"
+
