@@ -60,13 +60,17 @@ class BaseLoader(abc.ABC):
         """
         return await self._get_sources()
 
-    async def _producer(self):
+    async def _producer(self, sources: List[any] = None):
         """
         生产者任务 (框架实现)。
         并行加载所有数据源，并将结果放入队列。
+        
+        :param sources: (可选) 显式指定要处理的数据源列表。如果为 None，则调用 `_get_sources()` 获取。
         """
         try:
-            sources = await self._get_sources()
+            if sources is None:
+                sources = await self._get_sources()
+                
             if not sources:
                 await self.queue.put(None) # 如果没有源，直接发送结束信号
                 return
@@ -95,12 +99,14 @@ class BaseLoader(abc.ABC):
         finally:
             await self.queue.put(None)  # 确保在任何情况下都能发送结束信号
 
-    async def stream(self) -> AsyncGenerator[pd.DataFrame, None]:
+    async def stream(self, sources: List[any] = None) -> AsyncGenerator[pd.DataFrame, None]:
         """
         消费者 (框架实现)。
         以异步生成器的方式从队列中获取并产出数据。
+        
+        :param sources: (可选) 显式指定要处理的数据源列表。
         """
-        producer_task = asyncio.create_task(self._producer())
+        producer_task = asyncio.create_task(self._producer(sources))
 
         while True:
             df = await self.queue.get()

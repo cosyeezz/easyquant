@@ -43,12 +43,12 @@ ETL 模块的设计遵循“职责单一”和“管道编排”原则，主要�
 
 1.  **初始化**: 用户运行 `etl/scripts/run_etl.py`，启动 `Scheduler`。
 2.  **发现任务**: `Scheduler` 调用 `Loader.get_sources()` 获取所有待处理的数据源标识（例如 1000 个 CSV 文件的路径列表）。
-3.  **幂等性检查**: `Scheduler` 查询数据库的 `etl_metadata` 表，过滤掉已经处理过且未发生变化的任务（除非指定 `--force`）。
-4.  **任务分发**: `Scheduler` 根据策略（如按文件大小排序）将剩余任务分发给 Ray 的 Worker 进程池。
-5.  **并行执行**:
-    *   每个 Worker 进程接收到一个任务（如文件路径）。
-    *   **加载**: Worker 调用 `loader.load_one_source(path)` 将数据加载为 DataFrame。
-    *   **处理**: Worker 创建一个新的 `Pipeline` 实例，并调用 `pipeline.run(df)`。
+3.  **任务分发 (动态批次)**: `Scheduler` 根据任务总量和 Worker 数量动态计算批次大小（目标是每个 Worker 处理约 4 个批次）。这既减少了调度开销（避免产生数万个微小任务），又保证了负载均衡。
+4.  **背压控制**: 如果 Worker 处理速度跟不上分发速度，`Scheduler` 会自动暂停分发，防止内存溢出。
+5.  **并行执行 (Worker 内生产者-消费者模式)**:
+    *   Worker 接收到一个批次（例如 3000 个文件路径）。
+    *   **生产者 (后台加载)**: Worker 调用 `loader.stream(sources=batch)`，在后台并发加载这 10 个文件，并将生成的 DataFrame 放入内部队列。
+    *   **消费者 (处理)**: Worker 从队列中逐个获取 DataFrame，创建 `Pipeline` 实例并调用 `pipeline.run(df)`。
     *   **Pipeline 内部流程**:
         *   `TransformHandler`: 清洗数据、计算指标 (输入是 DataFrame)。
         *   `SaveHandler`: 调用 `storage.bulk_insert_df` 将结果写入数据库。
