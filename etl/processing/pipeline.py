@@ -54,5 +54,12 @@ class Pipeline:
                     data = func(data)
             return data
         except Exception as e:
-            logger.error(f"管道在处理数据 '{initial_data}' 时出错: {e}", exc_info=True)
+            # 避免打印完整数据，只打印类型信息，防止日志污染
+            data_info = f"Type: {type(initial_data)}"
+            if hasattr(initial_data, 'shape'): # pandas DataFrame/Series
+                data_info += f", Shape: {initial_data.shape}"
+            elif hasattr(initial_data, '__len__'):
+                data_info += f", Len: {len(initial_data)}"
+            
+            logger.error(f"管道在处理数据 ({data_info}) 时出错: {e}", exc_info=True)
             raise

@@ -45,7 +45,7 @@ class CsvLoader(BaseLoader):
             return [self.path]
         return glob(os.path.join(self.path, self.file_pattern), recursive=True)
 
-    async def load_one_source(self, source: str) -> pd.DataFrame:
+    async def _load_one_source(self, source: str) -> pd.DataFrame:
         """
         实现如何从单个文件路径异步加载数据并返回DataFrame。
         """

@@ -1,16 +1,16 @@
 import asyncio
 import logging
-from typing import Callable, Any, List, Optional
 import os
+from typing import Callable, Any, List
+
 import pandas as pd
-
 import ray
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
+from config import DATABASE_URL  # 假设您的数据库URL在config.py中
 from .data_loader.base import BaseLoader
 from .processing.pipeline import Pipeline
 from .storage.idempotency import IdempotencyChecker
-from config import DATABASE_URL  # 假设您的数据库URL在config.py中
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +41,8 @@ class PipelineExecutor:
             try:
                 # 1. 在 Worker 进程内使用 Loader 的流式接口 (生产者-消费者模式)
                 # Loader 会在后台并发加载 batch 中的数据源，并放入队列
-                # 这里通过 async for 从队列中逐个消费 DataFrame
-                async for data in self.loader.stream(sources=batch):
+                # 这里通过 async for 从队列中逐个消费 (source, DataFrame) 元组
+                async for source, data in self.loader.stream(sources=batch):
                     
                     # 如果加载结果为空，跳过
                     if data is None or (isinstance(data, pd.DataFrame) and data.empty):
@@ -53,16 +53,14 @@ class PipelineExecutor:
                     result = await pipeline.run(data)
                     results.append(result)
                     
-                    # 3. Pipeline 成功后，更新幂等性记录 (注意：这里需要知道原始的 source item，
-                    # 但 stream 只返回了 df。为了简单起见，假设 pipeline 返回了包含 source 信息的结果，
-                    # 或者我们需要调整 stream 接口返回 (source, df) 元组。
-                    # 鉴于当前架构，我们暂时跳过逐个 item 的幂等性更新，或者假设 batch 全部成功后统一更新)
-                    # 
-                    # 更严谨的做法是让 loader.stream yield (source, df)
+                    # 3. Pipeline 成功后，更新幂等性记录
+                    # 现在我们有了 source 标识，可以正确更新状态了
+                    checker = IdempotencyChecker(session)
+                    await checker.mark_as_processed(source)
                     
                 return results
             except Exception as e:
-                logger.error(f"Ray worker 在处理 '{item}' 时发生严重错误: {e}", exc_info=True)
+                logger.error(f"Ray worker 在处理 '{batch}' 时发生严重错误: {e}", exc_info=True)
                 # 发生错误时，不更新记录，以便下次可以重试
                 raise
 
@@ -123,6 +121,9 @@ class Scheduler:
         # 1. 获取所有待处理的数据源 (例如文件路径列表)
         # 这一步非常快，因为只是获取路径，不读取文件内容
         sources = await self.loader.get_sources()
+        
+        # 1.1 过滤掉已经处理过的数据源 (幂等性检查)
+        sources = await self._filter_processed_items(sources)
 
         if not sources:
             logger.warning("没有发现需要处理的数据源。调度结束。")

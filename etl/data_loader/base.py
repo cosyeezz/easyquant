@@ -4,7 +4,7 @@ import abc
 import asyncio
 import logging
 import pandas as pd
-from typing import AsyncGenerator, List
+from typing import AsyncGenerator, List, Any, Tuple
 
 # 获取一个模块级别的 logger
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ class BaseLoader(abc.ABC):
         self.queue = asyncio.Queue(maxsize=max_queue_size)
 
     @abc.abstractmethod
-    async def _get_sources(self) -> List[any]:
+    async def _get_sources(self) -> List[Any]:
         """
         [子类必须实现] 获取所有待加载的数据源标识。
 
@@ -42,25 +42,25 @@ class BaseLoader(abc.ABC):
         raise NotImplementedError("子类必须实现 '_get_sources' 方法")
 
     @abc.abstractmethod
-    async def load_one_source(self, source: any) -> pd.DataFrame:
+    async def _load_one_source(self, source: Any) -> pd.DataFrame:
         """
         [子类必须实现] 从单个数据源加载数据并返回 DataFrame。
         
-        该方法现在是公开的，允许外部调度器（如 Ray Worker）直接调用它来加载数据。
+        该方法是受保护的，由框架内部调用。
 
         :param source: `_get_sources` 方法返回的列表中的单个元素。
         :return: 一个Pandas DataFrame。如果加载失败或无数据，应返回一个空的DataFrame。
         """
-        raise NotImplementedError("子类必须实现 'load_one_source' 方法")
+        raise NotImplementedError("子类必须实现 '_load_one_source' 方法")
 
-    async def get_sources(self) -> List[any]:
+    async def get_sources(self) -> List[Any]:
         """
         获取所有待加载的数据源标识。
         公开方法，代理调用内部的 `_get_sources`。
         """
         return await self._get_sources()
 
-    async def _producer(self, sources: List[any] = None):
+    async def _producer(self, sources: List[Any] = None):
         """
         生产者任务 (框架实现)。
         并行加载所有数据源，并将结果放入队列。
@@ -81,7 +81,7 @@ class BaseLoader(abc.ABC):
 
             async def bounded_load(src):
                 async with sem:
-                    return await self.load_one_source(src)
+                    return await self._load_one_source(src)
 
             tasks = [asyncio.create_task(bounded_load(src)) for src in sources]
             
@@ -89,7 +89,7 @@ class BaseLoader(abc.ABC):
                 try:
                     df = await future
                     if df is not None and not df.empty:
-                        await self.queue.put(df)
+                        await self.queue.put((src, df))
                 except Exception:
                     logger.exception("加载单个数据源时发生未预料的异常")
             
@@ -99,7 +99,7 @@ class BaseLoader(abc.ABC):
         finally:
             await self.queue.put(None)  # 确保在任何情况下都能发送结束信号
 
-    async def stream(self, sources: List[any] = None) -> AsyncGenerator[pd.DataFrame, None]:
+    async def stream(self, sources: List[Any] = None) -> AsyncGenerator[Tuple[Any, pd.DataFrame], None]:
         """
         消费者 (框架实现)。
         以异步生成器的方式从队列中获取并产出数据。
@@ -113,7 +113,7 @@ class BaseLoader(abc.ABC):
             if df is None: # 收到结束信号
                 break
             
-            yield df
+            yield df # df is actually (source, df) tuple now
             self.queue.task_done()
 
         await producer_task # 等待生产者任务完全结束
@@ -123,7 +123,7 @@ class BaseLoader(abc.ABC):
         便捷方法 (框架实现)。
         聚合所有流式数据。警告: 可能消耗大量内存。
         """
-        all_dfs = [df async for df in self.stream()]
+        all_dfs = [df for _, df in [item async for item in self.stream()]]
         if not all_dfs:
             return pd.DataFrame()
         return pd.concat(all_dfs, ignore_index=True)
