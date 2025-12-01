@@ -28,17 +28,7 @@ class BaseLoader(abc.ABC):
                                该队列用于存储已加载但尚未被消费的数据块。
         """
         self.max_queue_size = max_queue_size
-        self._queue = None  # 延迟初始化，避免序列化问题
-    
-    @property
-    def queue(self) -> asyncio.Queue:
-        """
-        延迟初始化队列。
-        这样做可以确保 BaseLoader 实例可以被 pickle 序列化（用于 Ray）。
-        """
-        if self._queue is None:
-            self._queue = asyncio.Queue(maxsize=self.max_queue_size)
-        return self._queue
+        # self._queue 已移除，改为在 stream 中创建局部 queue 以支持并发调用
 
     @abc.abstractmethod
     async def _get_sources(self) -> List[Any]:
@@ -89,46 +79,116 @@ class BaseLoader(abc.ABC):
         """
         return await self._get_sources()
 
-    async def _producer(self, sources: List[Any] = None):
+    async def _producer(self, queue: asyncio.Queue, sources: List[Any] = None):
         """
         生产者任务 (框架实现)。
-        并行加载所有数据源，并将结果放入队列。
-        
+        按需加载数据源，避免一次性创建大量任务。
+
+        优化版本：使用工作池模式（worker pool），只维护固定数量的并发任务，
+        大幅减少内存占用和事件循环开销。
+
+        :param queue: 用于存放数据的异步队列
         :param sources: (可选) 显式指定要处理的数据源列表。如果为 None，则调用 `_get_sources()` 获取。
         """
+        sources_to_process = None
         try:
             if sources is None:
-                sources = await self._get_sources()
-                
-            if not sources:
-                await self.queue.put(None) # 如果没有源，直接发送结束信号
+                sources_to_process = await self._get_sources()
+            else:
+                sources_to_process = sources
+
+            if not sources_to_process:
+                logger.debug("没有数据源需要加载")
                 return
 
-            # 使用 Semaphore 限制并发数量，防止一次性创建过多任务导致内存爆炸
-            # 默认并发数为 max_queue_size 的 2 倍，或者可以设置为固定值
-            sem = asyncio.Semaphore(self.queue.maxsize * 2)
+            # 工作池模式：限制并发数量
+            # 使用 queue.maxsize * 2 作为并发数，平衡吞吐量和资源占用
+            max_concurrent = queue.maxsize * 2
+            logger.debug(f"启动生产者，最大并发数: {max_concurrent}, 总数据源: {len(sources_to_process)}")
 
-            async def bounded_load(src):
-                """加载单个数据源，返回 (source, DataFrame) 元组"""
-                async with sem:
-                    df_loaded = await self._load_one_source(src)
-                    return src, df_loaded
-
-            tasks = [asyncio.create_task(bounded_load(src)) for src in sources]
-            
-            for future in asyncio.as_completed(tasks):
+            async def load_worker(src):
+                """加载单个数据源的 Worker"""
                 try:
-                    source, df = await future
-                    if df is not None and not df.empty:
-                        await self.queue.put((source, df))
-                except Exception:
-                    logger.exception("加载单个数据源时发生未预料的异常")
-            
-        except Exception:
-            logger.exception("获取数据源列表时发生未预料的异常")
-            raise  # 重新抛出异常，让上层调用者知道发生了严重错误
+                    df_loaded = await self._load_one_source(src)
+                    return src, df_loaded, None  # (source, data, error)
+                except Exception as load_error:
+                    # 捕获单个数据源的加载错误，不影响其他数据源
+                    logger.error(f"加载数据源 {src} 失败: {load_error}", exc_info=True)
+                    return src, None, load_error
+
+            # 使用信号量控制并发数量
+            sem = asyncio.Semaphore(max_concurrent)
+
+            async def bounded_worker(src):
+                """带并发控制的 Worker"""
+                async with sem:
+                    return await load_worker(src)
+
+            # 按需创建任务（使用工作池模式）
+            tasks = []  # 使用列表存储任务
+            completed_count = 0
+            failed_count = 0
+
+            for source in sources_to_process:
+                # 创建任务
+                task = asyncio.create_task(bounded_worker(source))
+                tasks.append(task)
+
+                # 当累积任务数达到阈值时，等待部分完成
+                # 这样可以避免一次性创建过多任务
+                if len(tasks) >= max_concurrent * 3:
+                    # 等待至少一个任务完成
+                    done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+
+                    # 处理完成的任务
+                    for task in done:
+                        try:
+                            source, df, error = await task
+
+                            if error is None and df is not None and not df.empty:
+                                await queue.put((source, df))
+                                completed_count += 1
+                            elif error is not None:
+                                failed_count += 1
+                                logger.warning(f"跳过加载失败的数据源: {source}")
+                            else:
+                                logger.debug(f"数据源 {source} 返回空数据，跳过")
+
+                        except Exception as e:
+                            logger.exception(f"处理加载任务时发生未预期的异常: {e}")
+                            failed_count += 1
+
+                    # 将 pending 转换回列表继续处理
+                    tasks = list(pending)
+
+            # 等待所有剩余任务完成
+            if tasks:
+                for task in asyncio.as_completed(tasks):
+                    try:
+                        source, df, error = await task
+
+                        if error is None and df is not None and not df.empty:
+                            await queue.put((source, df))
+                            completed_count += 1
+                        elif error is not None:
+                            failed_count += 1
+                            logger.warning(f"跳过加载失败的数据源: {source}")
+                        else:
+                            logger.debug(f"数据源 {source} 返回空数据，跳过")
+
+                    except Exception as e:
+                        logger.exception(f"处理加载任务时发生未预期的异常: {e}")
+                        failed_count += 1
+
+            logger.info(f"生产者任务完成: 成功 {completed_count}, 失败 {failed_count}, 总计 {len(sources_to_process)}")
+
+        except Exception as e:
+            # 捕获 _get_sources() 或其他初始化错误
+            logger.exception(f"生产者初始化失败: {e}")
+            # 不重新抛出异常，而是优雅地结束
         finally:
-            await self.queue.put(None)  # 确保在任何情况下都能发送结束信号
+            # 确保在任何情况下都能发送结束信号
+            await queue.put(None)
 
     async def stream(self, sources: List[Any] = None) -> AsyncGenerator[Tuple[Any, pd.DataFrame], None]:
         """
@@ -137,15 +197,18 @@ class BaseLoader(abc.ABC):
         
         :param sources: (可选) 显式指定要处理的数据源列表。
         """
-        producer_task = asyncio.create_task(self._producer(sources))
+        # 创建局部队列，确保并发安全
+        queue = asyncio.Queue(maxsize=self.max_queue_size)
+        
+        producer_task = asyncio.create_task(self._producer(queue, sources))
 
         while True:
-            item = await self.queue.get()
+            item = await queue.get()
             if item is None:  # 收到结束信号
                 break
             
             yield item  # item 是 (source, DataFrame) 元组
-            self.queue.task_done()
+            queue.task_done()
 
         await producer_task # 等待生产者任务完全结束
 

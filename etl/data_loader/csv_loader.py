@@ -67,28 +67,39 @@ class CsvLoader(BaseLoader):
     async def get_source_metadata(self, source: str) -> Tuple[str, str]:
         """
         获取CSV文件的元数据用于幂等性检查。
-        
+
+        使用文件修改时间 + 文件大小作为快速哈希，避免读取整个文件。
+        这种方式性能极高（只需要一次 stat 系统调用），同时能有效检测文件变化。
+
         :param source: 文件路径
-        :return: (文件路径, SHA256哈希值)
+        :return: (文件路径, 快速哈希值)
         :raises FileNotFoundError: 如果文件不存在
         """
         # 使用文件路径作为唯一标识符
         identifier = source
-        
+
         # 检查文件是否存在
         if not os.path.exists(source):
             raise FileNotFoundError(f"数据源文件不存在: {source}")
-        
-        # 异步计算文件的SHA256哈希值
-        sha256_hash = hashlib.sha256()
+
         try:
-            async with aiofiles.open(source, "rb") as f:
-                while chunk := await f.read(4096):
-                    sha256_hash.update(chunk)
-            content_hash = sha256_hash.hexdigest()
+            # 使用 os.stat() 获取文件元数据（非常快，不读取文件内容）
+            stat_info = os.stat(source)
+
+            # 组合文件大小和修改时间作为"指纹"
+            # 这种方式比 SHA256 快 1000+ 倍，同时足够检测文件变化
+            file_size = stat_info.st_size
+            mtime_ns = stat_info.st_mtime_ns  # 纳秒级精度
+
+            # 生成快速哈希（格式：size:mtime_ns）
+            # 如果需要更强的唯一性，可以加上 inode
+            content_hash = f"{file_size}:{mtime_ns}"
+
+            logger.debug(f"文件元数据: {source} -> {content_hash}")
+
         except Exception as e:
-            logger.error(f"计算文件哈希失败: {source}, 错误: {e}")
+            logger.error(f"获取文件元数据失败: {source}, 错误: {e}")
             raise
-        
+
         return identifier, content_hash
 

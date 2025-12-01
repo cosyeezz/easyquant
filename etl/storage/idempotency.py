@@ -2,7 +2,7 @@ import logging
 from enum import Enum
 from typing import Optional
 
-from sqlalchemy import select, update, func
+from sqlalchemy import select, update, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert
 
@@ -88,42 +88,80 @@ class IdempotencyChecker:
     async def acquire_lock(self, identifier: str, content_hash: str) -> bool:
         """
         尝试获取数据源的处理锁（原子操作）。
-        
-        使用 SQLAlchemy 构建 PostgreSQL UPSERT 语句。
+
+        使用 PostgreSQL 的 SELECT ... FOR UPDATE SKIP LOCKED 实现真正的分布式锁。
+        这比 UPSERT 更安全，避免了并发竞态条件。
+
+        注意：此方法不会提交事务，需要调用者手动提交或回滚。
         """
         if not content_hash:
             logger.warning(f"[{identifier}] 内容哈希为空，无法获取锁")
             return False
 
-        # 1. 构建 INSERT 语句
-        stmt = insert(ETLMetadata).values(
-            source_identifier=identifier,
-            source_hash=content_hash,
-            status=ProcessingStatus.PROCESSING
-        )
+        try:
+            # 方案 1: 尝试获取已存在记录的排他锁
+            # 使用 FOR UPDATE SKIP LOCKED 避免等待，直接跳过已锁定的行
+            stmt = select(ETLMetadata).where(
+                ETLMetadata.source_identifier == identifier
+            ).with_for_update(skip_locked=True)
 
-        # 2. 定义冲突更新逻辑 (ON CONFLICT DO UPDATE)
-        # 如果主键冲突，且当前状态不是 PROCESSING，则更新为 PROCESSING
-        stmt = stmt.on_conflict_do_update(
-            index_elements=['source_identifier'],
-            set_={
-                'source_hash': content_hash,
-                'status': ProcessingStatus.PROCESSING
-            },
-            where=(ETLMetadata.status != ProcessingStatus.PROCESSING)
-        )
+            result = await self.session.execute(stmt)
+            record = result.scalar_one_or_none()
 
-        # 3. 执行并提交
-        result = await self.session.execute(stmt)
-        await self.session.commit()
+            if record is not None:
+                # 记录存在，检查状态
+                if record.status == ProcessingStatus.PROCESSING.value:
+                    # 已被其他 Worker 锁定
+                    logger.info(f"[{identifier}] ✗ 获取处理锁失败（已被锁定）")
+                    return False
 
-        success = result.rowcount > 0
-        if success:
-            logger.info(f"[{identifier}] ✓ 获取处理锁成功")
-        else:
-            logger.info(f"[{identifier}] ✗ 获取处理锁失败（已被锁定）")
+                # 更新状态和哈希
+                record.status = ProcessingStatus.PROCESSING.value
+                record.source_hash = content_hash
+                await self.session.flush()  # 刷新到数据库但不提交
+                logger.info(f"[{identifier}] ✓ 获取处理锁成功（已存在记录）")
+                return True
 
-        return success
+            # 方案 2: 记录不存在，插入新记录
+            # 使用 INSERT ... ON CONFLICT DO NOTHING 处理并发插入
+            stmt = insert(ETLMetadata).values(
+                source_identifier=identifier,
+                source_hash=content_hash,
+                status=ProcessingStatus.PROCESSING.value
+            )
+            stmt = stmt.on_conflict_do_nothing(index_elements=['source_identifier'])
+
+            insert_result = await self.session.execute(stmt)
+            await self.session.flush()
+
+            if insert_result.rowcount > 0:
+                # 插入成功，说明我们获得了锁
+                logger.info(f"[{identifier}] ✓ 获取处理锁成功（新记录）")
+                return True
+            else:
+                # 插入失败（被其他 Worker 抢先插入），重试获取锁
+                stmt = select(ETLMetadata).where(
+                    ETLMetadata.source_identifier == identifier
+                ).with_for_update(skip_locked=True)
+
+                result = await self.session.execute(stmt)
+                record = result.scalar_one_or_none()
+
+                if record is None or record.status == ProcessingStatus.PROCESSING.value:
+                    # 无法获取锁或已被锁定
+                    logger.info(f"[{identifier}] ✗ 获取处理锁失败（并发冲突）")
+                    return False
+
+                # 更新状态
+                record.status = ProcessingStatus.PROCESSING.value
+                record.source_hash = content_hash
+                await self.session.flush()
+                logger.info(f"[{identifier}] ✓ 获取处理锁成功（重试成功）")
+                return True
+
+        except Exception as e:
+            logger.error(f"[{identifier}] 获取锁时发生异常: {e}", exc_info=True)
+            return False
 
     async def mark_completed(self, identifier: str):
         """标记数据源处理完成。"""
@@ -142,12 +180,56 @@ class IdempotencyChecker:
         ).values(
             status=new_status,
             processed_at=func.now() if new_status in {
-                ProcessingStatus.COMPLETED, 
+                ProcessingStatus.COMPLETED,
                 ProcessingStatus.FAILED
             } else None
         )
-        
+
         await self.session.execute(stmt)
+        # 注意：不在这里 flush/commit，由调用者控制事务边界
+
+    async def reset_stale_tasks(self, timeout_minutes: int = 60) -> int:
+        """
+        重置长时间处于 PROCESSING 状态的任务为 PENDING。
+        用于处理因 Worker 崩溃而遗留的僵尸任务。
+
+        注意：PROCESSING 状态的记录在处理期间 processed_at 为 NULL，
+        只有 COMPLETED 或 FAILED 状态才会更新 processed_at。
+        因此我们应该查找创建时间（或最后更新时间）超时的 PROCESSING 记录。
+
+        :param timeout_minutes: 超时时间（分钟）
+        :return: 重置的任务数量
+        """
+        from datetime import datetime, timedelta
+
+        # 计算超时阈值时间
+        timeout_threshold = datetime.utcnow() - timedelta(minutes=timeout_minutes)
+
+        # 查询条件：
+        # 1. 状态为 PROCESSING
+        # 2. processed_at 为 NULL 或者 processed_at 早于阈值时间
+        #    (processed_at 可能在之前的 FAILED/COMPLETED 状态时被设置)
+        stmt = update(ETLMetadata).where(
+            ETLMetadata.status == ProcessingStatus.PROCESSING.value,
+            # 使用 OR: processed_at 为 NULL 或者超时
+            # 注意：SQLAlchemy 中 None 表示 NULL
+            or_(
+                ETLMetadata.processed_at.is_(None),
+                ETLMetadata.processed_at < timeout_threshold
+            )
+        ).values(
+            status=ProcessingStatus.PENDING.value,
+            processed_at=None  # 清除处理时间
+        )
+
+        result = await self.session.execute(stmt)
+        await self.session.commit()
+
+        count = result.rowcount
+        if count > 0:
+            logger.warning(f"已重置 {count} 个超时僵尸任务为 PENDING 状态")
+
+        return count
 
 
 

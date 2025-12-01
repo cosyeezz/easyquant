@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, func
+from sqlalchemy import Column, Integer, String, DateTime
 from .base import Base
 
 class ETLMetadata(Base):
@@ -8,19 +8,21 @@ class ETLMetadata(Base):
     __tablename__ = 'etl_metadata'
 
     id = Column(Integer, primary_key=True)
-    
+
     # 数据源的唯一标识符，例如文件路径
     source_identifier = Column(String, unique=True, index=True, nullable=False, comment="数据源的唯一标识符，如文件路径")
-    
-    # 数据源内容的哈希值（例如 SHA256），用于检测内容是否变化
-    source_hash = Column(String, nullable=False, comment="数据源内容的SHA256哈希值")
-    
+
+    # 数据源内容的哈希值（例如 size:mtime），用于检测内容是否变化
+    source_hash = Column(String, nullable=False, comment="数据源内容哈希（size:mtime）")
+
     # 处理状态：pending(待处理), processing(处理中), completed(已完成), failed(失败)
     status = Column(String, default='pending', index=True, nullable=False, comment="处理状态")
-    
+
     # 处理完成的时间戳
-    processed_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), comment="处理完成时间")
+    # 注意：不使用 server_default，因为只有 COMPLETED/FAILED 时才设置此字段
+    # PROCESSING 状态的记录 processed_at 应该为 NULL
+    processed_at = Column(DateTime, nullable=True, comment="处理完成时间")
 
     def __repr__(self):
-        return f"<ETLMetadata(source='{self.source_identifier}', hash='{self.source_hash[:10]}...', status='{self.status}')>"
+        return f"<ETLMetadata(source='{self.source_identifier}', hash='{self.source_hash[:10] if len(self.source_hash) > 10 else self.source_hash}...', status='{self.status}')>"
 

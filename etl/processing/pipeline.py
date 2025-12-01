@@ -23,13 +23,15 @@ class Pipeline:
         self._handlers = handlers
 
     @classmethod
-    def create(cls, handlers: List[HandlerType]) -> 'Pipeline':
+    def create(cls, handlers: List[HandlerType] = None) -> 'Pipeline':
         """
         创建一个 Pipeline 实例的工厂方法。
         
-        :param handlers: 处理器列表
+        :param handlers: 处理器列表, 默认为空列表.
         :return: Pipeline 实例
         """
+        if handlers is None:
+            handlers = []
         return cls(handlers)
 
     async def run(self, initial_data: Any) -> Any:
