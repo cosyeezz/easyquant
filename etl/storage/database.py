@@ -60,13 +60,15 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
     async with get_session() as session:
         # 使用 session 进行数据库操作
     """
-    async with AsyncSessionFactory() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
+    session = AsyncSessionFactory()
+    try:
+        yield session
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise
+    finally:
+        await session.close()
 
 
 async def bulk_insert_df(df: pd.DataFrame, table_name: str, session: AsyncSession):
