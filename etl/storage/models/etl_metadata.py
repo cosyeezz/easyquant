@@ -6,6 +6,7 @@ class ETLMetadata(Base):
     用于记录ETL处理元数据的模型，是实现幂等性的核心。
     """
     __tablename__ = 'etl_metadata'
+    __table_args__ = {'schema': 'public'}
 
     id = Column(Integer, primary_key=True)
 

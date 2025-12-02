@@ -54,6 +54,8 @@ async def main():
         action='store_true',
         help='强制重新处理所有文件，忽略幂等性检查'
     )
+    # --force 参数用于强制重新处理所有文件，即使它们之前已经成功处理过。
+    # 这在需要重新导入所有数据或修复了数据处理逻辑时非常有用。
 
     args = parser.parse_args()
 

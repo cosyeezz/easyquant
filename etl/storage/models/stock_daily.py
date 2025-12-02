@@ -65,6 +65,3 @@ class StockDaily(BaseModel, CodeDateMixin):
     avg_price = Column(Numeric(10, 2), comment="均价")
     trading_days = Column(Integer, comment="上市至今交易天数")
 
-    def __repr__(self):
-        return (f"<StockDaily(id='{self.id}', code='{self.code}', "
-                f"trade_date='{self.trade_date}', close='{self.close}')>")

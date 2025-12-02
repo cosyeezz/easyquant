@@ -1,0 +1,187 @@
+2025-12-02 22:04:59,706 - INFO - root - Logging configured.
+2025-12-02 22:04:59,707 - INFO - __main__ - 开始ETL任务: 数据目录=., 工作进程数=4, 强制运行=False
+2025-12-02 22:05:04,322 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 22:05:04,331 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 22:05:05,272 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 22:05:05,272 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 22:08:13,174 - INFO - root - Logging configured.
+2025-12-02 22:08:13,175 - INFO - __main__ - 开始ETL任务: 数据目录=., 工作进程数=4, 强制运行=False
+2025-12-02 22:08:15,070 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 22:08:15,082 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 22:08:15,811 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 22:08:15,811 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 22:19:35,485 - INFO - root - Logging configured.
+2025-12-02 22:19:58,189 - INFO - root - Logging configured.
+2025-12-02 22:19:58,190 - INFO - __main__ - 开始ETL任务: 数据目录=csv_data, 工作进程数=4, 强制运行=False
+2025-12-02 22:20:00,015 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 22:20:00,022 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 22:20:01,112 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 22:20:01,113 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 22:23:23,468 - INFO - root - Logging configured.
+2025-12-02 22:23:23,468 - INFO - __main__ - 开始ETL任务: 数据目录=csv_data, 工作进程数=4, 强制运行=False
+2025-12-02 22:23:25,339 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 22:23:25,345 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 22:23:26,521 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 22:23:26,522 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 22:54:11,956 - INFO - root - Logging configured.
+2025-12-02 22:54:22,704 - INFO - root - Logging configured.
+2025-12-02 22:54:22,705 - INFO - __main__ - 开始ETL任务: 数据目录=csv_data, 工作进程数=4, 强制运行=False
+2025-12-02 22:54:24,764 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 22:54:24,774 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 22:54:25,704 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 22:54:25,704 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 22:56:41,727 - INFO - root - Logging configured.
+2025-12-02 22:56:41,728 - INFO - __main__ - 开始ETL任务: 数据目录=csv_data, 工作进程数=4, 强制运行=False
+2025-12-02 22:56:43,482 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 22:56:43,576 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 22:56:44,724 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 22:56:44,725 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 22:57:36,244 - INFO - root - Logging configured.
+2025-12-02 22:57:36,245 - INFO - __main__ - 开始ETL任务: 数据目录=csv_data, 工作进程数=4, 强制运行=False
+2025-12-02 22:57:38,043 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 22:57:38,140 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 22:57:39,278 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 22:57:39,278 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 22:57:59,555 - INFO - root - Logging configured.
+2025-12-02 22:57:59,555 - INFO - __main__ - 开始ETL任务: 数据目录=csv_data, 工作进程数=4, 强制运行=False
+2025-12-02 22:58:01,469 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 22:58:01,570 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 22:58:02,449 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 22:58:02,449 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:00:01,852 - INFO - root - Logging configured.
+2025-12-02 23:00:01,852 - INFO - __main__ - 开始ETL任务: 数据目录=csv_data, 工作进程数=4, 强制运行=False
+2025-12-02 23:00:03,654 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 23:00:03,762 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:00:04,935 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 23:00:04,935 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:00:47,653 - INFO - root - Logging configured.
+2025-12-02 23:00:47,654 - INFO - __main__ - 开始ETL任务: 数据目录=csv_data, 工作进程数=4, 强制运行=False
+2025-12-02 23:00:49,520 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 23:00:49,613 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:00:50,652 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 23:00:50,652 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:03:12,415 - INFO - root - Logging configured.
+2025-12-02 23:03:12,416 - INFO - __main__ - 开始ETL任务: 数据目录=csv_data, 工作进程数=4, 强制运行=False
+2025-12-02 23:03:14,156 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 23:03:14,254 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:03:15,252 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 23:03:15,252 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:05:05,972 - INFO - root - Logging configured.
+2025-12-02 23:05:05,972 - INFO - __main__ - 开始ETL任务: 数据目录=csv_data, 工作进程数=4, 强制运行=False
+2025-12-02 23:05:07,818 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 23:05:07,911 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:05:08,905 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 23:05:08,906 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:09:14,419 - INFO - root - Logging configured.
+2025-12-02 23:09:14,419 - INFO - __main__ - 开始ETL任务: 数据目录=csv_data, 工作进程数=4, 强制运行=False
+2025-12-02 23:09:16,285 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 23:09:16,383 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:09:17,315 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 23:09:17,315 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:10:36,734 - INFO - root - Logging configured.
+2025-12-02 23:10:36,735 - INFO - __main__ - 开始ETL任务: 数据目录=csv_data, 工作进程数=4, 强制运行=False
+2025-12-02 23:10:38,601 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 23:10:38,736 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:10:39,736 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 23:10:39,736 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:13:04,291 - INFO - root - Logging configured.
+2025-12-02 23:13:04,291 - INFO - __main__ - 开始ETL任务: 数据目录=csv_data, 工作进程数=4, 强制运行=False
+2025-12-02 23:13:06,176 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 23:13:06,276 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:13:07,292 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 23:13:07,292 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:24:18,474 - INFO - root - Logging configured.
+2025-12-02 23:24:18,475 - INFO - __main__ - 开始ETL任务: 数据目录=csv_data, 工作进程数=4, 强制运行=False
+2025-12-02 23:24:20,347 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 23:24:20,442 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:24:21,500 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 23:24:21,500 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:30:45,035 - INFO - root - Logging configured.
+2025-12-02 23:30:45,036 - INFO - __main__ - 开始ETL任务: 数据目录=csv_data, 工作进程数=4, 强制运行=False
+2025-12-02 23:30:46,902 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 23:30:46,997 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:30:48,041 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 23:30:48,041 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:34:52,649 - INFO - root - Logging configured.
+2025-12-02 23:34:52,650 - INFO - __main__ - 开始ETL任务: 数据目录=csv_data, 工作进程数=4, 强制运行=False
+2025-12-02 23:34:54,350 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 23:34:54,472 - INFO - etl.scheduler - 已注册 1 个新数据源为 PENDING 状态
+2025-12-02 23:34:54,472 - INFO - etl.scheduler - 幂等性检查完成: 总计 1 个数据源，需要处理 1 个 (最大并发: 500)
+2025-12-02 23:34:54,472 - INFO - etl.scheduler - 发现 1 个数据源，开始分发任务...
+2025-12-02 23:34:54,501 - INFO - etl.scheduler - 动态批次策略: 总任务 1, Worker数 4. 计算批次大小 1 (目标总批次 16). 实际生成 1 个批次。
+2025-12-02 23:34:55,189 - INFO - etl.scheduler - 所有ETL任务已在所有 Ray 进程中完成。
+2025-12-02 23:34:55,189 - INFO - etl.scheduler - 开始清理 Ray Actor 的数据库连接...
+2025-12-02 23:34:55,195 - INFO - etl.scheduler - Ray Actor 数据库连接已清理
+2025-12-02 23:34:55,200 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:34:56,314 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 23:34:56,314 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:34:56,314 - INFO - __main__ - ✅ ETL任务完成。
+2025-12-02 23:35:30,572 - INFO - root - Logging configured.
+2025-12-02 23:35:30,572 - INFO - __main__ - 开始ETL任务: 数据目录=csv_data, 工作进程数=4, 强制运行=False
+2025-12-02 23:35:32,433 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 23:35:32,745 - INFO - etl.scheduler - 幂等性检查完成: 总计 1 个数据源，需要处理 1 个 (最大并发: 500)
+2025-12-02 23:35:32,745 - INFO - etl.scheduler - 发现 1 个数据源，开始分发任务...
+2025-12-02 23:35:32,778 - INFO - etl.scheduler - 动态批次策略: 总任务 1, Worker数 4. 计算批次大小 1 (目标总批次 16). 实际生成 1 个批次。
+2025-12-02 23:35:33,495 - INFO - etl.scheduler - 所有ETL任务已在所有 Ray 进程中完成。
+2025-12-02 23:35:33,496 - INFO - etl.scheduler - 开始清理 Ray Actor 的数据库连接...
+2025-12-02 23:35:33,502 - INFO - etl.scheduler - Ray Actor 数据库连接已清理
+2025-12-02 23:35:33,507 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:35:34,608 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 23:35:34,609 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:35:34,609 - INFO - __main__ - ✅ ETL任务完成。
+2025-12-02 23:39:46,754 - INFO - root - Logging configured.
+2025-12-02 23:39:46,755 - INFO - __main__ - 开始ETL任务: 数据目录=csv_data, 工作进程数=4, 强制运行=True
+2025-12-02 23:39:48,609 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 23:39:48,696 - WARNING - etl.scheduler - `force_run` 已启用，将跳过幂等性检查，处理所有数据项。
+2025-12-02 23:39:48,697 - INFO - etl.scheduler - 发现 1 个数据源，开始分发任务...
+2025-12-02 23:39:48,723 - INFO - etl.scheduler - 动态批次策略: 总任务 1, Worker数 4. 计算批次大小 1 (目标总批次 16). 实际生成 1 个批次。
+2025-12-02 23:39:49,373 - INFO - etl.scheduler - 所有ETL任务已在所有 Ray 进程中完成。
+2025-12-02 23:39:49,373 - INFO - etl.scheduler - 开始清理 Ray Actor 的数据库连接...
+2025-12-02 23:39:49,379 - INFO - etl.scheduler - Ray Actor 数据库连接已清理
+2025-12-02 23:39:49,384 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:39:50,361 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 23:39:50,361 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:39:50,361 - INFO - __main__ - ✅ ETL任务完成。
+2025-12-02 23:40:58,388 - INFO - root - Logging configured.
+2025-12-02 23:40:58,388 - INFO - __main__ - 开始ETL任务: 数据目录=csv_data, 工作进程数=4, 强制运行=True
+2025-12-02 23:41:00,245 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 23:41:00,340 - WARNING - etl.scheduler - `force_run` 已启用，将跳过幂等性检查，处理所有数据项。
+2025-12-02 23:41:00,341 - INFO - etl.scheduler - 发现 1 个数据源，开始分发任务...
+2025-12-02 23:41:00,368 - INFO - etl.scheduler - 动态批次策略: 总任务 1, Worker数 4. 计算批次大小 1 (目标总批次 16). 实际生成 1 个批次。
+2025-12-02 23:41:01,108 - INFO - etl.scheduler - 所有ETL任务已在所有 Ray 进程中完成。
+2025-12-02 23:41:01,109 - INFO - etl.scheduler - 开始清理 Ray Actor 的数据库连接...
+2025-12-02 23:41:01,114 - INFO - etl.scheduler - Ray Actor 数据库连接已清理
+2025-12-02 23:41:01,120 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:41:02,004 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 23:41:02,004 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:41:02,004 - INFO - __main__ - ✅ ETL任务完成。
+2025-12-02 23:42:10,080 - INFO - root - Logging configured.
+2025-12-02 23:42:10,081 - INFO - __main__ - 开始ETL任务: 数据目录=csv_data, 工作进程数=4, 强制运行=True
+2025-12-02 23:42:11,942 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 23:42:12,036 - WARNING - etl.scheduler - `force_run` 已启用，将跳过幂等性检查，处理所有数据项。
+2025-12-02 23:42:12,036 - INFO - etl.scheduler - 发现 1 个数据源，开始分发任务...
+2025-12-02 23:42:12,063 - INFO - etl.scheduler - 动态批次策略: 总任务 1, Worker数 4. 计算批次大小 1 (目标总批次 16). 实际生成 1 个批次。
+2025-12-02 23:42:12,063 - INFO - etl.scheduler - 分发批次 1/1 (大小: 1) 到 Worker 0...
+2025-12-02 23:42:12,063 - INFO - etl.scheduler - 等待剩余的 1 个任务完成...
+2025-12-02 23:42:12,742 - INFO - etl.scheduler - 所有ETL任务已在所有 Ray 进程中完成。
+2025-12-02 23:42:12,742 - INFO - etl.scheduler - 开始清理 Ray Actor 的数据库连接...
+2025-12-02 23:42:12,748 - INFO - etl.scheduler - Ray Actor 数据库连接已清理
+2025-12-02 23:42:12,753 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:42:13,750 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 23:42:13,751 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:42:13,751 - INFO - __main__ - ✅ ETL任务完成。
+2025-12-02 23:43:18,030 - INFO - root - Logging configured.
+2025-12-02 23:43:18,030 - INFO - __main__ - 开始ETL任务: 数据目录=csv_data, 工作进程数=4, 强制运行=True
+2025-12-02 23:43:19,873 - INFO - etl.scheduler - 调度器启动，正在获取数据源列表...
+2025-12-02 23:43:19,969 - WARNING - etl.scheduler - `force_run` 已启用，将跳过幂等性检查，处理所有数据项。
+2025-12-02 23:43:19,969 - INFO - etl.scheduler - 发现 1 个数据源，开始分发任务...
+2025-12-02 23:43:19,995 - INFO - etl.scheduler - 动态批次策略: 总任务 1, Worker数 4. 计算批次大小 1 (目标总批次 16). 实际生成 1 个批次。
+2025-12-02 23:43:19,995 - INFO - etl.scheduler - 分发批次 1/1 (大小: 1) 到 Worker 0...
+2025-12-02 23:43:19,995 - INFO - etl.scheduler - 等待剩余的 1 个任务完成...
+2025-12-02 23:43:20,828 - INFO - etl.scheduler - 所有ETL任务已在所有 Ray 进程中完成。
+2025-12-02 23:43:20,828 - INFO - etl.scheduler - 开始清理 Ray Actor 的数据库连接...
+2025-12-02 23:43:20,834 - INFO - etl.scheduler - Ray Actor 数据库连接已清理
+2025-12-02 23:43:20,839 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:43:21,678 - INFO - etl.scheduler - Ray 集群已关闭
+2025-12-02 23:43:21,679 - INFO - etl.scheduler - Scheduler 数据库引擎已清理
+2025-12-02 23:43:21,679 - INFO - __main__ - ✅ ETL任务完成。

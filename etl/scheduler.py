@@ -48,7 +48,10 @@ class Scheduler:
         self.engine = None  # 初始化为 None，防止 __init__ 失败时 dispose() 出错
         self.AsyncSessionFactory = None
 
-        self.engine = create_async_engine(DATABASE_URL)
+        self.engine = create_async_engine(
+            DATABASE_URL,
+            execution_options={"schema_translate_map": {None: "public"}},
+        )
         self.AsyncSessionFactory = async_sessionmaker(self.engine, expire_on_commit=False)
     
     async def dispose(self):
@@ -212,7 +215,7 @@ class Scheduler:
 
             # 1.1 重置僵尸任务 (防止上次运行崩溃导致任务卡死)
             async with self.AsyncSessionFactory() as session:
-                checker = IdempotencyChecker(session)
+                checker = IdempotencyChecker(session, force=self.force_run)
                 await checker.reset_stale_tasks()
 
             # 1.2 过滤掉已经处理过的数据源 (幂等性检查)
@@ -254,11 +257,13 @@ class Scheduler:
                         f"实际生成 {len(batches)} 个批次。")
 
             # 3. 遍历批次并分发
-            for batch in batches:
+            for i, batch in enumerate(batches):
                 # 简单的轮询调度
-                actor = actors[actor_index % self.max_workers]
-                actor_index += 1
+                actor_index = i % self.max_workers
+                actor = actors[actor_index]
 
+                logger.info(f"分发批次 {i+1}/{len(batches)} (大小: {len(batch)}) 到 Worker {actor_index}...")
+                
                 # 提交任务 (传递的是 batch 列表)
                 future = actor.process_item.remote(batch)
                 pending_tasks.append(future)
@@ -266,6 +271,7 @@ class Scheduler:
                 # 背压控制 (Backpressure):
                 # 如果积压的任务超过了 max_workers 的 2 倍，就等待一部分任务完成
                 if len(pending_tasks) >= self.max_workers * 2:
+                    logger.debug(f"任务积压达到 {len(pending_tasks)}，等待一个任务完成...")
                     ready_refs, pending_tasks = ray.wait(pending_tasks, num_returns=1)
                     # 检查已完成任务的结果，确保异常被捕获
                     try:
@@ -275,6 +281,7 @@ class Scheduler:
 
             # 等待所有剩余任务完成
             if pending_tasks:
+                logger.info(f"等待剩余的 {len(pending_tasks)} 个任务完成...")
                 try:
                     ray.get(pending_tasks)
                 except Exception as e:

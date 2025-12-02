@@ -1,7 +1,7 @@
 # easyquant/logging_config.py
 import logging
 import sys
-from .config import LOG_LEVEL, LOG_FORMAT, LOG_FILE
+from config import LOG_LEVEL, LOG_FORMAT, LOG_FILE
 
 def setup_logging():
     """

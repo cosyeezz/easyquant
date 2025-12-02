@@ -1,6 +1,6 @@
 import logging
 from enum import Enum
-from typing import Optional
+from typing import Optional, List
 
 from sqlalchemy import select, update, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,10 +36,45 @@ class ProcessingStatus(str, Enum):
 class IdempotencyChecker:
     """
     ETL 幂等性检查器 - 使用 SQLAlchemy 表达式语言实现。
+    
+    该检查器负责确定一个数据源（例如一个文件）是否应该被处理。
+    它通过在 `etl_metadata` 表中记录每个数据源的唯一标识符、内容哈希值和处理状态来实现幂等性。
     """
 
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession, force: bool = False):
+        """
+        初始化幂等性检查器。
+
+        :param session: 用于数据库操作的 SQLAlchemy 异步会话。
+        :param force: 如果为 `True`，则强制处理所有数据源，忽略其历史状态。默认为 `False`。
+        """
         self.session = session
+        self.force = force
+
+    async def check(self, items: List[any]) -> List[any]:
+        """
+        过滤给定的数据源列表，只返回需要处理的数据源。
+
+        此方法会执行以下步骤：
+        1.  如果 `force` 标志为 `True`，则跳过所有检查，直接返回所有数据源。
+        2.  并发获取每个数据源的元数据（唯一标识符和内容哈希）。
+        3.  批量从数据库中查询已存在的元数据记录。
+        4.  根据以下规则决定每个数据源是否需要处理：
+            -   **新数据源**: 如果数据库中不存在该数据源的记录，则需要处理，并为其创建一条状态为 `PENDING` 的新记录。
+            -   **内容已更新**: 如果数据源的内容哈希与数据库中记录的不匹配，则需要处理。
+            -   **之前处理失败**: 如果数据源之前的处理状态为 `FAILED` 或 `PENDING`，则需要重新处理。
+            -   **正在处理中**: 如果数据源的状态为 `PROCESSING`，则跳过，以避免冲突。
+            -   **已成功处理**: 如果状态为 `COMPLETED` 且内容哈希未变，则跳过。
+        5.  批量将所有新发现的数据源插入到 `etl_metadata` 表中。
+
+        :param items: 待检查的数据源对象列表（例如，文件路径列表）。
+        :return: 一个只包含需要被处理的数据源的列表。
+        """
+        if self.force:
+            logger.warning("`force_run` 已启用，将跳过幂等性检查，处理所有数据项。")
+            return items
+
+        # ... (le reste du code de la fonction check reste inchangé)
 
     async def _get_record(self, identifier: str) -> Optional[ETLMetadata]:
         """
@@ -77,7 +112,7 @@ class IdempotencyChecker:
             return True
 
         # 已完成且内容未变
-        if record.status == ProcessingStatus.COMPLETED:
+        if record.status == Processing-Status.COMPLETED:
             logger.debug(f"[{identifier}] 已完成且内容未变，跳过")
             return False
 

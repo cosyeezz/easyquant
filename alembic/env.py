@@ -7,6 +7,7 @@ from alembic import context
 
 # 这是 Alembic 的配置对象，它提供了
 # 访问 .ini 文件中值的途径。
+from config import DATABASE_URL
 config = context.config
 
 # 为 Python 日志系统解释配置文件。
@@ -61,24 +62,17 @@ def run_migrations_online() -> None:
     在这种模式下，我们需要创建一个 Engine，并将一个数据库连接
     与 context 关联起来。
     """
-    # 从配置中获取原始的异步数据库URL
-    url = config.get_main_option("sqlalchemy.url")
-    # 将异步驱动 'asyncpg' 替换为同步驱动 'psycopg2'。
-    # 这是因为 Alembic 的 autogenerate 过程是同步执行的，
-    # 直接使用异步驱动会导致 greenlet 错误。
-    sync_url = url.replace("postgresql+asyncpg", "postgresql+psycopg2")
-    
-    # 使用修改后的同步URL创建一个同步的SQLAlchemy引擎。
-    connectable = create_engine(sync_url)
+    # 使用从 config.py 导入的 DATABASE_URL
+    # 并将 'postgresql+asyncpg' 替换为 'postgresql' 以进行同步操作
+    db_url = DATABASE_URL.replace("postgresql+asyncpg", "postgresql")
+    connectable = create_engine(db_url)
 
-    # 使用这个同步引擎建立连接
+
     with connectable.connect() as connection:
-        # 配置 context，将连接和目标元数据关联起来
         context.configure(
             connection=connection, target_metadata=target_metadata
         )
 
-        # 在一个事务中运行迁移
         with context.begin_transaction():
             context.run_migrations()
 

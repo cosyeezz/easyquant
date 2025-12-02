@@ -44,7 +44,7 @@ async def test_stream_from_folder(sample_csv_folder):
     loader = CsvLoader(path=sample_csv_folder, file_pattern="*.csv")
     
     results = []
-    async for df in loader.stream():
+    async for file_path, df in loader.stream():
         assert isinstance(df, pd.DataFrame)
         assert not df.empty
         results.append(df)
