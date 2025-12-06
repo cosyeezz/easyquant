@@ -2,9 +2,10 @@
 
 import abc
 import asyncio
+import functools
 import logging
 import pandas as pd
-from typing import AsyncGenerator, List, Any, Tuple
+from typing import AsyncGenerator, List, Any, Tuple, Optional
 
 # 获取一个模块级别的 logger
 logger = logging.getLogger(__name__)
@@ -21,13 +22,15 @@ class BaseLoader(abc.ABC):
     框架会自动处理并行调度、背压(backpressure)和内存管理。
     """
 
-    def __init__(self, max_queue_size: int = 100):
+    def __init__(self, max_queue_size: int = 100, max_concurrent_workers: int = None):
         """
         初始化基类加载器。
         :param max_queue_size: 内部处理队列的最大尺寸，用于内存管理和背压。
                                该队列用于存储已加载但尚未被消费的数据块。
+        :param max_concurrent_workers: 最大并发加载任务数。默认为 max_queue_size * 2。
         """
         self.max_queue_size = max_queue_size
+        self.max_concurrent_workers = max_concurrent_workers or (max_queue_size * 2)
         # self._queue 已移除，改为在 stream 中创建局部 queue 以支持并发调用
 
     @abc.abstractmethod
@@ -54,12 +57,14 @@ class BaseLoader(abc.ABC):
         """
         raise NotImplementedError("子类必须实现 '_load_one_source' 方法")
 
-    async def run_sync(self, func, *args):
+    async def run_sync(self, func, *args, **kwargs):
         """
         便捷方法: 在线程池中安全地运行一个同步阻塞函数。
         """
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, func, *args)
+        # 使用 partial 包装函数以支持参数传递
+        wrapped_func = functools.partial(func, *args, **kwargs)
+        return await loop.run_in_executor(None, wrapped_func)
 
 
     async def get_sources(self) -> List[Any]:
@@ -68,6 +73,30 @@ class BaseLoader(abc.ABC):
         公开方法，代理调用内部的 `_get_sources`。
         """
         return await self._get_sources()
+
+    async def _process_completed_task(self, task) -> Tuple[Any, Optional[pd.DataFrame], bool]:
+        """
+        处理单个完成的任务。
+
+        :param task: 已完成的异步任务
+        :return: (source, DataFrame, success) 元组。success 为 True 表示成功，False 表示失败或无数据。
+                 DataFrame 在失败时为 None。
+        """
+        try:
+            source, df, error = await task
+
+            if error is None and df is not None and not df.empty:
+                return source, df, True
+            elif error is not None:
+                logger.warning(f"跳过加载失败的数据源: {source}")
+                return source, None, False
+            else:
+                logger.debug(f"数据源 {source} 返回空数据，跳过")
+                return source, None, False
+
+        except Exception as e:
+            logger.exception(f"处理加载任务时发生未预期的异常: {e}")
+            return None, None, False
 
     async def _producer(self, queue: asyncio.Queue):
         """
@@ -87,8 +116,8 @@ class BaseLoader(abc.ABC):
                 return
 
             # 工作池模式：限制并发数量
-            # 使用 queue.maxsize * 2 作为并发数，平衡吞吐量和资源占用
-            max_concurrent = queue.maxsize * 2
+            # 使用配置的并发数，平衡吞吐量和资源占用
+            max_concurrent = self.max_concurrent_workers
             logger.debug(f"启动生产者，最大并发数: {max_concurrent}, 总数据源: {len(sources_to_process)}")
 
             async def load_worker(src):
@@ -127,20 +156,11 @@ class BaseLoader(abc.ABC):
 
                     # 处理完成的任务
                     for task in done:
-                        try:
-                            source, df, error = await task
-
-                            if error is None and df is not None and not df.empty:
-                                await queue.put((source, df))
-                                completed_count += 1
-                            elif error is not None:
-                                failed_count += 1
-                                logger.warning(f"跳过加载失败的数据源: {source}")
-                            else:
-                                logger.debug(f"数据源 {source} 返回空数据，跳过")
-
-                        except Exception as e:
-                            logger.exception(f"处理加载任务时发生未预期的异常: {e}")
+                        source, df, success = await self._process_completed_task(task)
+                        if success and df is not None:
+                            await queue.put((source, df))
+                            completed_count += 1
+                        else:
                             failed_count += 1
 
                     # 将 pending 转换回列表继续处理
@@ -149,20 +169,11 @@ class BaseLoader(abc.ABC):
             # 等待所有剩余任务完成
             if tasks:
                 for task in asyncio.as_completed(tasks):
-                    try:
-                        source, df, error = await task
-
-                        if error is None and df is not None and not df.empty:
-                            await queue.put((source, df))
-                            completed_count += 1
-                        elif error is not None:
-                            failed_count += 1
-                            logger.warning(f"跳过加载失败的数据源: {source}")
-                        else:
-                            logger.debug(f"数据源 {source} 返回空数据，跳过")
-
-                    except Exception as e:
-                        logger.exception(f"处理加载任务时发生未预期的异常: {e}")
+                    source, df, success = await self._process_completed_task(task)
+                    if success and df is not None:
+                        await queue.put((source, df))
+                        completed_count += 1
+                    else:
                         failed_count += 1
 
             logger.info(f"生产者任务完成: 成功 {completed_count}, 失败 {failed_count}, 总计 {len(sources_to_process)}")
@@ -182,15 +193,24 @@ class BaseLoader(abc.ABC):
         """
         # 创建局部队列，确保并发安全
         queue = asyncio.Queue(maxsize=self.max_queue_size)
-        
+
         producer_task = asyncio.create_task(self._producer(queue))
 
-        while True:
-            item = await queue.get()
-            if item is None:  # 收到结束信号
-                break
-            
-            yield item  # item 是 (source, DataFrame) 元组
-            queue.task_done()
+        try:
+            while True:
+                item = await queue.get()
+                if item is None:  # 收到结束信号
+                    break
 
-        await producer_task # 等待生产者任务完全结束
+                yield item  # item 是 (source, DataFrame) 元组
+                queue.task_done()
+        finally:
+            # 确保生产者任务被正确清理
+            if not producer_task.done():
+                producer_task.cancel()
+                try:
+                    await producer_task
+                except asyncio.CancelledError:
+                    pass
+            elif not producer_task.cancelled():
+                await producer_task

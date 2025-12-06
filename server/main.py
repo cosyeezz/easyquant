@@ -1,163 +1,213 @@
+"""
+EasyQuant FastAPI 事件服务
+
+提供事件上报和查询接口，用于监控所有工作进程的状态。
+"""
 import asyncio
 import multiprocessing
 import time
 import random
-import os
-from typing import List
+from typing import List, Optional
+from datetime import datetime
 
 import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from starlette.websockets import WebSocketState
+from fastapi import FastAPI, Depends, Query, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+from sqlalchemy import select, desc
+from sqlalchemy.ext.asyncio import AsyncSession
 
-# 导入我们之前创建的监控基类
-from common.monitor import BaseMonitor
+# 导入数据库和模型
+from storage.database import get_session
+from storage.models.event import Event
 
-# 1. ------------------- WebSocket 连接管理器 -------------------
-class ConnectionManager:
-    """管理所有活跃的WebSocket连接"""
-    def __init__(self):
-        self.active_connections: List[WebSocket] = []
+# ================= Pydantic 模型 =================
 
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
+class EventCreate(BaseModel):
+    """接收事件数据的请求模型"""
+    process_name: str = Field(..., description="进程名称，如 'ETL_Pipeline_1'")
+    event_name: str = Field(..., description="事件名称，如 'loader.task.started'")
+    payload: Optional[dict] = Field(None, description="事件详细信息（JSON格式）")
 
-    def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
-
-    async def broadcast(self, message: str):
-        # 遍历所有连接并发送消息
-        # 为了防止在迭代过程中列表被修改，我们创建一个副本
-        for connection in self.active_connections[:]:
-            if connection.client_state == WebSocketState.CONNECTED:
-                try:
-                    await connection.send_text(message)
-                except Exception:
-                    # 如果发送失败（例如连接已断开），则移除该连接
-                    self.disconnect(connection)
-
-# 2. ------------------- 模拟的工作进程 -------------------
-class DataProcessor(BaseMonitor):
-    """一个模拟的数据处理进程"""
-    def run(self):
-        self.set_status('Running')
-        self.update_metric('processed_files', 0)
-        self.update_metric('total_files', 1000)
-        
-        for i in range(1, 1001):
-            time.sleep(random.uniform(0.01, 0.05))
-            self.increment_metric('processed_files')
-            if i % 100 == 0:
-                # 每处理100个文件更新一次状态
-                self.set_status(f'Processing batch {i // 100}/10')
-        
-        self.set_status('Finished')
-
-class TradingBot(BaseMonitor):
-    """一个模拟的交易机器人进程"""
-    def run(self):
-        self.set_status('Connecting')
-        time.sleep(2)
-        self.set_status('Running')
-        self.update_metric('pnl', 0.0)
-        self.update_metric('trades', 0)
-
-        for _ in range(300): # 模拟运行5分钟
-            time.sleep(1)
-            # 模拟盈亏变化
-            current_pnl = self._status['metrics'].get('pnl', 0.0)
-            pnl_change = random.uniform(-10.5, 15.5)
-            self.update_metric('pnl', round(current_pnl + pnl_change, 2))
-            
-            # 模拟交易
-            if random.random() < 0.1:
-                self.increment_metric('trades')
-        
-        self.set_status('Stopped')
-
-
-# 3. ------------------- FastAPI 应用设置 -------------------
-app = FastAPI()
-manager = ConnectionManager()
-
-# 这是关键：将多进程共享的字典定义在FastAPI应用可以访问的作用域
-# 注意：实际使用时，此字典由主进程创建并传入
-shared_status_dict = None 
-
-@app.websocket("/ws/status")
-async def websocket_endpoint(websocket: WebSocket):
-    """通过WebSocket实时推送所有进程的状态"""
-    await manager.connect(websocket)
-    try:
-        while True:
-            # 保持连接开放，等待断开
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
-
-async def status_broadcaster(status_dict: dict):
-    """后台任务：定期从共享字典读取状态并广播"""
-    while True:
-        # 将Manager.dict转换为普通dict以便序列化
-        statuses = dict(status_dict)
-        # FastAPI的jsonable_encoder可以很好地处理时间等类型
-        from fastapi.encoders import jsonable_encoder
-        json_message = jsonable_encoder(statuses)
-        
-        await manager.broadcast(str(json_message))
-        await asyncio.sleep(1) # 每秒广播一次
-
-# 4. ------------------- 主程序入口 -------------------
-if __name__ == "__main__":
-    # 在主程序块中设置好多进程环境
-    multiprocessing.freeze_support() # 对Windows打包成exe时有用
-
-    # 创建一个进程管理器和共享的状态字典
-    with multiprocessing.Manager() as process_manager:
-        shared_status_dict = process_manager.dict()
-        
-        # 定义要启动的工作进程
-        worker_definitions = {
-            "ETL_Process_1": (DataProcessor, {}),
-            "Trading_Bot_NYSE": (TradingBot, {}),
-            "Trading_Bot_NASDAQ": (TradingBot, {}),
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "process_name": "ETL_Pipeline_1",
+                "event_name": "loader.queue.status",
+                "payload": {
+                    "queue_size": 42,
+                    "current_file": "stock_data_2024.csv",
+                    "processed": 1000,
+                    "total": 5000
+                }
+            }
         }
-        
+
+
+class EventResponse(BaseModel):
+    """返回事件数据的响应模型"""
+    id: int
+    process_name: str
+    event_name: str
+    payload: Optional[dict]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ================= FastAPI 应用 =================
+
+app = FastAPI(
+    title="EasyQuant 事件服务",
+    description="量化交易系统的事件上报和监控API",
+    version="1.0.0"
+)
+
+# 配置 CORS，允许前端跨域访问
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 生产环境应该设置为具体的前端域名
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# ================= API 端点 =================
+
+@app.get("/")
+async def root():
+    """健康检查端点"""
+    return {
+        "service": "EasyQuant 事件服务",
+        "status": "running",
+        "timestamp": datetime.now().isoformat()
+    }
+
+
+@app.post("/api/v1/events", response_model=EventResponse, status_code=201)
+async def create_event(
+    event: EventCreate,
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    接收并存储来自工作进程的事件
+
+    - **process_name**: 进程名称
+    - **event_name**: 事件类型
+    - **payload**: 事件详细信息（可选）
+    """
+    try:
+        # 创建事件对象
+        db_event = Event(
+            process_name=event.process_name,
+            event_name=event.event_name,
+            payload=event.payload
+        )
+
+        # 添加到会话并提交
+        session.add(db_event)
+        await session.commit()
+        await session.refresh(db_event)
+
+        return db_event
+
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"创建事件失败: {str(e)}")
+
+
+@app.get("/api/v1/events", response_model=List[EventResponse])
+async def get_events(
+    process_name: Optional[str] = Query(None, description="按进程名筛选"),
+    event_name: Optional[str] = Query(None, description="按事件名筛选"),
+    limit: int = Query(100, ge=1, le=1000, description="返回的最大事件数"),
+    offset: int = Query(0, ge=0, description="跳过的事件数"),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    查询事件数据
+
+    - **process_name**: 可选，筛选特定进程的事件
+    - **event_name**: 可选，筛选特定类型的事件
+    - **limit**: 返回的最大事件数（默认100）
+    - **offset**: 分页偏移量（默认0）
+    """
+    try:
+        # 构建查询
+        query = select(Event)
+
+        # 添加筛选条件
+        if process_name:
+            query = query.where(Event.process_name == process_name)
+        if event_name:
+            query = query.where(Event.event_name == event_name)
+
+        # 按创建时间倒序排列
+        query = query.order_by(desc(Event.created_at))
+
+        # 分页
+        query = query.offset(offset).limit(limit)
+
+        # 执行查询
+        result = await session.execute(query)
+        events = result.scalars().all()
+
+        return events
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"查询事件失败: {str(e)}")
+
+
+@app.get("/api/v1/processes")
+async def get_processes(session: AsyncSession = Depends(get_session)):
+    """
+    获取所有活跃进程的列表和最新状态
+    """
+    try:
+        # 查询所有不同的进程名
+        from sqlalchemy import distinct, func
+
+        query = select(distinct(Event.process_name))
+        result = await session.execute(query)
+        process_names = result.scalars().all()
+
+        # 为每个进程获取最新事件
         processes = []
-        for name, (worker_class, kwargs) in worker_definitions.items():
-            instance = worker_class(name=name, shared_status_dict=shared_status_dict, **kwargs)
-            p = multiprocessing.Process(target=instance.run, daemon=True)
-            processes.append(p)
+        for name in process_names:
+            latest_query = (
+                select(Event)
+                .where(Event.process_name == name)
+                .order_by(desc(Event.created_at))
+                .limit(1)
+            )
+            result = await session.execute(latest_query)
+            latest_event = result.scalar_one_or_none()
 
-        try:
-            # 启动所有后台工作进程
-            for p in processes:
-                p.start()
+            if latest_event:
+                processes.append({
+                    "name": name,
+                    "latest_event": EventResponse.model_validate(latest_event),
+                    "last_seen": latest_event.created_at
+                })
 
-            # 设置FastAPI应用可以访问共享字典
-            # 这是个变通方法，因为FastAPI在uvicorn中运行，不能直接传递参数
-            # 我们通过模块级变量来共享
-            __main__.shared_status_dict = shared_status_dict
+        return processes
 
-            # 创建并启动后台广播任务
-            loop = asyncio.get_event_loop()
-            broadcast_task = loop.create_task(status_broadcaster(shared_status_dict))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"查询进程列表失败: {str(e)}")
 
-            # 启动FastAPI服务器
-            print("--- 监控服务器已启动 ---")
-            print("访问 http://127.0.0.1:8000/ 来连接前端页面")
-            print("WebSocket 端点位于 ws://127.0.0.1:8000/ws/status")
-            
-            uvicorn.run(app, host="0.0.0.0", port=8000)
 
-        finally:
-            print("\n--- 服务器正在关闭，终止所有工作进程 ---")
-            for p in processes:
-                if p.is_alive():
-                    p.terminate()
-                    p.join()
-            print("--- 所有进程已清理 ---")
+# ================= 主程序入口 =================
 
-# 在文件顶部将 __main__ 模块导入，以便在函数中访问其变量
-import __main__
+if __name__ == "__main__":
+    print("=" * 60)
+    print("EasyQuant 事件服务")
+    print("=" * 60)
+    print(f"API 文档: http://127.0.0.1:8000/docs")
+    print(f"事件上报: POST http://127.0.0.1:8000/api/v1/events")
+    print(f"事件查询: GET  http://127.0.0.1:8000/api/v1/events")
+    print("=" * 60)
+
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
