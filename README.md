@@ -50,7 +50,7 @@ easyquant/
 │   └── (React 前端应用)
 ├── server/
 │   ├── common/            # 后端内部通用模块
-│   │   └── monitor.py     # 监控基类 BaseMonitor
+│   │   └── event_service.py # 核心事件记录服务
 │   ├── etl/
 │   │   ├── data_loader/
 │   │   ├── process/

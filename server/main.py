@@ -3,10 +3,6 @@ EasyQuant FastAPI 事件服务
 
 提供事件上报和查询接口，用于监控所有工作进程的状态。
 """
-import asyncio
-import multiprocessing
-import time
-import random
 from typing import List, Optional
 from datetime import datetime
 
@@ -17,9 +13,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# 导入数据库和模型
+# 导入数据库、模型和服务
 from storage.database import get_session
 from storage.models.event import Event
+from common.event_service import record_event as record_event_service
 
 # ================= Pydantic 模型 =================
 
@@ -100,21 +97,18 @@ async def create_event(
     - **payload**: 事件详细信息（可选）
     """
     try:
-        # 创建事件对象
-        db_event = Event(
+        # 调用核心服务函数来记录事件
+        db_event = await record_event_service(
+            session=session,
             process_name=event.process_name,
             event_name=event.event_name,
             payload=event.payload
         )
-
-        # 添加到会话并提交
-        session.add(db_event)
-        await session.commit()
-        await session.refresh(db_event)
-
         return db_event
 
     except Exception as e:
+        # 服务层可能会抛出特定异常，这里可以做更精细的处理
+        # 为了保持健壮性，暂时捕获通用异常
         await session.rollback()
         raise HTTPException(status_code=500, detail=f"创建事件失败: {str(e)}")
 
