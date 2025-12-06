@@ -51,6 +51,7 @@
 - **数据库核心升级**:
     - `server/storage/database.py` 已全面升级为基于用户贡献的高性能异步版本。
     - 核心包含 `bulk_insert_df` 和 `bulk_upsert_df` 等函数，为未来海量数据处理提供了强大的性能保障。
+    - 明确了其生产级的连接池管理模式：`async_engine` 在应用启动时创建并维护一个持久的连接池，而 `get_session` 依赖注入确保了每个API请求都能高效地复用这些连接，而非重复创建。
 
 - **模型层重构**:
     - 创建了 `server/storage/models` 目录，用于存放所有 ORM 模型定义。
