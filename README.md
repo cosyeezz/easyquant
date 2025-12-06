@@ -64,6 +64,7 @@ easyquant/
 │   ├── common/             # 后端内部通用模块
 │   │   └── event_service.py# 核心事件记录服务
 │   ├── etl/                # ETL 模块
+│   │   └── data_loader/    # 数据加载器 (e.g., csv_loader.py)
 │   ├── backtest/           # 回测模块
 │   ├── live/               # 实盘模块
 │   ├── storage/            # 共享的、核心的数据存储模块

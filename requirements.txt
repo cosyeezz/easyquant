@@ -1,7 +1,17 @@
+# Web框架
 fastapi
 uvicorn[standard]
 python-multipart
+
+# 数据库
 sqlalchemy
+asyncpg
 psycopg2-binary
 alembic
+
+# 数据处理
+pandas
+
+# 工具库
 httpx
+python-dotenv

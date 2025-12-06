@@ -61,3 +61,13 @@
 - 根据最终讨论，决定废弃 `BaseMonitor` 抽象类，因为它引入了不必要的复杂性。
 - 确立 `server/common/event_service.py` 中的 `record_event` 函数作为项目中事件记录的唯一入口。
 - 未来，所有业务代码将通过直接调用 `event_service.record_event()` 函数，来实现清晰、统一的事件埋点。
+
+### 8. ETL模块完善与项目规范建立
+- **新增CSV加载器**:
+    - 删除了仅作为演示的 `api_loader_example.py`。
+    - 在 `server/etl/data_loader/` 中新增了 `csv_loader.py`，提供了一个从本地文件系统加载 CSV 文件的具体实现。
+    - `CSVLoader` 继承自 `BaseLoader`，并利用 `run_sync` 方法安全地在异步环境中执行 `pandas.read_csv`。
+- **代码规范化**:
+    - 根据规范要求，移除了 `csv_loader.py` 中用于独立测试和演示的 `main` 函数及相关代码，使模块更加纯粹。
+- **项目约定**:
+    - 创建了 `GEMINI.md` 文件，用于记录项目开发过程中形成的特定规则和约定，例如“不在正式代码中包含测试函数”。
