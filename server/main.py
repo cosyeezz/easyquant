@@ -52,7 +52,6 @@ if __name__ == "__main__":
     print("EasyQuant 事件服务")
     print("=" * 60)
     print(f"API 文档: http://127.0.0.1:8000/docs")
-    print(f"事件上报: POST http://127.0.0.1:8000/api/v1/events")
     print(f"事件查询: GET  http://127.0.0.1:8000/api/v1/events")
     print("=" * 60)
 

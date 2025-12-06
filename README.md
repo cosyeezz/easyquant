@@ -46,11 +46,21 @@ easyquant/
 ├── .git/
 ├── alembic/               # Alembic 数据库迁移工具目录
 │   └── versions/
-├── client/
-│   └── (React 前端应用)
+├── client/                # React 前端应用
+│   ├── src/
+│   │   ├── components/    # React组件
+│   │   │   ├── ETLConfig.jsx       # ETL配置页面
+│   │   │   └── ProcessMonitor.jsx  # 进程监控页面
+│   │   ├── services/      # API服务
+│   │   │   └── api.js              # API调用封装
+│   │   ├── App.jsx        # 主应用组件
+│   │   └── main.jsx       # 应用入口
+│   ├── package.json
+│   ├── vite.config.js
+│   └── README.md          # 前端详细文档
 ├── server/
 │   ├── common/            # 后端内部通用模块
-│   │   └── event_service.py # 核心事件记录服务
+│   │   └── monitor.py     # 监控基类 BaseMonitor
 │   ├── etl/
 │   │   ├── data_loader/
 │   │   ├── process/
@@ -64,8 +74,8 @@ easyquant/
 │   │       ├── __init__.py
 │   │       ├── base.py    # 通用模型基类 (含时间戳)
 │   │       └── event.py   # Event 数据表的定义
-│   ├── main.py            # 系统主入口和FastAPI服务
-│   └── test_client.html   # 用于测试的临时客户端
+│   └── main.py            # 系统主入口和FastAPI服务
+├── test_events_generator.py # 测试数据生成器
 ├── .env                   # (需要您手动创建) 环境变量文件
 ├── alembic.ini            # Alembic 配置文件
 ├── devlog.md              # 开发日志
@@ -75,8 +85,9 @@ easyquant/
 
 ## 快速启动
 
-1.  **安装依赖:**
-    `pandas` 是必需的。
+### 后端服务
+
+1.  **安装Python依赖:**
     ```sh
     pip install -r requirements.txt
     ```
@@ -85,20 +96,128 @@ easyquant/
     - 确保您已安装并运行 PostgreSQL 数据库。
     - 在项目根目录创建一个 `.env` 文件。
     - 在 `.env` 文件中配置您的**异步**数据库连接URL，协议需为 `postgresql+asyncpg`。例如:
-      `DATABASE_URL="postgresql+asyncpg://user:password@localhost/easyquant_dev"`
+      ```
+      DATABASE_URL="postgresql+asyncpg://user:password@localhost/easyquant_dev"
+      ```
 
 3.  **执行数据库迁移:**
-    (在您完成配置后，我将为您运行此步骤)
     ```sh
     alembic upgrade head
     ```
     此命令会在您的数据库中自动创建 `events` 表。
 
-4.  **启动服务:**
+4.  **启动后端服务:**
     ```sh
     python server/main.py
     ```
+    服务将在 `http://localhost:8000` 启动。
+    访问 `http://localhost:8000/docs` 查看API文档。
 
-5.  **测试监控:**
-    在浏览器中打开 `server/test_client.html` 文件 (后续会更新为轮询模式)，即可看到监控数据。
+### 前端应用
+
+1.  **安装Node.js依赖:**
+    ```sh
+    cd client
+    npm install
+    ```
+
+2.  **启动前端开发服务器:**
+    ```sh
+    npm run dev
+    ```
+    应用将在 `http://localhost:3000` 启动。
+
+### 测试数据生成
+
+如果您想快速测试前端界面，可以运行测试数据生成器：
+
+```sh
+# 确保后端服务已启动
+python test_events_generator.py
+```
+
+这个脚本会模拟多个ETL进程向API发送事件数据，您可以立即在前端看到监控效果。
+
+## 使用指南
+
+### 1. ETL配置页面
+
+在前端的"ETL配置"页签中：
+
+- **配置进程数量**: 留空则系统自动分配，建议为CPU核心数的50-75%
+- **选择数据源**: 支持本地文件、API接口、数据库和QMT终端
+- **设置批处理大小**: 每批处理的记录数（默认1000）
+- **调整并行任务数**: 每个进程内部的并行任务数（1-16）
+- **启用数据验证和错误重试**: 确保数据质量和系统稳定性
+
+配置完成后点击"启动ETL"按钮。
+
+### 2. 进程监控页面
+
+在"进程监控"页签中可以：
+
+- 查看所有运行中的进程卡片
+- 实时追踪每个进程的：
+  - 处理进度（进度条和百分比）
+  - 队列大小
+  - 当前处理的文件
+  - 错误信息（如果有）
+- 点击进程卡片查看详细的事件日志
+- 使用右上角的"自动刷新"开关控制数据更新（默认每2秒刷新）
+
+### 3. 事件系统
+
+系统使用事件驱动架构，工作进程可以通过HTTP API报告各种事件：
+
+**事件示例**:
+```python
+# 在工作进程中报告事件
+await report_event(
+    process_name="ETL_Pipeline_1",
+    event_name="loader.queue.status",
+    payload={
+        "queue_size": 42,
+        "current_file": "stock_data_2024.csv",
+        "processed": 1000,
+        "total": 5000,
+        "progress": 20.0
+    }
+)
+```
+
+**推荐的事件命名规范**:
+- `loader.task.started` - 任务开始
+- `loader.queue.status` - 队列状态更新
+- `loader.file.processing` - 文件处理中
+- `loader.progress.update` - 进度更新
+- `loader.task.completed` - 任务完成
+- `loader.error.occurred` - 发生错误
+
+## API文档
+
+后端提供以下API端点：
+
+- `GET /` - 健康检查
+- `POST /api/v1/events` - 创建事件
+- `GET /api/v1/events` - 查询事件（支持筛选和分页）
+- `GET /api/v1/processes` - 获取所有进程列表和最新状态
+
+详细的API文档请访问: `http://localhost:8000/docs`
+
+## 技术栈
+
+### 后端
+- Python 3.10+
+- FastAPI - Web框架
+- SQLAlchemy - ORM
+- PostgreSQL - 数据库
+- asyncpg - 异步数据库驱动
+- Alembic - 数据库迁移
+
+### 前端
+- React 18 - UI框架
+- Vite - 构建工具
+- Tailwind CSS - 样式框架
+- Axios - HTTP客户端
+- Lucide React - 图标库
 

@@ -17,27 +17,6 @@ router = APIRouter()
 # ================= Pydantic 模型 =================
 # （这些模型也可以移到更通用的 schemas/pydantic 文件中，但为了简单起见，暂时放在这里）
 
-class EventCreate(BaseModel):
-    """接收事件数据的请求模型"""
-    process_name: str = Field(..., description="进程名称，如 'ETL_Pipeline_1'")
-    event_name: str = Field(..., description="事件名称，如 'loader.task.started'")
-    payload: Optional[dict] = Field(None, description="事件详细信息（JSON格式）")
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "process_name": "ETL_Pipeline_1",
-                "event_name": "loader.queue.status",
-                "payload": {
-                    "queue_size": 42,
-                    "current_file": "stock_data_2024.csv",
-                    "processed": 1000,
-                    "total": 5000
-                }
-            }
-        }
-
-
 class EventResponse(BaseModel):
     """返回事件数据的响应模型"""
     id: int
@@ -51,27 +30,8 @@ class EventResponse(BaseModel):
         from_attributes = True
 
 # ================= API 端点 =================
-
-@router.post("/events", response_model=EventResponse, status_code=201)
-async def create_event(
-    event: EventCreate,
-    session: AsyncSession = Depends(get_session)
-):
-    """
-    接收并存储来自工作进程的事件
-    """
-    try:
-        db_event = await record_event_service(
-            session=session,
-            process_name=event.process_name,
-            event_name=event.event_name,
-            payload=event.payload
-        )
-        return db_event
-    except Exception as e:
-        await session.rollback()
-        raise HTTPException(status_code=500, detail=f"创建事件失败: {str(e)}")
-
+# 注意：我们不再需要 POST /events 端点，因为所有事件都在服务内部通过调用 event_service 来创建。
+# 这里只保留用于前端查询的 GET 端点。
 
 @router.get("/events", response_model=List[EventResponse])
 async def get_events(
