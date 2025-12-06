@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Process Monitor</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 2em; background: #f5f5f5; color: #333; }
+        h1 { color: #111; }
+        #connection-status { margin-bottom: 1em; font-weight: bold; }
+        #statuses { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1em; }
+        .process-card { background: white; border-radius: 8px; padding: 1em; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease-in-out; }
+        .process-card:hover { transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
+        .process-card h3 { margin-top: 0; display: flex; align-items: center; }
+        .process-card pre { background-color: #fafafa; border: 1px solid #eee; padding: 0.5em; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; }
+        .status-dot { height: 12px; width: 12px; border-radius: 50%; display: inline-block; margin-right: 10px; }
+        .status-running { background-color: #28a745; }
+        .status-processing { background-color: #17a2b8; }
+        .status-connecting { background-color: #ffc107; }
+        .status-finished { background-color: #6c757d; }
+        .status-stopped { background-color: #dc3545; }
+        .status-initializing { background-color: #ffc107; }
+        .status-unknown { background-color: #ccc; }
+    </style>
+</head>
+<body>
+    <h1>Real-Time Process Monitor</h1>
+    <div id="connection-status">Connecting to server...</div>
+    <div id="statuses"></div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const statusesContainer = document.getElementById("statuses");
+            const connectionStatus = document.getElementById("connection-status");
+            const ws = new WebSocket("ws://127.0.0.1:8000/ws/status");
+
+            ws.onopen = function(event) {
+                console.log("WebSocket connection established.");
+                connectionStatus.textContent = "✅ Connected to server.";
+                connectionStatus.style.color = "green";
+            };
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(JSON.parse(event.data)); // The data is double-stringified in this setup, so parse twice.
+                console.log("Received data:", data);
+                
+                statusesContainer.innerHTML = '';
+
+                Object.keys(data).sort().forEach(processName => {
+                    const process = data[processName];
+                    const card = document.createElement("div");
+                    card.className = "process-card";
+                    
+                    const statusClass = "status-" + (process.status ? process.status.toLowerCase().split(' ')[0] : 'unknown');
+
+                    card.innerHTML = `
+                        <h3>
+                            <span class="status-dot ${statusClass}"></span>
+                            ${process.name || 'N/A'}
+                        </h3>
+                        <p><strong>PID:</strong> ${process.pid}</p>
+                        <p><strong>Status:</strong> ${process.status}</p>
+                        <p><strong>Last Update:</strong> ${new Date(process.last_update * 1000).toLocaleTimeString()}</p>
+                        <h4>Metrics:</h4>
+                        <pre>${JSON.stringify(process.metrics, null, 2)}</pre>
+                    `;
+                    statusesContainer.appendChild(card);
+                });
+            };
+
+            ws.onclose = function(event) {
+                console.log("WebSocket connection closed.");
+                connectionStatus.textContent = "❌ Connection closed. Attempting to reconnect...";
+                connectionStatus.style.color = "red";
+                // Simple reconnect logic
+                setTimeout(() => window.location.reload(), 3000);
+            };
+
+            ws.onerror = function(error) {
+                console.error("WebSocket error:", error);
+                connectionStatus.textContent = "❌ Connection error.";
+                connectionStatus.style.color = "red";
+            };
+        });
+    </script>
+</body>
+</html>
