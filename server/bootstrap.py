@@ -1,5 +1,9 @@
 import logging
+import os
 from sqlalchemy import select, text
+from alembic import command
+from alembic.config import Config
+
 from server.storage.database import AsyncSessionFactory
 from server.storage.models.data_table_config import TableCategory
 
@@ -13,16 +17,41 @@ DEFAULT_CATEGORIES = [
     {"code": "system", "name": "系统配置", "description": "系统内部使用的配置表"},
 ]
 
+def run_db_migrations():
+    """
+    使用 Alembic 自动执行数据库迁移，确保表结构最新。
+    这相当于在命令行运行 'alembic upgrade head'。
+    """
+    try:
+        logger.info("Checking and applying database migrations...")
+        
+        # 假设 alembic.ini 在当前工作目录下（通常是项目根目录）
+        alembic_cfg_path = "alembic.ini"
+        if not os.path.exists(alembic_cfg_path):
+            raise FileNotFoundError(f"Cannot find alembic.ini at {os.getcwd()}")
+            
+        alembic_cfg = Config(alembic_cfg_path)
+        
+        # 执行 upgrade head
+        command.upgrade(alembic_cfg, "head")
+        
+        logger.info("Database migrations applied successfully.")
+    except Exception as e:
+        logger.critical(f"Failed to apply database migrations: {e}")
+        raise RuntimeError("Database migration failed. Cannot start application.") from e
+
 async def check_and_bootstrap():
     """
     系统启动时的自检与引导程序。
     1. 检查数据库连接。
-    2. 初始化必要的种子数据 (Seed Data)。
+    2. 自动运行数据库迁移 (创建/更新表结构)。
+    3. 初始化必要的种子数据 (Seed Data)。
     """
     logger.info("Starting system bootstrap check...")
     
+    # 1. 检查数据库连接
+    # 虽然 Alembic 也会连接，但这里先快速检查一下连通性比较稳妥
     async with AsyncSessionFactory() as session:
-        # 1. 检查数据库连接 (Select 1)
         try:
             await session.execute(text("SELECT 1"))
             logger.info("Database connection check passed.")
@@ -30,9 +59,15 @@ async def check_and_bootstrap():
             logger.critical(f"Database connection failed: {e}")
             raise RuntimeError("Database connection failed. Cannot start application.")
 
-        # 2. 初始化分类数据
+    # 2. 运行数据库迁移 (同步操作)
+    # Alembic 命令通常是阻塞的，放在这里运行是安全的，因为我们需要等待 DB 就绪
+    run_db_migrations()
+
+    # 3. 初始化种子数据
+    async with AsyncSessionFactory() as session:
         try:
             logger.info("Checking table categories...")
+            # 此时表肯定已经存在了，因为刚才运行了迁移
             stmt = select(TableCategory)
             result = await session.execute(stmt)
             existing = result.scalars().first()
@@ -53,8 +88,6 @@ async def check_and_bootstrap():
                 
         except Exception as e:
             logger.error(f"Failed to initialize seed data: {e}")
-            # 种子数据失败通常不应阻止系统启动，但应记录严重错误
-            # 取决于业务严格程度，这里选择记录并继续，或抛出异常
             raise e
 
     logger.info("System bootstrap completed successfully.")

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum, Text
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum, Text, DateTime
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 import enum
@@ -41,6 +41,7 @@ class DataTableConfig(Base, TimestampMixin):
     table_name = Column(String, unique=True, nullable=False, comment="物理表名")
     description = Column(Text, nullable=False, comment="详细描述")
     status = Column(Enum(TableStatus), default=TableStatus.DRAFT, nullable=False)
+    last_published_at = Column(DateTime, nullable=True, comment="上次成功发布(物理建表)的时间")
 
     # Schema Definitions (JSONB for PostgreSQL)
     # 存储列定义列表: [{"name": "ts_code", "type": "VARCHAR(20)", "is_pk": true, "comment": "..."}]

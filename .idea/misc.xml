@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="cosyee-quant" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="cosyee-quant" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="cosyee_quant_env" project-jdk-type="Python SDK" />
 </project>

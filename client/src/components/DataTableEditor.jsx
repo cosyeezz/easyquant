@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Save, Loader2, Plus, Trash2, GripVertical, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Save, Loader2, Plus, Trash2, GripVertical } from 'lucide-react'
 import api from '../services/api'
 
 const COLUMN_TYPES = [
@@ -15,15 +15,14 @@ const COLUMN_TYPES = [
 ]
 
 function DataTableEditor({ tableId, onNavigate }) {
-  const [loading, setLoading] = useState(!!tableId)
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [publishing, setPublishing] = useState(false)
-  const [showPublishConfirm, setShowPublishConfirm] = useState(false)
   const [error, setError] = useState(null)
+  const [categories, setCategories] = useState([])
   const [form, setForm] = useState({
     name: '',
     table_name: '',
-    category: 'market_data',
+    category_id: '', // Changed from category string to category_id
     description: '',
     status: 'DRAFT',
     columns_schema: [],
@@ -31,19 +30,45 @@ function DataTableEditor({ tableId, onNavigate }) {
   })
 
   useEffect(() => {
-    if (tableId) {
-      api.getDataTable(tableId).then(data => {
-        setForm(data)
-        setLoading(false)
-      }).catch(console.error)
-    }
+    loadData()
   }, [tableId])
+
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      // Load categories first
+      const cats = await api.getTableCategories()
+      setCategories(cats)
+      
+      // Default to first category if creating new
+      let initialCategoryId = cats.length > 0 ? cats[0].id : ''
+
+      if (tableId) {
+        const data = await api.getDataTable(tableId)
+        setForm(data)
+      } else {
+        setForm(prev => ({ ...prev, category_id: initialCategoryId }))
+      }
+    } catch (err) {
+      console.error(err)
+      setError('加载数据失败')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const updateForm = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
-  const isPublished = form.status === 'CREATED'
+  // Handle category_id as integer
+  const handleCategoryChange = (e) => {
+    const val = parseInt(e.target.value, 10)
+    updateForm('category_id', val)
+  }
+
+  // Use status lowercase check to match backend
+  const isPublished = form.status === 'created' || form.status === 'CREATED'
 
   // Column operations
   const addColumn = () => {
@@ -76,7 +101,7 @@ function DataTableEditor({ tableId, onNavigate }) {
   }
 
   const handleSave = async () => {
-    if (!form.name || !form.table_name || !form.description) {
+    if (!form.name || !form.table_name || !form.description || !form.category_id) {
       setError('请填写所有必填项')
       return
     }
@@ -93,20 +118,6 @@ function DataTableEditor({ tableId, onNavigate }) {
       setError(err.response?.data?.detail || '保存失败')
     } finally {
       setSaving(false)
-    }
-  }
-
-  const handlePublish = async () => {
-    setPublishing(true)
-    setError(null)
-    try {
-      await api.publishDataTable(tableId)
-      onNavigate('tables')
-    } catch (err) {
-      setError(err.response?.data?.detail || '发布失败')
-    } finally {
-      setPublishing(false)
-      setShowPublishConfirm(false)
     }
   }
 
@@ -171,14 +182,14 @@ function DataTableEditor({ tableId, onNavigate }) {
         <div>
           <label className="form-label">分类 *</label>
           <select
-            value={form.category}
-            onChange={(e) => updateForm('category', e.target.value)}
+            value={form.category_id}
+            onChange={handleCategoryChange}
             className="input-field"
             disabled={isPublished}
           >
-            <option value="market_data">行情数据</option>
-            <option value="feature">特征数据</option>
-            <option value="system">系统数据</option>
+            {categories.map(cat => (
+              <option key={cat.id} value={cat.id}>{cat.name} ({cat.code})</option>
+            ))}
           </select>
         </div>
 
@@ -340,43 +351,13 @@ function DataTableEditor({ tableId, onNavigate }) {
         <button onClick={() => onNavigate('tables')} className="btn-secondary">取消</button>
         <button
           onClick={handleSave}
-          disabled={saving || !form.name || !form.table_name || !form.description}
-          className="btn-secondary flex items-center gap-2"
+          disabled={saving || !form.name || !form.table_name || !form.description || !form.category_id}
+          className="btn-primary flex items-center gap-2"
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          保存草稿
+          保存内容
         </button>
-        {tableId && !isPublished && (
-          <button
-            onClick={() => setShowPublishConfirm(true)}
-            className="btn-primary flex items-center gap-2"
-          >
-            发布并创建
-          </button>
-        )}
       </div>
-
-      {/* Publish Confirm Modal */}
-      {showPublishConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 space-y-4">
-            <div className="flex items-center gap-3 text-warning-600">
-              <AlertTriangle className="w-6 h-6" />
-              <h3 className="font-semibold text-lg">确认发布</h3>
-            </div>
-            <p className="text-slate-600">
-              发布后将在数据库中创建物理表 <code className="bg-slate-100 px-1 rounded">{form.table_name}</code>，
-              表结构将无法修改。确定继续？
-            </p>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setShowPublishConfirm(false)} className="btn-secondary">取消</button>
-              <button onClick={handlePublish} disabled={publishing} className="btn-primary">
-                {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : '确认发布'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

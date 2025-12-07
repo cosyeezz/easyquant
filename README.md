@@ -139,7 +139,44 @@ easyquant/
 1.  **安装依赖:** `cd client && npm install`
 2.  **启动服务:** `npm run dev`
 
+## 服务管理 (运维)
+
+项目内置了 `manage.py` 脚本，用于标准化地管理后端服务的生命周期（启动、停止、重启、日志查看）。
+
+**常用命令:**
+
+- **启动服务**:
+  ```sh
+  python manage.py start
+  ```
+  *自动处理 PID 文件、日志重定向 (`logs/server.log`) 和环境变量加载。*
+
+- **停止服务**:
+  ```sh
+  python manage.py stop
+  ```
+
+- **重启服务**:
+  ```sh
+  python manage.py restart
+  ```
+
+- **查看状态**:
+  ```sh
+  python manage.py status
+  ```
+
 ## 使用指南
+
+### 数据表管理 (Data Warehouse)
+
+系统采用严格的 **"配置(Config) -> 物理表(Physical Table)"** 分离模式，确保生产环境数据的安全性。
+
+1.  **草稿 (Draft)**: 新建的表配置默认为草稿状态。此时只存在于配置表中，物理数据库未创建。
+2.  **发布 (Publish)**: 点击发布后，系统会根据 Schema 自动生成并执行 DDL 语句，创建物理表。
+3.  **同步状态 (Sync State)**:
+    - **已同步 (Synced)**: 配置与物理表一致。
+    - **待同步 (Unsynced)**: 修改了已发布的配置（如新增字段），需要再次发布以应用变更。
 
 ### 事件系统
 

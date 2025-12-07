@@ -44,7 +44,7 @@ class ETLTaskConfigResponse(ETLTaskConfigBase):
 
 # --- Handlers Discovery API ---
 
-@router.get("/handlers")
+@router.get("/etl/handlers")
 def get_available_handlers():
     """
     获取所有可用的 ETL 处理器及其配置 Schema。
@@ -58,7 +58,7 @@ class SourcePreviewRequest(BaseModel):
     source_type: str
     source_config: dict
 
-@router.post("/preview-source")
+@router.post("/etl/preview-source")
 def preview_source(request: SourcePreviewRequest):
     """
     预览数据源列名 (用于 CSV 文件夹)。

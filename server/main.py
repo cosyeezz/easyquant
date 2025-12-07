@@ -3,6 +3,19 @@ EasyQuant FastAPI 事件服务
 
 提供事件上报和查询接口，用于监控所有工作进程的状态。
 """
+import os
+import sys
+
+# --- Startup Check ---
+if os.environ.get("EASYQUANT_LAUNCHER") != "1":
+    print("\n" + "!" * 60)
+    print("ERROR: Direct execution prohibited.")
+    print("Please use the management script to start the application:")
+    print("  python manage.py start")
+    print("!" * 60 + "\n")
+    sys.exit(1)
+# ---------------------
+
 from datetime import datetime
 import logging
 from contextlib import asynccontextmanager
@@ -70,7 +83,7 @@ async def root():
 # 包含 v1 版本的事件相关 API
 # 所有在 events_v1.router 中定义的路由都会自动带上 /api/v1 前缀
 app.include_router(events_v1.router, prefix="/api/v1")
-app.include_router(etl_v1.router, prefix="/api/v1/etl", tags=["ETL Configuration"])
+app.include_router(etl_v1.router, prefix="/api/v1", tags=["ETL Configuration"])
 app.include_router(data_tables_v1.router, prefix="/api/v1", tags=["Data Table Management"])
 
 
