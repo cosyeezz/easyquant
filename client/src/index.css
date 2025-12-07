@@ -10,7 +10,9 @@
 
 @layer components {
   .card {
-    @apply bg-white rounded-xl shadow-lg border border-slate-200 p-6 transition-all duration-300 hover:shadow-xl;
+    @apply bg-white rounded-2xl shadow-lg border border-slate-200/60 p-6
+           transition-all duration-300 hover:shadow-2xl hover:border-slate-300/80
+           hover:-translate-y-0.5;
   }
 
   .card-header {
@@ -18,41 +20,132 @@
   }
 
   .btn-primary {
-    @apply px-4 py-2 bg-primary-600 text-white rounded-lg font-medium
-           hover:bg-primary-700 active:scale-95 transition-all duration-200
-           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+    @apply px-5 py-2.5 bg-gradient-to-r from-primary-600 to-indigo-600 text-white rounded-xl font-medium
+           hover:from-primary-700 hover:to-indigo-700 hover:shadow-lg hover:shadow-primary-500/25
+           active:scale-[0.98] transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none;
   }
 
   .btn-secondary {
-    @apply px-4 py-2 bg-slate-200 text-slate-700 rounded-lg font-medium
-           hover:bg-slate-300 active:scale-95 transition-all duration-200
-           focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2;
+    @apply px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-medium border border-slate-200
+           hover:bg-slate-200 hover:border-slate-300 hover:shadow-md
+           active:scale-[0.98] transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-icon {
+    @apply p-2.5 rounded-xl text-slate-500
+           hover:bg-slate-100 hover:text-slate-700 hover:shadow-sm
+           active:scale-95 transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-slate-300;
+  }
+
+  .btn-icon-danger {
+    @apply p-2.5 rounded-xl text-slate-400
+           hover:bg-danger-50 hover:text-danger-600 hover:shadow-sm
+           active:scale-95 transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-danger-300;
   }
 
   .input-field {
-    @apply w-full px-4 py-2 border border-slate-300 rounded-lg
-           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
+    @apply w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl
+           text-slate-700 placeholder-slate-400
+           hover:border-slate-300 hover:bg-white
+           focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 focus:bg-white
            transition-all duration-200;
   }
 
+  /* 美化下拉选择框 */
+  select.input-field {
+    @apply appearance-none cursor-pointer
+           bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')]
+           bg-[length:20px] bg-[right_12px_center] bg-no-repeat pr-10;
+  }
+
+  select.input-field:hover {
+    @apply bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%230f172a%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')];
+  }
+
+  select.input-field:focus {
+    @apply bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%234f46e5%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')];
+  }
+
+  /* 美化 checkbox */
+  input[type="checkbox"] {
+    @apply w-5 h-5 rounded-md border-2 border-slate-300 text-primary-600
+           focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-0
+           hover:border-primary-400 transition-all duration-200 cursor-pointer;
+  }
+
+  /* 美化 range slider */
+  input[type="range"] {
+    @apply h-2 bg-slate-200 rounded-full appearance-none cursor-pointer
+           focus:outline-none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    @apply appearance-none w-5 h-5 bg-gradient-to-br from-primary-500 to-indigo-600
+           rounded-full shadow-lg shadow-primary-500/30 cursor-pointer
+           hover:scale-110 transition-transform duration-200;
+  }
+
   .badge {
-    @apply px-3 py-1 rounded-full text-xs font-semibold;
+    @apply px-3 py-1 rounded-full text-xs font-semibold tracking-wide;
   }
 
   .badge-success {
-    @apply badge bg-success-100 text-success-700;
+    @apply badge bg-success-100 text-success-700 ring-1 ring-success-200;
   }
 
   .badge-warning {
-    @apply badge bg-warning-100 text-warning-700;
+    @apply badge bg-warning-100 text-warning-700 ring-1 ring-warning-200;
   }
 
   .badge-danger {
-    @apply badge bg-danger-100 text-danger-700;
+    @apply badge bg-danger-100 text-danger-700 ring-1 ring-danger-200;
   }
 
   .badge-info {
-    @apply badge bg-primary-100 text-primary-700;
+    @apply badge bg-primary-100 text-primary-700 ring-1 ring-primary-200;
+  }
+
+  /* 交互式卡片 */
+  .card-interactive {
+    @apply card cursor-pointer
+           hover:ring-2 hover:ring-primary-500/20 hover:border-primary-300;
+  }
+
+  .card-interactive.selected {
+    @apply ring-2 ring-primary-500 border-primary-400 shadow-xl shadow-primary-500/10;
+  }
+
+  /* 步骤指示器 */
+  .stepper-dot {
+    @apply w-10 h-10 rounded-full flex items-center justify-center font-semibold
+           transition-all duration-300;
+  }
+
+  .stepper-dot.active {
+    @apply bg-gradient-to-br from-primary-500 to-indigo-600 text-white shadow-lg shadow-primary-500/30;
+  }
+
+  .stepper-dot.inactive {
+    @apply bg-slate-100 text-slate-400 border-2 border-slate-200;
+  }
+
+  .stepper-dot.completed {
+    @apply bg-success-500 text-white shadow-lg shadow-success-500/30;
+  }
+
+  /* 表单标签 */
+  .form-label {
+    @apply block text-sm font-medium text-slate-700 mb-2;
+  }
+
+  .form-hint {
+    @apply mt-1.5 text-xs text-slate-500;
   }
 }
 
@@ -68,4 +161,33 @@
 
 ::-webkit-scrollbar-thumb {
   @apply bg-slate-400 rounded-full hover:bg-slate-500;
+}
+
+/* 动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-slideUp {
+  animation: slideUp 0.3s ease-out;
 }

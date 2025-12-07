@@ -6,10 +6,20 @@ class ApiService {
   constructor() {
     this.client = axios.create({
       baseURL: API_BASE_URL,
+      timeout: 10000,
       headers: {
         'Content-Type': 'application/json',
       },
     });
+
+    this.client.interceptors.response.use(
+      (res) => res,
+      (err) => {
+        const msg = err.response?.data?.detail || err.message || '请求失败'
+        console.error('API Error:', msg)
+        return Promise.reject(err)
+      }
+    );
   }
 
   /**
@@ -22,18 +32,6 @@ class ApiService {
    */
   async getEvents(params = {}) {
     const response = await this.client.get('/events', { params });
-    return response.data;
-  }
-
-  /**
-   * 创建新事件
-   * @param {Object} event - 事件数据
-   * @param {string} event.process_name - 进程名称
-   * @param {string} event.event_name - 事件名称
-   * @param {Object} event.payload - 事件详细信息
-   */
-  async createEvent(event) {
-    const response = await this.client.post('/events', event);
     return response.data;
   }
 
@@ -55,6 +53,88 @@ class ApiService {
       process_name: processName,
       limit,
     });
+  }
+
+  // ========== ETL Config API ==========
+
+  async getETLConfigs() {
+    const response = await this.client.get('/etl-configs');
+    return response.data;
+  }
+
+  async getETLConfig(id) {
+    const response = await this.client.get(`/etl-configs/${id}`);
+    return response.data;
+  }
+
+  async createETLConfig(config) {
+    const response = await this.client.post('/etl-configs', config);
+    return response.data;
+  }
+
+  async updateETLConfig(id, config) {
+    const response = await this.client.put(`/etl-configs/${id}`, config);
+    return response.data;
+  }
+
+  async deleteETLConfig(id) {
+    const response = await this.client.delete(`/etl-configs/${id}`);
+    return response.data;
+  }
+
+  async runETLConfig(id) {
+    const response = await this.client.post(`/etl-configs/${id}/run`);
+    return response.data;
+  }
+
+  async previewSource(sourceType, sourceConfig) {
+    const response = await this.client.post('/etl/preview-source', {
+      source_type: sourceType,
+      source_config: sourceConfig,
+    });
+    return response.data;
+  }
+
+  async getHandlers() {
+    const response = await this.client.get('/etl/handlers');
+    return response.data;
+  }
+
+  // ========== Data Table API ==========
+
+  async getDataTables() {
+    const response = await this.client.get('/data-tables');
+    return response.data;
+  }
+
+  async getDataTable(id) {
+    const response = await this.client.get(`/data-tables/${id}`);
+    return response.data;
+  }
+
+  async createDataTable(data) {
+    const response = await this.client.post('/data-tables', data);
+    return response.data;
+  }
+
+  async updateDataTable(id, data) {
+    const response = await this.client.put(`/data-tables/${id}`, data);
+    return response.data;
+  }
+
+  async deleteDataTable(id) {
+    const response = await this.client.delete(`/data-tables/${id}`);
+    return response.data;
+  }
+
+  async publishDataTable(id) {
+    const response = await this.client.post(`/data-tables/${id}/publish`);
+    return response.data;
+  }
+
+  async getTableCategories() {
+    const response = await this.client.get('/categories');
+    return response.data;
   }
 }
 

@@ -9,7 +9,6 @@ from pydantic import BaseModel, Field
 
 from server.storage.database import get_session
 from server.storage.models.event import Event
-from server.common.event_service import record_event as record_event_service
 
 # 创建一个新的路由器
 router = APIRouter()

@@ -4,19 +4,46 @@ EasyQuant FastAPI 事件服务
 提供事件上报和查询接口，用于监控所有工作进程的状态。
 """
 from datetime import datetime
+import logging
+from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # 从新的 API 路由文件中导入路由器
 from server.api.v1 import events as events_v1
+from server.api.v1 import etl as etl_v1
+from server.api.v1 import data_tables as data_tables_v1
+from server.bootstrap import check_and_bootstrap
+
+# 设置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# ================= Lifespan (启动/关闭事件) =================
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 启动前逻辑
+    try:
+        await check_and_bootstrap()
+    except Exception as e:
+        logger.error(f"Bootstrap failed: {e}")
+        # 在生产级应用中，如果引导失败，通常应该阻止启动
+        raise e
+    
+    yield
+    
+    # 关闭后逻辑 (如果需要清理资源，如关闭 DB 连接池，虽然 database.py 会自动处理)
+    pass
 
 # ================= FastAPI 应用 =================
 
 app = FastAPI(
     title="EasyQuant 事件服务",
     description="量化交易系统的事件上报和监控API",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # 配置 CORS，允许前端跨域访问
@@ -43,6 +70,8 @@ async def root():
 # 包含 v1 版本的事件相关 API
 # 所有在 events_v1.router 中定义的路由都会自动带上 /api/v1 前缀
 app.include_router(events_v1.router, prefix="/api/v1")
+app.include_router(etl_v1.router, prefix="/api/v1/etl", tags=["ETL Configuration"])
+app.include_router(data_tables_v1.router, prefix="/api/v1", tags=["Data Table Management"])
 
 
 # ================= 主程序入口 =================
@@ -55,5 +84,4 @@ if __name__ == "__main__":
     print(f"事件查询: GET  http://127.0.0.1:8000/api/v1/events")
     print("=" * 60)
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, log_level="info", reload=True)
-
+    uvicorn.run("server.main:app", host="0.0.0.0", port=8000, log_level="info", reload=True)

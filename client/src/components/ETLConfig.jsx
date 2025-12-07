@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Play, Settings, FileText, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
+import Modal from './Modal'
 
 function ETLConfig() {
   const [config, setConfig] = useState({
@@ -10,6 +11,7 @@ function ETLConfig() {
   })
 
   const [isRunning, setIsRunning] = useState(false)
+  const [showModal, setShowModal] = useState(false)
 
   const handleInputChange = (field, value) => {
     setConfig(prev => ({ ...prev, [field]: value }))
@@ -22,7 +24,8 @@ function ETLConfig() {
 
     // 模拟启动过程
     setTimeout(() => {
-      alert('ETL进程启动成功！')
+      setIsRunning(false)
+      setShowModal(true)
     }, 1500)
   }
 
@@ -245,6 +248,15 @@ function ETLConfig() {
           </div>
         </div>
       )}
+
+      {/* 成功弹窗 */}
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title="启动成功！"
+        message="ETL进程已成功启动，你可以在【进程监控】页签查看实时运行状态和处理进度。"
+        type="success"
+      />
     </div>
   )
 }

@@ -1,6 +1,8 @@
 # EasyQuant Client - 前端应用
 
-这是EasyQuant量化交易系统的Web监控前端，使用React + Vite + Tailwind CSS构建。
+> 量化交易系统的现代化Web监控界面
+
+这是EasyQuant量化交易系统的独立前端应用，使用React + Vite + Tailwind CSS构建。即使脱离后端项目，本文档也包含了完整的使用说明。
 
 ## 功能特性
 
@@ -190,6 +192,202 @@ rm -rf node_modules/.vite
 npm run dev
 ```
 
+## 后端API说明
+
+如果你是独立开发前端，需要了解后端API接口规范：
+
+### 基础信息
+- **Base URL**: `http://localhost:8000/api/v1`
+- **协议**: HTTP/REST
+- **数据格式**: JSON
+
+### 端点列表
+
+#### 1. 获取事件列表
+```http
+GET /api/v1/events
+```
+
+**查询参数**:
+- `process_name` (可选): 按进程名筛选
+- `event_name` (可选): 按事件名筛选
+- `limit` (可选): 返回数量，默认100
+- `offset` (可选): 分页偏移，默认0
+
+**响应示例**:
+```json
+[
+  {
+    "id": 1,
+    "process_name": "ETL_Pipeline_1",
+    "event_name": "loader.queue.status",
+    "payload": {
+      "queue_size": 42,
+      "current_file": "stock_data_2024.csv",
+      "processed": 1000,
+      "total": 5000,
+      "progress": 20.0
+    },
+    "created_at": "2025-12-06T10:30:00Z",
+    "updated_at": "2025-12-06T10:30:00Z"
+  }
+]
+```
+
+#### 2. 获取进程列表
+```http
+GET /api/v1/processes
+```
+
+**响应示例**:
+```json
+[
+  {
+    "name": "ETL_Pipeline_1",
+    "latest_event": {
+      "id": 100,
+      "process_name": "ETL_Pipeline_1",
+      "event_name": "task.running",
+      "payload": { ... },
+      "created_at": "2025-12-06T10:35:00Z",
+      "updated_at": "2025-12-06T10:35:00Z"
+    },
+    "last_seen": "2025-12-06T10:35:00Z"
+  }
+]
+```
+
+### Payload字段规范
+
+为了让前端正确解析和显示，后端事件的payload应包含以下字段（可选）：
+
+```typescript
+{
+  queue_size?: number       // 队列大小
+  current_file?: string     // 当前处理文件
+  processed?: number        // 已处理数量
+  total?: number           // 总数量
+  progress?: number        // 进度百分比 (0-100)
+  status?: string          // 状态: running | completed | error
+  error?: string           // 错误信息
+}
+```
+
+### CORS配置
+
+后端需要配置CORS以允许前端跨域访问：
+
+```python
+# FastAPI示例
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+
+### 推荐的事件命名规范
+
+- `task.started` - 任务开始
+- `task.running` - 任务运行中
+- `task.completed` - 任务完成
+- `task.error` - 任务错误
+- `loader.queue.status` - 队列状态更新
+- `loader.file.processing` - 文件处理中
+- `loader.progress.update` - 进度更新
+
+## 开发资源
+
+### 相关文档
+- 📝 [开发日志](./DEVLOG.md) - 详细的开发过程记录
+- 🎨 [Tailwind CSS](https://tailwindcss.com) - 样式框架文档
+- ⚛️ [React Hooks](https://react.dev/reference/react) - React官方文档
+- 🚀 [Vite](https://vitejs.dev) - 构建工具文档
+
+### 项目结构说明
+```
+client/
+├── public/              # 静态资源（图标、图片等）
+├── src/
+│   ├── components/      # React组件
+│   │   ├── ETLConfig.jsx        # ETL配置页面
+│   │   └── ProcessMonitor.jsx   # 进程监控页面
+│   ├── services/        # 业务逻辑层
+│   │   └── api.js               # API调用封装
+│   ├── App.jsx          # 主应用组件
+│   ├── main.jsx         # 应用入口
+│   └── index.css        # 全局样式
+├── index.html           # HTML模板
+├── package.json         # 项目配置和依赖
+├── vite.config.js       # Vite配置
+├── tailwind.config.js   # Tailwind配置
+├── postcss.config.js    # PostCSS配置
+├── README.md            # 本文档
+└── DEVLOG.md            # 开发日志
+```
+
+## 常见问题 (FAQ)
+
+### Q: 如何修改后端API地址？
+A: 编辑 `vite.config.js` 中的代理配置：
+```javascript
+proxy: {
+  '/api': {
+    target: 'http://your-backend-url:port',
+    changeOrigin: true,
+  }
+}
+```
+
+### Q: 如何添加新的页面？
+A:
+1. 在 `src/components/` 创建新组件
+2. 在 `App.jsx` 的 `tabs` 数组添加新页签
+3. 在渲染部分添加条件渲染
+
+### Q: 为什么进程监控页面是空的？
+A: 确保：
+1. 后端服务正在运行
+2. 后端有数据（运行测试数据生成器）
+3. 检查浏览器控制台的网络请求
+
+### Q: 如何自定义主题颜色？
+A: 编辑 `tailwind.config.js` 中的 `colors` 配置。
+
+### Q: 能否部署到生产环境？
+A: 可以。运行 `npm run build` 后，将 `dist/` 目录部署到任何静态服务器（Nginx、Vercel、Netlify等）。
+
+## 贡献指南
+
+欢迎提交Issue和Pull Request！
+
+### 开发流程
+1. Fork本项目
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启Pull Request
+
+### 代码规范
+- 使用ESLint进行代码检查
+- 使用Prettier进行代码格式化
+- 组件使用PascalCase命名
+- 遵循React Hooks规则
+
 ## 许可证
 
-MIT
+MIT License - 详见 LICENSE 文件
+
+## 联系方式
+
+- 项目主页: [GitHub Repository]
+- 问题反馈: [Issues]
+- 邮箱: your-email@example.com
+
+---
+
+**Made with ❤️ by EasyQuant Team**
+
+*最后更新: 2025-12-06*

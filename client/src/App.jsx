@@ -1,13 +1,23 @@
-import { useState, useEffect } from 'react'
-import { Activity, Database, Server } from 'lucide-react'
-import ETLConfig from './components/ETLConfig'
+import { useState } from 'react'
+import { Activity, Database, Server, Table2 } from 'lucide-react'
 import ProcessMonitor from './components/ProcessMonitor'
+import ETLTaskList from './components/ETLTaskList'
+import ETLTaskEditor from './components/ETLTaskEditor'
+import DataTableList from './components/DataTableList'
+import DataTableEditor from './components/DataTableEditor'
 
 function App() {
-  const [activeTab, setActiveTab] = useState('etl-config')
+  const [activeTab, setActiveTab] = useState('etl')
+  const [editId, setEditId] = useState(null)
+
+  const handleNavigate = (tab, id = null) => {
+    setActiveTab(tab)
+    setEditId(id)
+  }
 
   const tabs = [
-    { id: 'etl-config', name: 'ETL配置', icon: Database },
+    { id: 'tables', name: '数据表', icon: Table2 },
+    { id: 'etl', name: 'ETL任务', icon: Database },
     { id: 'monitor', name: '进程监控', icon: Activity },
   ]
 
@@ -45,17 +55,14 @@ function App() {
           <nav className="flex gap-8">
             {tabs.map((tab) => {
               const Icon = tab.icon
+              const isActive = activeTab === tab.id || 
+                (tab.id === 'tables' && activeTab.startsWith('table')) ||
+                (tab.id === 'etl' && activeTab.startsWith('etl'))
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`
-                    flex items-center gap-2 px-4 py-4 border-b-2 font-medium transition-all duration-200
-                    ${activeTab === tab.id
-                      ? 'border-primary-500 text-primary-600'
-                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                    }
-                  `}
+                  onClick={() => handleNavigate(tab.id)}
+                  className={`flex items-center gap-2 px-4 py-4 border-b-2 font-medium transition-all duration-200 ${isActive ? 'border-primary-500 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}
                 >
                   <Icon className="w-5 h-5" />
                   {tab.name}
@@ -68,7 +75,12 @@ function App() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'etl-config' && <ETLConfig />}
+        {activeTab === 'tables' && <DataTableList onNavigate={handleNavigate} />}
+        {activeTab === 'table-new' && <DataTableEditor onNavigate={handleNavigate} />}
+        {activeTab === 'table-edit' && <DataTableEditor tableId={editId} onNavigate={handleNavigate} />}
+        {activeTab === 'etl' && <ETLTaskList onNavigate={handleNavigate} />}
+        {activeTab === 'etl-new' && <ETLTaskEditor onNavigate={handleNavigate} />}
+        {activeTab === 'etl-edit' && <ETLTaskEditor taskId={editId} onNavigate={handleNavigate} />}
         {activeTab === 'monitor' && <ProcessMonitor />}
       </main>
 

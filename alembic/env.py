@@ -26,6 +26,8 @@ load_dotenv()
 #    so that Base's metadata knows about them.
 from server.storage.models.base import Base
 import server.storage.models.event
+import server.storage.models.etl_task_config
+import server.storage.models.data_table_config
 target_metadata = Base.metadata
 
 # 3. Read the database URL from the environment variable (fail fast)
