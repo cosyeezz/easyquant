@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Pencil, Trash2, Loader2, Database, Play, AlertTriangle } from 'lucide-react'
+import { Plus, Pencil, Trash2, Loader2, Database, Play, AlertTriangle, Copy } from 'lucide-react'
 import api from '../services/api'
 import Modal from './Modal'
 
@@ -160,6 +160,9 @@ function DataTableList({ onNavigate }) {
                             发布
                           </button>
                         )}
+                        <button onClick={() => onNavigate('table-new', table.id)} className="btn-icon" title="复制表结构">
+                          <Copy className="w-4 h-4" />
+                        </button>
                         <button onClick={() => onNavigate('table-edit', table.id)} className="btn-icon" title="编辑内容">
                           <Pencil className="w-4 h-4" />
                         </button>
@@ -181,9 +184,13 @@ function DataTableList({ onNavigate }) {
         isOpen={deleteModal.open}
         onClose={() => setDeleteModal({ open: false, table: null })}
         onConfirm={handleDelete}
-        title="确认删除"
-        message={`确定要删除数据表 "${deleteModal.table?.name}" 吗？此操作不可恢复。`}
-        type="warning"
+        title={deleteModal.table?.status === 'CREATED' || deleteModal.table?.status === 'created' ? "高危操作确认" : "确认删除"}
+        message={
+          (deleteModal.table?.status === 'CREATED' || deleteModal.table?.status === 'created')
+            ? `警告：您正在删除已发布的表 "${deleteModal.table?.name}"。\n这将永久删除数据库中的物理表 "${deleteModal.table?.table_name}" 及其所有数据！\n此操作极度危险且不可恢复，请三思！`
+            : `确定要删除数据表 "${deleteModal.table?.name}" 吗？此操作不可恢复。`
+        }
+        type={(deleteModal.table?.status === 'CREATED' || deleteModal.table?.status === 'created') ? 'error' : 'warning'}
       />
 
       {/* Publish Modal */}

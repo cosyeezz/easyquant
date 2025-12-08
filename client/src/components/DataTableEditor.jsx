@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Save, Loader2, Plus, Trash2, GripVertical } from 'lucide-react'
+import { ArrowLeft, Save, Loader2, Plus, Trash2, GripVertical, X } from 'lucide-react'
 import api from '../services/api'
 
 const COLUMN_TYPES = [
@@ -14,7 +14,7 @@ const COLUMN_TYPES = [
   { value: 'JSONB', label: 'JSONB', hint: '非结构化数据' },
 ]
 
-function DataTableEditor({ tableId, onNavigate }) {
+function DataTableEditor({ tableId, cloneFromId, onNavigate }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -31,7 +31,7 @@ function DataTableEditor({ tableId, onNavigate }) {
 
   useEffect(() => {
     loadData()
-  }, [tableId])
+  }, [tableId, cloneFromId])
 
   const loadData = async () => {
     try {
@@ -45,7 +45,29 @@ function DataTableEditor({ tableId, onNavigate }) {
 
       if (tableId) {
         const data = await api.getDataTable(tableId)
+        // Ensure arrays exist
+        data.columns_schema = data.columns_schema || []
+        data.indexes_schema = data.indexes_schema || []
+        data.indexes_schema.forEach(idx => {
+          idx.columns = idx.columns || []
+        })
         setForm(data)
+      } else if (cloneFromId) {
+        const data = await api.getDataTable(cloneFromId)
+        // Ensure arrays exist
+        data.columns_schema = data.columns_schema || []
+        data.indexes_schema = data.indexes_schema || []
+        data.indexes_schema.forEach(idx => {
+          idx.columns = idx.columns || []
+        })
+        setForm({
+          ...data,
+          id: undefined, // Clear ID to create new
+          name: `${data.name} (副本)`,
+          table_name: `${data.table_name}_copy`,
+          status: 'DRAFT',
+          // Keep other fields like columns, indexes, category, description
+        })
       } else {
         setForm(prev => ({ ...prev, category_id: initialCategoryId }))
       }
@@ -162,7 +184,6 @@ function DataTableEditor({ tableId, onNavigate }) {
               onChange={(e) => updateForm('name', e.target.value)}
               className="input-field"
               placeholder="例如：A股日线行情"
-              disabled={isPublished}
             />
           </div>
           <div>
@@ -175,7 +196,7 @@ function DataTableEditor({ tableId, onNavigate }) {
               placeholder="例如：daily_bars"
               disabled={isPublished}
             />
-            <p className="form-hint">只能包含小写字母、数字和下划线</p>
+            <p className="form-hint">只能包含小写字母、数字和下划线{isPublished && ' (已发布表不可重命名)'}</p>
           </div>
         </div>
 
@@ -185,7 +206,6 @@ function DataTableEditor({ tableId, onNavigate }) {
             value={form.category_id}
             onChange={handleCategoryChange}
             className="input-field"
-            disabled={isPublished}
           >
             {categories.map(cat => (
               <option key={cat.id} value={cat.id}>{cat.name} ({cat.code})</option>
@@ -209,11 +229,9 @@ function DataTableEditor({ tableId, onNavigate }) {
       <div className="card space-y-4">
         <div className="flex items-center justify-between border-b pb-2">
           <h3 className="font-semibold text-slate-800">字段定义</h3>
-          {!isPublished && (
-            <button onClick={addColumn} className="btn-secondary flex items-center gap-1 text-sm">
-              <Plus className="w-4 h-4" /> 添加字段
-            </button>
-          )}
+          <button onClick={addColumn} className="btn-secondary flex items-center gap-1 text-sm">
+            <Plus className="w-4 h-4" /> 添加字段
+          </button>
         </div>
 
         {form.columns_schema.length === 0 ? (
@@ -242,7 +260,6 @@ function DataTableEditor({ tableId, onNavigate }) {
                         onChange={(e) => updateColumn(i, 'name', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                         className="input-field !py-1"
                         placeholder="column_name"
-                        disabled={isPublished}
                       />
                     </td>
                     <td className="py-2 px-2">
@@ -250,7 +267,6 @@ function DataTableEditor({ tableId, onNavigate }) {
                         value={col.type}
                         onChange={(e) => updateColumn(i, 'type', e.target.value)}
                         className="input-field !py-1"
-                        disabled={isPublished}
                       >
                         {COLUMN_TYPES.map(t => (
                           <option key={t.value} value={t.value}>{t.label}</option>
@@ -263,7 +279,6 @@ function DataTableEditor({ tableId, onNavigate }) {
                         checked={col.is_pk}
                         onChange={(e) => updateColumn(i, 'is_pk', e.target.checked)}
                         className="w-4 h-4"
-                        disabled={isPublished}
                       />
                     </td>
                     <td className="py-2 px-2">
@@ -276,11 +291,9 @@ function DataTableEditor({ tableId, onNavigate }) {
                       />
                     </td>
                     <td className="py-2 px-2">
-                      {!isPublished && (
-                        <button onClick={() => removeColumn(i)} className="btn-icon-danger !p-1">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
+                      <button onClick={() => removeColumn(i)} className="btn-icon-danger !p-1">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -293,53 +306,100 @@ function DataTableEditor({ tableId, onNavigate }) {
       {/* Section C: 索引定义 */}
       <div className="card space-y-4">
         <div className="flex items-center justify-between border-b pb-2">
-          <h3 className="font-semibold text-slate-800">索引定义</h3>
-          {!isPublished && (
-            <button onClick={addIndex} className="btn-secondary flex items-center gap-1 text-sm">
-              <Plus className="w-4 h-4" /> 添加索引
-            </button>
-          )}
+          <div className="space-y-1">
+            <h3 className="font-semibold text-slate-800">索引定义</h3>
+            <p className="text-xs text-slate-500">支持联合索引，通过添加多个列来组合</p>
+          </div>
+          <button onClick={addIndex} className="btn-secondary flex items-center gap-1 text-sm">
+             <Plus className="w-4 h-4" /> 添加索引
+          </button>
         </div>
 
         {form.indexes_schema.length === 0 ? (
-          <div className="text-center py-8 text-slate-400">暂无索引</div>
+          <div className="text-center py-8 text-slate-400 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+            暂无索引配置
+          </div>
         ) : (
           <div className="space-y-3">
             {form.indexes_schema.map((idx, i) => (
-              <div key={i} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                <input
-                  type="text"
-                  value={idx.name}
-                  onChange={(e) => updateIndex(i, 'name', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                  className="input-field !py-1 w-40"
-                  placeholder="idx_name"
-                  disabled={isPublished}
-                />
-                <select
-                  multiple
-                  value={idx.columns}
-                  onChange={(e) => updateIndex(i, 'columns', Array.from(e.target.selectedOptions, o => o.value))}
-                  className="input-field !py-1 flex-1 min-h-[60px]"
-                  disabled={isPublished}
-                >
-                  {columnNames.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-                <label className="flex items-center gap-2 text-sm">
+              <div key={i} className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 bg-white border border-slate-200 rounded-lg shadow-sm hover:border-primary-200 transition-colors">
+                
+                {/* 索引名称 */}
+                <div className="w-full sm:w-48">
+                  <label className="block text-xs font-medium text-slate-500 mb-1">索引名称</label>
                   <input
-                    type="checkbox"
-                    checked={idx.unique}
-                    onChange={(e) => updateIndex(i, 'unique', e.target.checked)}
-                    disabled={isPublished}
+                    type="text"
+                    value={idx.name}
+                    onChange={(e) => updateIndex(i, 'name', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                    className="input-field !py-1.5 w-full"
+                    placeholder="例如: idx_symbol_date"
                   />
-                  唯一
-                </label>
-                {!isPublished && (
-                  <button onClick={() => removeIndex(i)} className="btn-icon-danger !p-1">
+                </div>
+
+                {/* 索引列 (Tag Editor) */}
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-slate-500 mb-1">索引列组合 (联合索引)</label>
+                  <div className="flex flex-wrap gap-2 min-h-[38px] p-1.5 bg-slate-50 rounded border border-slate-200">
+                    {idx.columns.map((colName, colIdx) => (
+                      <span key={colIdx} className="inline-flex items-center px-2 py-1 rounded bg-white border border-slate-200 text-sm text-slate-700 shadow-sm">
+                        {colName}
+                        <button
+                          onClick={() => {
+                            const newCols = idx.columns.filter((_, ci) => ci !== colIdx)
+                            updateIndex(i, 'columns', newCols)
+                          }}
+                          className="ml-1.5 text-slate-400 hover:text-red-500"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                    
+                    <div className="relative group">
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          if (e.target.value && !idx.columns.includes(e.target.value)) {
+                            updateIndex(i, 'columns', [...idx.columns, e.target.value])
+                          }
+                        }}
+                        className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
+                      >
+                        <option value="">添加列...</option>
+                        {columnNames.filter(c => !idx.columns.includes(c)).map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                      <div className="flex items-center gap-1 px-2 py-1 text-sm text-slate-500 border border-dashed border-slate-300 rounded hover:border-primary-400 hover:text-primary-600 hover:bg-primary-50 transition-all bg-white">
+                        <Plus className="w-3 h-3" /> 添加列
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 唯一性开关 */}
+                <div className="flex items-center pt-5">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={idx.unique}
+                        onChange={(e) => updateIndex(i, 'unique', e.target.checked)}
+                      />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"></div>
+                    </div>
+                    <span className="text-sm text-slate-600">唯一索引</span>
+                  </label>
+                </div>
+
+                {/* 删除按钮 */}
+                <div className="pt-5">
+                  <button onClick={() => removeIndex(i)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="删除索引">
                     <Trash2 className="w-4 h-4" />
                   </button>
-                )}
+                </div>
+
               </div>
             ))}
           </div>

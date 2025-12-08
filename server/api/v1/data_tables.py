@@ -145,20 +145,21 @@ async def update_table_draft(
         raise HTTPException(status_code=404, detail="Table config not found")
     
     if config.status == TableStatus.CREATED:
-        # 已发布表只允许修改非结构化字段（如显示名、描述）
-        # 这里为了简单，如果已发布，禁止修改 schema
-        if (data.table_name != config.table_name or 
-            [c.dict() for c in data.columns_schema] != config.columns_schema):
-             raise HTTPException(status_code=400, detail="Cannot modify schema of a published table. Use migration tools (TBD).")
+        # 已发布表禁止修改物理表名 (Renaming physical tables is complex)
+        if data.table_name != config.table_name:
+             raise HTTPException(status_code=400, detail="Cannot rename physical table of a published config.")
 
     config.name = data.name
     config.description = data.description
     config.category_id = data.category_id
-    # Only update schema if draft
+    
+    # Always allow schema updates (Backend is truth, sync status handled by timestamps)
+    config.columns_schema = [c.dict() for c in data.columns_schema]
+    config.indexes_schema = [i.dict() for i in data.indexes_schema]
+
+    # Only allow table_name update if DRAFT
     if config.status == TableStatus.DRAFT:
         config.table_name = data.table_name
-        config.columns_schema = [c.dict() for c in data.columns_schema]
-        config.indexes_schema = [i.dict() for i in data.indexes_schema]
 
     await session.commit()
     await session.refresh(config)
@@ -228,11 +229,16 @@ async def delete_table(id: int, session: AsyncSession = Depends(get_session)):
         raise HTTPException(status_code=404, detail="Table config not found")
         
     if config.status == TableStatus.CREATED:
-        # 生产环境通常禁止删除已发布的表，或者需要特殊的 Drop 流程
-        # 这里暂时允许删除配置，但不删除物理表（防止误删数据）
-        # 或者：抛出错误，要求必须先归档
-        raise HTTPException(status_code=400, detail="Cannot delete a published table. Please archive it first (feature TBD).")
+        # 允许删除已发布表，同时删除物理表
+        try:
+            # DROP TABLE IF EXISTS ... CASCADE
+            # table_name is validated by regex on creation, so injection risk is minimal
+            drop_sql = text(f"DROP TABLE IF EXISTS {config.table_name} CASCADE")
+            await session.execute(drop_sql)
+        except Exception as e:
+            await session.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to drop physical table: {str(e)}")
 
     await session.delete(config)
     await session.commit()
-    return {"message": "Draft deleted"}
+    return {"message": "Table and configuration deleted successfully"}

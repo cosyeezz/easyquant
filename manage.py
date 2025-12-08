@@ -85,40 +85,91 @@ def kill_process_tree(pid):
     except Exception as e:
         print(f"Failed to kill PID {pid}: {e}")
 
-def force_stop(target="all"):
+def get_client_port():
     """
-    强力停止逻辑：
-    1. 尝试读取 PID 文件停止
-    2. 尝试根据端口/特征码兜底停止
+    尝试从 client/vite.config.js 读取配置的端口。
+    默认返回 3000。
     """
-    pids = read_pids()
+    config_path = PROJECT_ROOT / "client" / "vite.config.js"
+    default_port = 3000
+    try:
+        if not config_path.exists():
+            return default_port
+        
+        with open(config_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            
+            # 1. 尝试匹配 server: { ... port: 3000 ... }
+            # 使用 DOTALL 模式让 . 匹配换行符
+            match = re.search(r'server:\s*\{[^}]*port:\s*(\d+)', content, re.DOTALL)
+            if match:
+                return int(match.group(1))
+            
+            # 2. 简单的后备匹配
+            match_simple = re.search(r'port:\s*(\d+)', content)
+            if match_simple:
+                return int(match_simple.group(1))
+                
+    except Exception as e:
+        print(f"Warning: Could not parse vite.config.js for port: {e}")
     
-    # 1. PID 文件清理
-    targets_to_kill = []
-    if target == "all": targets_to_kill = list(pids.keys())
-    elif target in pids: targets_to_kill = [target]
+    return default_port
 
-    for name in targets_to_kill:
-        pid = pids[name]
-        print(f"[{name}] Stopping PID (from file): {pid}...")
-        kill_process_tree(pid)
-        if name in pids: del pids[name]
+def force_stop(service_name):
+    """
+    通过查找端口占用强制停止服务。
+    Server: 8000
+    Client: 动态读取 (默认 3000)
+    """
+    ports = []
+    if service_name in ["server", "all"]:
+        ports.append(8000)
+    if service_name in ["client", "all"]:
+        ports.append(get_client_port())
 
-    # 2. 兜底清理 (Port / Name)
-    if target in ["all", "server"]:
-        if check_port_in_use(8000):
-            print("[Server] Port 8000 is still in use, forcing cleanup...")
-            kill_process_on_port(8000)
-    
-    if target in ["all", "client"]:
-        # 前端较难通过端口查杀(Vite端口不固定)，只能尝试 pkill (Unix only)
-        # Windows 下 taskkill /IM node.exe 风险太大，暂不执行全局查杀，仅依赖 PID
-        if platform.system() != "Windows":
-            # 尝试查找包含 "vite" 的 node 进程
-            subprocess.run(["pkill", "-f", "vite"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    for port in ports:
+        print(f"[{service_name.upper() if service_name != 'all' else 'SYSTEM'}] Checking port {port}...")
+        try:
+            # 使用 lsof 查找占用端口的 PID
+            # -t: terse (only PIDs)
+            # -i: internet files
+            result = subprocess.run(
+                ["lsof", "-t", "-i", f":{port}"], 
+                capture_output=True, 
+                text=True
+            )
+            pids = result.stdout.strip().split('\n')
+            pids = [p for p in pids if p] # filter empty strings
 
-    # 更新 PID 文件
-    write_pids(pids)
+            if not pids:
+                print(f"  No process found on port {port}.")
+                continue
+
+            for pid in pids:
+                try:
+                    pid_int = int(pid)
+                    print(f"  Killing PID {pid_int} on port {port}...")
+                    os.kill(pid_int, signal.SIGTERM) # Try gentle kill first
+                    # Optional: wait and force kill if needed
+                except ValueError:
+                    pass
+                except ProcessLookupError:
+                    print(f"  PID {pid} already gone.")
+                except Exception as e:
+                    print(f"  Error killing PID {pid}: {e}")
+                    
+        except FileNotFoundError:
+             print("  Warning: 'lsof' command not found. Cannot kill by port automatically.")
+        except Exception as e:
+            print(f"  Error checking port {port}: {e}")
+
+    # Clean up PID file just in case
+    if os.path.exists(PID_FILE):
+        try:
+            os.remove(PID_FILE)
+            print(f"Removed PID file: {PID_FILE}")
+        except OSError:
+            pass
 
 def start_services(target="all"):
     # 启动前先执行清理！
@@ -147,19 +198,26 @@ def start_services(target="all"):
     # --- Start Server ---
     if target in ["all", "server"]:
         print("[Server] Starting backend service...")
-        server_out = open(LOG_DIR / "server.log", "w", encoding='utf-8')
-        server_err = open(LOG_DIR / "server.err.log", "w", encoding='utf-8')
+        server_log = LOG_DIR / "server.log"
+        server_err_log = LOG_DIR / "server.err.log"
+        
+        # Use shell redirection to avoid file descriptor issues when parent exits
+        cmd_str = f'"{sys.executable}" server/main.py > "{server_log}" 2> "{server_err_log}"'
         
         try:
             server_proc = subprocess.Popen(
-                SERVER_CMD,
+                cmd_str,
                 cwd=PROJECT_ROOT,
-                stdout=server_out,
-                stderr=server_err,
                 env=run_env,
+                shell=True,
+                stdin=subprocess.DEVNULL, # Detach stdin to prevent 'Bad file descriptor'
+                # On Unix, start_new_session=True creates a new process group/session
+                start_new_session=(platform.system() != "Windows"),
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if platform.system() == "Windows" else 0
             )
-            pids['server'] = server_proc.pid
+            pids['server'] = server_proc.pid + 1 if platform.system() != "Windows" else server_proc.pid # Shell pid vs child pid? Actually shell pid is what we get.
+            # Wait, if shell=True, pids['server'] is the PID of the shell (sh/bash).
+            # Killing the shell usually kills the child if they are in the same group.
             print(f"[Server] Started with PID: {server_proc.pid}")
         except Exception as e:
             print(f"[Server] Failed to start: {e}")
@@ -168,17 +226,21 @@ def start_services(target="all"):
     # --- Start Client ---
     if target in ["all", "client"]:
         print("[Client] Starting frontend service...")
-        client_out = open(LOG_DIR / "client.log", "w", encoding='utf-8')
-        client_err = open(LOG_DIR / "client.err.log", "w", encoding='utf-8')
+        client_log = LOG_DIR / "client.log"
+        client_err_log = LOG_DIR / "client.err.log"
+        
+        # npm run dev
+        npm_cmd_str = " ".join(NPM_CMD)
+        cmd_str = f'{npm_cmd_str} > "{client_log}" 2> "{client_err_log}"'
 
         try:
             client_proc = subprocess.Popen(
-                NPM_CMD,
+                cmd_str,
                 cwd=PROJECT_ROOT / "client",
-                stdout=client_out,
-                stderr=client_err,
                 env=run_env,
-                shell=(platform.system() == "Windows"),
+                shell=True,
+                stdin=subprocess.DEVNULL, # Detach stdin
+                start_new_session=(platform.system() != "Windows"),
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if platform.system() == "Windows" else 0
             )
             pids['client'] = client_proc.pid

@@ -76,7 +76,7 @@ function App() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'tables' && <DataTableList onNavigate={handleNavigate} />}
-        {activeTab === 'table-new' && <DataTableEditor onNavigate={handleNavigate} />}
+        {activeTab === 'table-new' && <DataTableEditor cloneFromId={editId} onNavigate={handleNavigate} />}
         {activeTab === 'table-edit' && <DataTableEditor tableId={editId} onNavigate={handleNavigate} />}
         {activeTab === 'etl' && <ETLTaskList onNavigate={handleNavigate} />}
         {activeTab === 'etl-new' && <ETLTaskEditor onNavigate={handleNavigate} />}
