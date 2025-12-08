@@ -1,3 +1,55 @@
+# 开发日志 (2025-12-08)
+
+## 概述
+
+本日开发聚焦于 **用户体验 (UX) 的深度优化** 与 **核心业务流程的闭环**。我们完成了数据表从“草稿”到“发布”的完整状态流转逻辑，引入了现代化 UI 组件库，修复了关键的 SQL 生成 bug，并增强了系统的可观测性（实时日志监控）。
+
+## 详细工作项
+
+### 1. 数据表管理 (Data Warehouse) 闭环
+- **发布流程实现**:
+    - **后端**: 新增 `POST /data-tables/{id}/publish` 接口。实现了 `DDLGenerator` 的增强版，支持：
+        - SQL 保留字检查 (PostgreSQL)。
+        - 命名规范正则校验。
+        - 严格的 Schema 校验 (主键存在性、索引列引用)。
+        - **[FIX] 自动索引命名**: 修复了当用户未提供索引名称时生成无效 SQL (`CREATE INDEX ON ...`) 的问题，现在会自动生成规范名称。
+        - 事务性 DDL 执行 (Create Table + Create Index)。
+    - **前端**: 在 `DataTableEditor` 中实现了发布入口。
+        - 状态驱动的 UI: 仅在 `DRAFT` 状态显示“发布上线”按钮。
+        - **自定义模态框 (Modal)**: 替换了原生的 `window.confirm/alert`，提供清晰的风险提示（不可逆操作），并在操作失败时直接在弹窗内优雅展示错误信息。
+
+- **分类管理系统**:
+    - 实现了数据表分类的完整 CRUD。
+    - 前端新增 `CategoryManagerModal`，支持在编辑表结构时直接管理分类。
+
+- **字段编辑器优化**:
+    - 扩展了 PostgreSQL 数据类型支持（`JSONB`, `UUID`, `ARRAY`, `NUMERIC` 等）。
+    - 实现了**实时字段级校验**：输入时即时检查命名规范和重复性，并提供红框高亮和错误提示。
+    - **UI 布局优化**: 将全局错误提示移动到编辑器底部左侧（保存按钮旁），确保用户在点击保存时能立即看到反馈。
+
+### 2. 前端 UI/UX 重构
+- **UI 组件化**:
+    - 开发了通用的 `Select` 组件（基于 Headless UI 思想），替换了所有原生的丑陋 `<select>` 标签，支持自定义样式和交互。
+    - 统一了 Modal 弹窗风格，支持 Success/Warning/Error 多种状态。
+- **列表页美化**: 重构了 `DataTableList`，将删除和发布操作的确认弹窗全部升级为自定义 Modal，彻底移除原生 `alert`。
+
+### 3. 可观测性 (Observability)
+- **实时日志监控**:
+    - 后端新增 `GET /api/v1/system/logs/{service}` 接口，支持读取 Server 和 Client 的实时日志。
+    - 前端 `ProcessMonitor` 底部新增 **Terminal 风格日志查看器**，支持自动轮询刷新。
+    - **[FIX] 异常日志**: 修复了 API 捕获异常时未记录日志的问题，确保所有后端错误（如 SQL 执行失败）都能在监控终端中查看。
+
+### 4. 运维与稳定性 (DevOps)
+- **`manage.py` 核心修复**:
+    - 解决了 macOS/Linux 下 `subprocess` 文件描述符继承导致的 `OSError: [Errno 9] Bad file descriptor` 问题。
+    - 采用了更健壮的 `nohup` 风格启动方式 (`stdin=DEVNULL`, `stdout/stderr` 重定向)，确保服务与控制台完全解耦。
+
+## 下一步计划
+1.  **实现 `DatabaseSaveHandler`**: 万事俱备，只欠东风。现在表结构已就绪，下一步必须打通数据入库逻辑。
+2.  **ETL Runner 实现**: 串联 Loader -> Pipeline -> Handler 的执行引擎。
+
+---
+
 # 开发日志 (2025-12-07)
 
 ## 概述

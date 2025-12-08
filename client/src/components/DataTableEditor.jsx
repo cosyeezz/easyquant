@@ -1,28 +1,56 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Save, Loader2, Plus, Trash2, GripVertical, X } from 'lucide-react'
+import { ArrowLeft, Save, Loader2, Plus, Trash2, GripVertical, X, Settings, UploadCloud, AlertCircle } from 'lucide-react'
 import api from '../services/api'
+import Select from './ui/Select'
+import CategoryManagerModal from './CategoryManagerModal'
+import Modal from './Modal'
 
 const COLUMN_TYPES = [
-  { value: 'VARCHAR(20)', label: 'VARCHAR(20)', hint: '短文本 (代码)' },
-  { value: 'VARCHAR(100)', label: 'VARCHAR(100)', hint: '中等文本 (名称)' },
-  { value: 'TIMESTAMPTZ', label: 'TIMESTAMPTZ', hint: '带时区时间' },
-  { value: 'DOUBLE PRECISION', label: 'DOUBLE PRECISION', hint: '双精度浮点 (价格)' },
-  { value: 'NUMERIC', label: 'NUMERIC', hint: '高精度小数 (财务)' },
-  { value: 'INT', label: 'INT', hint: '整数' },
-  { value: 'BIGINT', label: 'BIGINT', hint: '大整数 (成交量)' },
-  { value: 'BOOLEAN', label: 'BOOLEAN', hint: '布尔值' },
-  { value: 'JSONB', label: 'JSONB', hint: '非结构化数据' },
+  { value: 'VARCHAR(20)', label: 'VARCHAR(20)', hint: '短代码 (如 symbol)' },
+  { value: 'VARCHAR(100)', label: 'VARCHAR(100)', hint: '名称/标题' },
+  { value: 'TEXT', label: 'TEXT', hint: '长文本/备注' },
+  { value: 'CHAR(10)', label: 'CHAR(10)', hint: '定长字符' },
+  { value: 'TIMESTAMPTZ', label: 'TIMESTAMPTZ', hint: '带时区时间 (推荐)' },
+  { value: 'DATE', label: 'DATE', hint: '仅日期 (无时间)' },
+  { value: 'TIME', label: 'TIME', hint: '仅时间' },
+  { value: 'DOUBLE PRECISION', label: 'DOUBLE PRECISION', hint: '浮点数 (价格/计算)' },
+  { value: 'NUMERIC(20,4)', label: 'NUMERIC(20,4)', hint: '高精度财务金额' },
+  { value: 'INT', label: 'INT', hint: '整数 (4字节)' },
+  { value: 'BIGINT', label: 'BIGINT', hint: '大整数 (8字节/成交量)' },
+  { value: 'BOOLEAN', label: 'BOOLEAN', hint: '布尔值 (True/False)' },
+  { value: 'JSONB', label: 'JSONB', hint: 'JSON 对象 (高效查询)' },
+  { value: 'UUID', label: 'UUID', hint: '全局唯一ID' },
+  { value: 'VARCHAR[]', label: 'VARCHAR[]', hint: '文本数组' },
+  { value: 'INT[]', label: 'INT[]', hint: '整数数组' },
 ]
+
+const RESERVED_KEYWORDS = new Set([
+  "ALL", "ANALYSE", "ANALYZE", "AND", "ANY", "ARRAY", "AS", "ASC", "ASYMMETRIC", "AUTHORIZATION",
+  "BINARY", "BOTH", "CASE", "CAST", "CHECK", "COLLATE", "COLUMN", "CONSTRAINT", "CREATE", "CROSS",
+  "CURRENT_DATE", "CURRENT_ROLE", "CURRENT_TIME", "CURRENT_TIMESTAMP", "CURRENT_USER", "DEFAULT",
+  "DEFERRABLE", "DESC", "DISTINCT", "DO", "ELSE", "END", "EXCEPT", "FALSE", "FOR", "FOREIGN",
+  "FREEZE", "FROM", "FULL", "GRANT", "GROUP", "HAVING", "ILIKE", "IN", "INITIALLY", "INNER",
+  "INTERSECT", "INTO", "IS", "ISNULL", "JOIN", "LATERAL", "LEADING", "LEFT", "LIKE", "LIMIT",
+  "LOCALTIME", "LOCALTIMESTAMP", "NATURAL", "NEW", "NOT", "NOTNULL", "NULL", "OFF", "OFFSET",
+  "OLD", "ON", "ONLY", "OR", "ORDER", "OUTER", "OVERLAPS", "PLACING", "PRIMARY", "REFERENCES",
+  "RIGHT", "SELECT", "SESSION_USER", "SIMILAR", "SOME", "SYMMETRIC", "TABLE", "THEN", "TO",
+  "TRAILING", "TRUE", "UNION", "UNIQUE", "USER", "USING", "VERBOSE", "WHEN", "WHERE", "WINDOW", "WITH"
+])
+const NAME_REGEX = /^[a-z_][a-z0-9_]*$/
 
 function DataTableEditor({ tableId, cloneFromId, onNavigate }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [publishing, setPublishing] = useState(false)
+  const [showPublishConfirm, setShowPublishConfirm] = useState(false)
   const [error, setError] = useState(null)
+  const [validationErrors, setValidationErrors] = useState({})
   const [categories, setCategories] = useState([])
+  const [showCatModal, setShowCatModal] = useState(false)
   const [form, setForm] = useState({
     name: '',
     table_name: '',
-    category_id: '', // Changed from category string to category_id
+    category_id: '', 
     description: '',
     status: 'DRAFT',
     columns_schema: [],
@@ -33,14 +61,18 @@ function DataTableEditor({ tableId, cloneFromId, onNavigate }) {
     loadData()
   }, [tableId, cloneFromId])
 
+  const refreshCategories = async () => {
+    const cats = await api.getTableCategories()
+    setCategories(cats)
+  }
+
   const loadData = async () => {
     try {
       setLoading(true)
-      // Load categories first
+      await refreshCategories()
+      
       const cats = await api.getTableCategories()
       setCategories(cats)
-      
-      // Default to first category if creating new
       let initialCategoryId = cats.length > 0 ? cats[0].id : ''
 
       if (tableId) {
@@ -81,15 +113,14 @@ function DataTableEditor({ tableId, cloneFromId, onNavigate }) {
 
   const updateForm = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }))
+    // Clear global error when user edits
+    if (error) setError(null)
   }
 
-  // Handle category_id as integer
-  const handleCategoryChange = (e) => {
-    const val = parseInt(e.target.value, 10)
+  const handleCategoryChange = (val) => {
     updateForm('category_id', val)
   }
 
-  // Use status lowercase check to match backend
   const isPublished = form.status === 'created' || form.status === 'CREATED'
 
   // Column operations
@@ -122,9 +153,65 @@ function DataTableEditor({ tableId, cloneFromId, onNavigate }) {
     updateForm('indexes_schema', form.indexes_schema.filter((_, i) => i !== index))
   }
 
+  const validateForm = () => {
+    const errors = {}
+    let isValid = true
+
+    // 1. Table Name
+    if (!form.table_name) {
+      errors.table_name = '物理表名不能为空'
+    } else if (!NAME_REGEX.test(form.table_name)) {
+      errors.table_name = '格式错误 (仅小写字母/数字/下划线)'
+    } else if (RESERVED_KEYWORDS.has(form.table_name.toUpperCase())) {
+      errors.table_name = '使用了保留关键字'
+    }
+
+    // 2. Columns
+    if (form.columns_schema.length === 0) {
+      errors.general = '请至少添加一个字段'
+    }
+    
+    const colNames = new Set()
+    let hasPk = false
+    
+    form.columns_schema.forEach((col, index) => {
+      if (!col.name) {
+        errors[`columns.${index}.name`] = '必填'
+      } else if (!NAME_REGEX.test(col.name)) {
+        errors[`columns.${index}.name`] = '格式错误'
+      } else if (RESERVED_KEYWORDS.has(col.name.toUpperCase())) {
+        errors[`columns.${index}.name`] = '保留字'
+      } else if (colNames.has(col.name)) {
+        errors[`columns.${index}.name`] = '重复'
+      }
+      colNames.add(col.name)
+      
+      if (col.is_pk) hasPk = true
+    })
+
+    if (!hasPk && form.columns_schema.length > 0) {
+      errors.general = errors.general || '必须指定主键'
+    }
+
+    if (Object.keys(errors).length > 0) {
+      isValid = false
+    }
+    
+    setValidationErrors(errors)
+    return isValid
+  }
+
   const handleSave = async () => {
+    console.log('Validating form...')
+    if (!validateForm()) {
+      setError('校验失败：请检查红色标记字段')
+      console.log('Validation failed')
+      return
+    }
+    
     if (!form.name || !form.table_name || !form.description || !form.category_id) {
-      setError('请填写所有必填项')
+      setError('校验失败：请填写所有必填项')
+      console.log('Required fields missing')
       return
     }
     setSaving(true)
@@ -143,6 +230,28 @@ function DataTableEditor({ tableId, cloneFromId, onNavigate }) {
     }
   }
 
+  const handlePublishClick = () => {
+    if (!validateForm()) {
+      setError('校验失败：请检查红色标记字段')
+      return
+    }
+    setShowPublishConfirm(true)
+  }
+
+  const executePublish = async () => {
+    setPublishing(true)
+    setError(null)
+    try {
+      await api.publishDataTable(tableId)
+      await loadData() 
+      setShowPublishConfirm(false)
+    } catch (err) {
+      setError(err.response?.data?.detail || '发布失败')
+    } finally {
+      setPublishing(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -152,9 +261,19 @@ function DataTableEditor({ tableId, cloneFromId, onNavigate }) {
   }
 
   const columnNames = form.columns_schema.map(c => c.name).filter(Boolean)
+  
+  // Transform options for Select components
+  const categoryOptions = categories.map(cat => ({ value: cat.id, label: `${cat.name} (${cat.code})` }))
+  
+  // For index column adder
+  const getAvailableColumnOptions = (currentColumns) => {
+    return columnNames
+      .filter(c => !currentColumns.includes(c))
+      .map(c => ({ value: c, label: c }))
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20"> {/* pb-20 for bottom actions space */}
       <div className="flex items-center gap-4">
         <button onClick={() => onNavigate('tables')} className="p-2 hover:bg-slate-100 rounded-lg">
           <ArrowLeft className="w-5 h-5" />
@@ -168,9 +287,7 @@ function DataTableEditor({ tableId, cloneFromId, onNavigate }) {
         )}
       </div>
 
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">{error}</div>
-      )}
+      {/* Top error removed */}
 
       {/* Section A: 基础信息 */}
       <div className="card space-y-5">
@@ -192,25 +309,31 @@ function DataTableEditor({ tableId, cloneFromId, onNavigate }) {
               type="text"
               value={form.table_name}
               onChange={(e) => updateForm('table_name', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-              className="input-field"
+              className={`input-field ${validationErrors.table_name ? 'border-red-500 focus:border-red-500 focus:ring-red-200' : ''}`}
               placeholder="例如：daily_bars"
               disabled={isPublished}
             />
+            {validationErrors.table_name && <p className="text-xs text-red-500 mt-1">{validationErrors.table_name}</p>}
             <p className="form-hint">只能包含小写字母、数字和下划线{isPublished && ' (已发布表不可重命名)'}</p>
           </div>
         </div>
 
         <div>
-          <label className="form-label">分类 *</label>
-          <select
+          <div className="flex items-center justify-between mb-1">
+            <label className="form-label mb-0">分类 *</label>
+            <button 
+              onClick={() => setShowCatModal(true)}
+              className="text-xs flex items-center gap-1 text-primary-600 hover:text-primary-700 hover:underline"
+            >
+              <Settings className="w-3 h-3" /> 管理分类
+            </button>
+          </div>
+          <Select
             value={form.category_id}
             onChange={handleCategoryChange}
-            className="input-field"
-          >
-            {categories.map(cat => (
-              <option key={cat.id} value={cat.id}>{cat.name} ({cat.code})</option>
-            ))}
-          </select>
+            options={categoryOptions}
+            placeholder="选择分类"
+          />
         </div>
 
         <div>
@@ -237,13 +360,13 @@ function DataTableEditor({ tableId, cloneFromId, onNavigate }) {
         {form.columns_schema.length === 0 ? (
           <div className="text-center py-8 text-slate-400">暂无字段，点击上方按钮添加</div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto min-h-[300px]">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
                   <th className="text-left py-2 px-2 w-8"></th>
-                  <th className="text-left py-2 px-2">列名</th>
-                  <th className="text-left py-2 px-2">类型</th>
+                  <th className="text-left py-2 px-2 w-48">列名</th>
+                  <th className="text-left py-2 px-2 w-48">类型</th>
                   <th className="text-center py-2 px-2 w-16">主键</th>
                   <th className="text-left py-2 px-2">描述</th>
                   <th className="w-10"></th>
@@ -254,24 +377,29 @@ function DataTableEditor({ tableId, cloneFromId, onNavigate }) {
                   <tr key={i} className="border-b hover:bg-slate-50">
                     <td className="py-2 px-2 text-slate-300"><GripVertical className="w-4 h-4" /></td>
                     <td className="py-2 px-2">
-                      <input
-                        type="text"
-                        value={col.name}
-                        onChange={(e) => updateColumn(i, 'name', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                        className="input-field !py-1"
-                        placeholder="column_name"
-                      />
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={col.name}
+                          onChange={(e) => updateColumn(i, 'name', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                          className={`input-field !py-1 ${validationErrors[`columns.${i}.name`] ? '!border-red-500' : ''}`}
+                          placeholder="column_name"
+                          title={validationErrors[`columns.${i}.name`]}
+                        />
+                        {validationErrors[`columns.${i}.name`] && (
+                          <span className="absolute -bottom-3 left-0 text-[10px] text-red-500 whitespace-nowrap">
+                            {validationErrors[`columns.${i}.name`]}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-2 px-2">
-                      <select
+                      <Select
                         value={col.type}
-                        onChange={(e) => updateColumn(i, 'type', e.target.value)}
-                        className="input-field !py-1"
-                      >
-                        {COLUMN_TYPES.map(t => (
-                          <option key={t.value} value={t.value}>{t.label}</option>
-                        ))}
-                      </select>
+                        onChange={(val) => updateColumn(i, 'type', val)}
+                        options={COLUMN_TYPES}
+                        className="!py-0" 
+                      />
                     </td>
                     <td className="py-2 px-2 text-center">
                       <input
@@ -355,24 +483,16 @@ function DataTableEditor({ tableId, cloneFromId, onNavigate }) {
                       </span>
                     ))}
                     
-                    <div className="relative group">
-                      <select
+                    <div className="w-32">
+                      <Select 
                         value=""
-                        onChange={(e) => {
-                          if (e.target.value && !idx.columns.includes(e.target.value)) {
-                            updateIndex(i, 'columns', [...idx.columns, e.target.value])
-                          }
+                        placeholder="添加列..."
+                        options={getAvailableColumnOptions(idx.columns)}
+                        onChange={(val) => {
+                           if (val) updateIndex(i, 'columns', [...idx.columns, val])
                         }}
-                        className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
-                      >
-                        <option value="">添加列...</option>
-                        {columnNames.filter(c => !idx.columns.includes(c)).map(c => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
-                      <div className="flex items-center gap-1 px-2 py-1 text-sm text-slate-500 border border-dashed border-slate-300 rounded hover:border-primary-400 hover:text-primary-600 hover:bg-primary-50 transition-all bg-white">
-                        <Plus className="w-3 h-3" /> 添加列
-                      </div>
+                        className="!border-dashed !bg-transparent hover:!bg-white"
+                      />
                     </div>
                   </div>
                 </div>
@@ -406,18 +526,74 @@ function DataTableEditor({ tableId, cloneFromId, onNavigate }) {
         )}
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center justify-end gap-4">
-        <button onClick={() => onNavigate('tables')} className="btn-secondary">取消</button>
-        <button
-          onClick={handleSave}
-          disabled={saving || !form.name || !form.table_name || !form.description || !form.category_id}
-          className="btn-primary flex items-center gap-2"
-        >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          保存内容
-        </button>
+      {/* Actions with Bottom Error Display */}
+      <div className="flex items-center justify-between gap-4 mt-8 pt-6 border-t border-slate-200">
+        
+        {/* Left Side: Error Feedback */}
+        <div className="flex-1 min-w-0 mr-4">
+          {(error || validationErrors.general) && (
+            <div role="alert" className="flex items-center gap-2 text-red-700 animate-pulse bg-red-100 px-3 py-2 rounded-lg border border-red-200 max-w-full">
+               <AlertCircle className="w-5 h-5 flex-shrink-0" />
+               <span className="text-sm font-medium" title={error || validationErrors.general}>
+                 {error || validationErrors.general}
+               </span>
+            </div>
+          )}
+        </div>
+
+        {/* Right Side: Action Buttons */}
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <button onClick={() => onNavigate('tables')} className="btn-secondary">取消</button>
+          
+          {tableId && !isPublished && (
+            <button
+              onClick={handlePublishClick}
+              disabled={saving || publishing}
+              className="btn-primary bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-200 flex items-center gap-2"
+            >
+              {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
+              发布上线
+            </button>
+          )}
+
+          <button
+            onClick={handleSave}
+            disabled={saving || publishing}
+            className="btn-primary flex items-center gap-2"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            保存内容
+          </button>
+        </div>
       </div>
+      
+      <CategoryManagerModal 
+        isOpen={showCatModal} 
+        onClose={() => setShowCatModal(false)}
+        onChange={refreshCategories}
+      />
+
+      <Modal 
+        isOpen={showPublishConfirm}
+        onClose={() => setShowPublishConfirm(false)}
+        onConfirm={executePublish}
+        type="warning"
+        title="确定要发布数据表吗？"
+        message={
+          <div className="text-left space-y-2 text-sm text-slate-600">
+            <p className="font-medium text-slate-800">您即将发布表 "{form.name}" ({form.table_name})。</p>
+            <p>发布操作将会：</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>严格校验 Schema 定义的合法性。</li>
+              <li>在数据库中创建物理表 (CREATE TABLE)。</li>
+              <li>创建所有定义的索引。</li>
+            </ul>
+            <p className="mt-3 p-3 bg-warning-50 text-warning-800 rounded-lg border border-warning-200">
+              <span className="font-bold">⚠️ 注意：</span> 发布后，表的物理名将锁定，无法再重命名。
+            </p>
+          </div>
+        }
+      />
     </div>
   )
 }

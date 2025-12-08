@@ -1,3 +1,4 @@
+import logging
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, validator
@@ -8,6 +9,8 @@ from sqlalchemy.exc import IntegrityError
 from server.storage.database import get_session
 from server.storage.models.data_table_config import DataTableConfig, TableCategory, TableStatus
 from server.storage.ddl_generator import DDLGenerator
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -72,6 +75,15 @@ class CategoryResponse(BaseModel):
     class Config:
         orm_mode = True
 
+class CategoryCreate(BaseModel):
+    code: str = Field(..., pattern="^[a-z0-9_]+$", description="唯一标识代码")
+    name: str = Field(..., description="显示名称")
+    description: Optional[str] = None
+
+class CategoryUpdate(BaseModel):
+    name: str
+    description: Optional[str] = None
+
 # --- Categories API ---
 
 @router.get("/categories", response_model=List[CategoryResponse])
@@ -79,6 +91,56 @@ async def get_categories(session: AsyncSession = Depends(get_session)):
     stmt = select(TableCategory).order_by(TableCategory.id)
     result = await session.execute(stmt)
     return result.scalars().all()
+
+@router.post("/categories", response_model=CategoryResponse)
+async def create_category(data: CategoryCreate, session: AsyncSession = Depends(get_session)):
+    # Check if code exists
+    stmt = select(TableCategory).where(TableCategory.code == data.code)
+    if (await session.execute(stmt)).scalar_one_or_none():
+        raise HTTPException(status_code=400, detail=f"Category code '{data.code}' already exists")
+    
+    new_cat = TableCategory(
+        code=data.code,
+        name=data.name,
+        description=data.description
+    )
+    session.add(new_cat)
+    try:
+        await session.commit()
+        await session.refresh(new_cat)
+        return new_cat
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(status_code=400, detail="Database integrity error")
+
+@router.put("/categories/{id}", response_model=CategoryResponse)
+async def update_category(id: int, data: CategoryUpdate, session: AsyncSession = Depends(get_session)):
+    stmt = select(TableCategory).where(TableCategory.id == id)
+    cat = (await session.execute(stmt)).scalar_one_or_none()
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found")
+    
+    cat.name = data.name
+    cat.description = data.description
+    await session.commit()
+    await session.refresh(cat)
+    return cat
+
+@router.delete("/categories/{id}")
+async def delete_category(id: int, session: AsyncSession = Depends(get_session)):
+    # Check if used
+    stmt = select(DataTableConfig).where(DataTableConfig.category_id == id)
+    if (await session.execute(stmt)).first():
+        raise HTTPException(status_code=400, detail="Cannot delete category that is in use by tables")
+        
+    del_stmt = select(TableCategory).where(TableCategory.id == id)
+    cat = (await session.execute(del_stmt)).scalar_one_or_none()
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found")
+        
+    await session.delete(cat)
+    await session.commit()
+    return {"message": "Category deleted"}
 
 # --- Data Tables API ---
 
@@ -98,20 +160,20 @@ async def get_table(id: int, session: AsyncSession = Depends(get_session)):
     return config
 
 @router.post("/data-tables", response_model=DataTableResponse)
-async def create_table_draft(
-    data: DataTableCreate, 
-    session: AsyncSession = Depends(get_session)
-):
-    # Check category existence
-    cat_stmt = select(TableCategory).where(TableCategory.id == data.category_id)
-    cat_res = await session.execute(cat_stmt)
-    if not cat_res.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail=f"Category ID {data.category_id} not found")
+async def create_data_table(data: DataTableCreate, session: AsyncSession = Depends(get_session)):
+    # 1. Validate Schema Logic
+    is_valid, error_msg = DDLGenerator.validate_schema(
+        data.table_name, 
+        [c.dict() for c in data.columns_schema],
+        [i.dict() for i in data.indexes_schema]
+    )
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=f"Schema Validation Error: {error_msg}")
 
-    # Check table name uniqueness in Config (not DB yet)
-    exist_stmt = select(DataTableConfig).where(DataTableConfig.table_name == data.table_name)
-    if (await session.execute(exist_stmt)).scalar_one_or_none():
-        raise HTTPException(status_code=400, detail=f"Table name '{data.table_name}' already exists in drafts")
+    # Check existing physical name
+    stmt = select(DataTableConfig).where(DataTableConfig.table_name == data.table_name)
+    if (await session.execute(stmt)).scalar_one_or_none():
+        raise HTTPException(status_code=400, detail=f"Table name '{data.table_name}' already exists")
 
     new_table = DataTableConfig(
         name=data.name,
@@ -123,47 +185,98 @@ async def create_table_draft(
         indexes_schema=[i.dict() for i in data.indexes_schema]
     )
     session.add(new_table)
-    try:
-        await session.commit()
-        await session.refresh(new_table)
-        return new_table
-    except IntegrityError:
-        await session.rollback()
-        raise HTTPException(status_code=400, detail="Database integrity error")
-
-@router.put("/data-tables/{id}", response_model=DataTableResponse)
-async def update_table_draft(
-    id: int, 
-    data: DataTableUpdate, 
-    session: AsyncSession = Depends(get_session)
-):
-    stmt = select(DataTableConfig).where(DataTableConfig.id == id)
-    result = await session.execute(stmt)
-    config = result.scalar_one_or_none()
-    
-    if not config:
-        raise HTTPException(status_code=404, detail="Table config not found")
-    
-    if config.status == TableStatus.CREATED:
-        # 已发布表禁止修改物理表名 (Renaming physical tables is complex)
-        if data.table_name != config.table_name:
-             raise HTTPException(status_code=400, detail="Cannot rename physical table of a published config.")
-
-    config.name = data.name
-    config.description = data.description
-    config.category_id = data.category_id
-    
-    # Always allow schema updates (Backend is truth, sync status handled by timestamps)
-    config.columns_schema = [c.dict() for c in data.columns_schema]
-    config.indexes_schema = [i.dict() for i in data.indexes_schema]
-
-    # Only allow table_name update if DRAFT
-    if config.status == TableStatus.DRAFT:
-        config.table_name = data.table_name
-
     await session.commit()
-    await session.refresh(config)
-    return config
+    await session.refresh(new_table)
+    return new_table
+
+@router.put("/data-tables/{table_id}", response_model=DataTableResponse)
+async def update_data_table(table_id: int, data: DataTableUpdate, session: AsyncSession = Depends(get_session)):
+    stmt = select(DataTableConfig).where(DataTableConfig.id == table_id)
+    table = (await session.execute(stmt)).scalar_one_or_none()
+    
+    if not table:
+        raise HTTPException(status_code=404, detail="Data table not found")
+
+    # Validate Schema Logic
+    is_valid, error_msg = DDLGenerator.validate_schema(
+        data.table_name, 
+        [c.dict() for c in data.columns_schema], 
+        [i.dict() for i in data.indexes_schema]
+    )
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=f"Schema Validation Error: {error_msg}")
+
+    if table.status == TableStatus.CREATED:
+        # 已发布表只允许有限修改 (这里之前已经放宽了限制，但我们可以加回一些检查，或者信任用户)
+        # 目前保持放宽，只检查表名变更（通常不允许变表名）
+        if table.table_name != data.table_name:
+             raise HTTPException(status_code=400, detail="Cannot rename a published table")
+    
+    table.name = data.name
+    # table_name update is allowed only for DRAFT, but frontend disables it for CREATED.
+    # If backend receives it, we can either ignore or error.
+    if table.status == TableStatus.DRAFT:
+        table.table_name = data.table_name
+        
+    table.category_id = data.category_id
+    table.description = data.description
+    table.columns_schema = [c.dict() for c in data.columns_schema]
+    table.indexes_schema = [i.dict() for i in data.indexes_schema]
+    
+    await session.commit()
+    await session.refresh(table)
+    return table
+
+@router.post("/data-tables/{table_id}/publish")
+async def publish_data_table(table_id: int, session: AsyncSession = Depends(get_session)):
+    stmt = select(DataTableConfig).where(DataTableConfig.id == table_id)
+    table = (await session.execute(stmt)).scalar_one_or_none()
+    
+    if not table:
+        raise HTTPException(status_code=404, detail="Data table not found")
+        
+    if table.status == TableStatus.CREATED:
+        raise HTTPException(status_code=400, detail="Table is already published")
+        
+    # 1. Validate again
+    is_valid, error_msg = DDLGenerator.validate_schema(
+        table.table_name, 
+        table.columns_schema,
+        table.indexes_schema
+    )
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+        
+    # 2. Generate DDL
+    try:
+        ddls = DDLGenerator.generate_create_table_sqls(
+            table.table_name, 
+            table.description, 
+            table.columns_schema
+        )
+        idx_ddls = DDLGenerator.generate_index_sqls(
+            table.table_name,
+            table.indexes_schema
+        )
+        all_sqls = ddls + idx_ddls
+        
+        # 3. Execute DDL
+        for sql in all_sqls:
+            await session.execute(text(sql))
+            
+        # 4. Update Status
+        table.status = TableStatus.CREATED
+        await session.commit()
+        
+    except Exception as e:
+        await session.rollback()
+        logger.exception(f"Failed to publish table {table_id}")
+        # Clean up if partial creation happened? 
+        # Ideally DDLs are not transactional in some DBs, but Postgres supports transactional DDL.
+        # So rollback should drop the table if created inside transaction.
+        raise HTTPException(status_code=500, detail=f"Failed to publish table: {str(e)}")
+        
+    return {"message": "Table published successfully", "status": "CREATED"}
 
 @router.post("/data-tables/{id}/publish")
 async def publish_table(id: int, session: AsyncSession = Depends(get_session)):
@@ -213,6 +326,7 @@ async def publish_table(id: int, session: AsyncSession = Depends(get_session)):
         
     except Exception as e:
         await session.rollback()
+        logger.exception(f"Failed to publish table {id}")
         # 转换更友好的错误信息
         err_msg = str(e)
         if "already exists" in err_msg:

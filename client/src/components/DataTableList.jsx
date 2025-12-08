@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Pencil, Trash2, Loader2, Database, Play, AlertTriangle, Copy } from 'lucide-react'
+import { Plus, Pencil, Trash2, Loader2, Database, Play, AlertTriangle, Copy, X } from 'lucide-react'
 import api from '../services/api'
 import Modal from './Modal'
 
@@ -10,9 +10,10 @@ function DataTableList({ onNavigate }) {
   const [error, setError] = useState(null)
   
   // Modals
-  const [deleteModal, setDeleteModal] = useState({ open: false, table: null })
-  const [publishModal, setPublishModal] = useState({ open: false, table: null })
+  const [deleteModal, setDeleteModal] = useState({ open: false, table: null, error: null })
+  const [publishModal, setPublishModal] = useState({ open: false, table: null, error: null })
   const [publishing, setPublishing] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -25,7 +26,6 @@ function DataTableList({ onNavigate }) {
         api.getDataTables(),
         api.getTableCategories()
       ])
-      console.log('Tables data:', tablesData) // Debug log
       setTables(tablesData)
       setCategories(categoriesData)
     } catch (err) {
@@ -37,27 +37,32 @@ function DataTableList({ onNavigate }) {
 
   const handleDelete = async () => {
     if (!deleteModal.table) return
+    setDeleting(true)
+    setDeleteModal(prev => ({ ...prev, error: null }))
     try {
       await api.deleteDataTable(deleteModal.table.id)
       setTables(tables.filter(t => t.id !== deleteModal.table.id))
+      setDeleteModal({ open: false, table: null, error: null })
     } catch (error) {
       console.error('Failed to delete:', error)
-      alert(error.response?.data?.detail || '删除失败')
+      setDeleteModal(prev => ({ ...prev, error: error.response?.data?.detail || '删除失败' }))
+    } finally {
+      setDeleting(false)
     }
-    setDeleteModal({ open: false, table: null })
   }
 
   const handlePublish = async () => {
     if (!publishModal.table) return
     setPublishing(true)
+    setPublishModal(prev => ({ ...prev, error: null }))
     try {
       await api.publishDataTable(publishModal.table.id)
       // Refresh list to update status
       const updatedTables = await api.getDataTables()
       setTables(updatedTables)
-      setPublishModal({ open: false, table: null })
+      setPublishModal({ open: false, table: null, error: null })
     } catch (err) {
-      alert(err.response?.data?.detail || '发布失败')
+      setPublishModal(prev => ({ ...prev, error: err.response?.data?.detail || '发布失败' }))
     } finally {
       setPublishing(false)
     }
@@ -152,7 +157,7 @@ function DataTableList({ onNavigate }) {
                       <div className="flex items-center justify-end gap-2">
                         {!isPublished && (
                           <button 
-                            onClick={() => setPublishModal({ open: true, table })} 
+                            onClick={() => setPublishModal({ open: true, table, error: null })} 
                             className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 active:scale-95 transition-all shadow-sm shadow-primary-500/20"
                             title="发布并创建物理表"
                           >
@@ -166,7 +171,7 @@ function DataTableList({ onNavigate }) {
                         <button onClick={() => onNavigate('table-edit', table.id)} className="btn-icon" title="编辑内容">
                           <Pencil className="w-4 h-4" />
                         </button>
-                        <button onClick={() => setDeleteModal({ open: true, table })} className="btn-icon-danger" title="删除">
+                        <button onClick={() => setDeleteModal({ open: true, table, error: null })} className="btn-icon-danger" title="删除">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -179,39 +184,96 @@ function DataTableList({ onNavigate }) {
         </div>
       )}
 
-      {/* Delete Modal */}
-      <Modal
-        isOpen={deleteModal.open}
-        onClose={() => setDeleteModal({ open: false, table: null })}
-        onConfirm={handleDelete}
-        title={deleteModal.table?.status === 'CREATED' || deleteModal.table?.status === 'created' ? "高危操作确认" : "确认删除"}
-        message={
-          (deleteModal.table?.status === 'CREATED' || deleteModal.table?.status === 'created')
-            ? `警告：您正在删除已发布的表 "${deleteModal.table?.name}"。\n这将永久删除数据库中的物理表 "${deleteModal.table?.table_name}" 及其所有数据！\n此操作极度危险且不可恢复，请三思！`
-            : `确定要删除数据表 "${deleteModal.table?.name}" 吗？此操作不可恢复。`
-        }
-        type={(deleteModal.table?.status === 'CREATED' || deleteModal.table?.status === 'created') ? 'error' : 'warning'}
-      />
+      {/* Delete Modal - Reimplemented using Custom Modal component won't allow showing error inside easily unless modified. 
+          So we'll use a custom inline implementation similar to Publish Modal for better control.
+      */}
+      {deleteModal.open && (
+         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fadeIn p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-xl animate-slideUp">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-red-100 rounded-full">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-lg text-slate-800">
+                  {(deleteModal.table?.status === 'CREATED' || deleteModal.table?.status === 'created') ? "高危操作警告" : "确认删除"}
+                </h3>
+                
+                <div className="mt-2 text-slate-600 text-sm">
+                  {(deleteModal.table?.status === 'CREATED' || deleteModal.table?.status === 'created') ? (
+                    <div className="space-y-2">
+                      <p>您正在删除已发布的表 <span className="font-bold">{deleteModal.table?.name}</span>。</p>
+                      <p className="bg-red-50 border border-red-100 p-2 rounded text-red-700">
+                        警告：这将永久删除数据库中的物理表 <code className="font-mono bg-red-100 px-1 rounded">{deleteModal.table?.table_name}</code> 及其所有数据！
+                      </p>
+                      <p>此操作极度危险且不可恢复！</p>
+                    </div>
+                  ) : (
+                    <p>确定要删除数据表 "{deleteModal.table?.name}" 吗？此操作不可恢复。</p>
+                  )}
+                </div>
+
+                {deleteModal.error && (
+                   <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                     {deleteModal.error}
+                   </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-3 mt-6">
+              <button 
+                onClick={() => setDeleteModal({ open: false, table: null, error: null })} 
+                className="btn-secondary"
+                disabled={deleting}
+              >
+                取消
+              </button>
+              <button 
+                onClick={handleDelete} 
+                disabled={deleting} 
+                className="btn-danger flex items-center gap-2"
+              >
+                {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                {deleting ? '删除中...' : '确认删除'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Publish Modal */}
       {publishModal.open && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fadeIn">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 space-y-4 shadow-xl animate-slideUp">
-            <div className="flex items-center gap-3 text-warning-600">
-              <AlertTriangle className="w-6 h-6" />
-              <h3 className="font-semibold text-lg">确认发布</h3>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fadeIn p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-xl animate-slideUp">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-amber-100 rounded-full">
+                <AlertTriangle className="w-6 h-6 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-lg text-slate-800">确认发布</h3>
+                
+                <div className="mt-2 text-slate-600 text-sm">
+                  <p className="mb-2">您即将发布表 <span className="font-semibold text-slate-800">{publishModal.table?.name}</span>。</p>
+                  <p>此操作将：</p>
+                  <ul className="list-disc list-inside ml-2 mt-1 space-y-1">
+                    <li>在数据库中创建物理表 <code className="bg-slate-100 px-1 rounded">{publishModal.table?.table_name}</code></li>
+                    <li>锁定表结构（不可再修改字段定义）</li>
+                  </ul>
+                </div>
+
+                {publishModal.error && (
+                   <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm break-words">
+                     <div className="font-semibold mb-1">发布失败:</div>
+                     {publishModal.error}
+                   </div>
+                )}
+              </div>
             </div>
-            <div className="text-slate-600">
-              <p className="mb-2">您即将发布表 <span className="font-semibold text-slate-800">{publishModal.table?.name}</span>。</p>
-              <p>此操作将：</p>
-              <ul className="list-disc list-inside ml-2 mt-1 space-y-1 text-sm">
-                <li>在数据库中创建物理表 <code className="bg-slate-100 px-1 rounded">{publishModal.table?.table_name}</code></li>
-                <li>锁定表结构（不可再修改字段定义）</li>
-              </ul>
-            </div>
-            <div className="flex justify-end gap-3 mt-4">
+
+            <div className="flex justify-end gap-3 mt-6">
               <button 
-                onClick={() => setPublishModal({ open: false, table: null })} 
+                onClick={() => setPublishModal({ open: false, table: null, error: null })} 
                 className="btn-secondary"
                 disabled={publishing}
               >

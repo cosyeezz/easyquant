@@ -27,6 +27,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from server.api.v1 import events as events_v1
 from server.api.v1 import etl as etl_v1
 from server.api.v1 import data_tables as data_tables_v1
+from server.api.v1 import system as system_v1
 from server.bootstrap import check_and_bootstrap
 
 # 设置日志
@@ -85,6 +86,7 @@ async def root():
 app.include_router(events_v1.router, prefix="/api/v1")
 app.include_router(etl_v1.router, prefix="/api/v1", tags=["ETL Configuration"])
 app.include_router(data_tables_v1.router, prefix="/api/v1", tags=["Data Table Management"])
+app.include_router(system_v1.router, prefix="/api/v1/system", tags=["System & Logs"])
 
 
 # ================= 主程序入口 =================

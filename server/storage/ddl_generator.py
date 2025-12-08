@@ -1,29 +1,26 @@
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional, Tuple
+import re
 from sqlalchemy import MetaData, Table, Column
 from sqlalchemy.schema import CreateTable
 from sqlalchemy.types import (
     VARCHAR, INTEGER, BIGINT, FLOAT, BOOLEAN, DATE, 
-    TIMESTAMP, NUMERIC, JSON, Text
+    TIMESTAMP, NUMERIC, JSON, Text, CHAR
 )
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.dialects.postgresql import DOUBLE_PRECISION, JSONB, TIMESTAMP as PG_TIMESTAMP
+from sqlalchemy.dialects.postgresql import DOUBLE_PRECISION, JSONB, TIMESTAMP as PG_TIMESTAMP, ARRAY, UUID
 
-# 映射前端类型字符串到 SQLAlchemy 类型
-TYPE_MAPPING = {
-    "VARCHAR": VARCHAR,
-    "TEXT": Text,
-    "INT": INTEGER,
-    "INTEGER": INTEGER,
-    "BIGINT": BIGINT,
-    "FLOAT": FLOAT,
-    "DOUBLE PRECISION": DOUBLE_PRECISION, 
-    "NUMERIC": NUMERIC,
-    "BOOLEAN": BOOLEAN,
-    "DATE": DATE,
-    "TIMESTAMP": TIMESTAMP,
-    "TIMESTAMPTZ": PG_TIMESTAMP(timezone=True), 
-    "JSON": JSON,
-    "JSONB": JSONB, 
+# PostgreSQL Reserved Keywords (subset of common ones to avoid)
+RESERVED_KEYWORDS = {
+    "ALL", "ANALYSE", "ANALYZE", "AND", "ANY", "ARRAY", "AS", "ASC", "ASYMMETRIC", "AUTHORIZATION",
+    "BINARY", "BOTH", "CASE", "CAST", "CHECK", "COLLATE", "COLUMN", "CONSTRAINT", "CREATE", "CROSS",
+    "CURRENT_DATE", "CURRENT_ROLE", "CURRENT_TIME", "CURRENT_TIMESTAMP", "CURRENT_USER", "DEFAULT",
+    "DEFERRABLE", "DESC", "DISTINCT", "DO", "ELSE", "END", "EXCEPT", "FALSE", "FOR", "FOREIGN",
+    "FREEZE", "FROM", "FULL", "GRANT", "GROUP", "HAVING", "ILIKE", "IN", "INITIALLY", "INNER",
+    "INTERSECT", "INTO", "IS", "ISNULL", "JOIN", "LATERAL", "LEADING", "LEFT", "LIKE", "LIMIT",
+    "LOCALTIME", "LOCALTIMESTAMP", "NATURAL", "NEW", "NOT", "NOTNULL", "NULL", "OFF", "OFFSET",
+    "OLD", "ON", "ONLY", "OR", "ORDER", "OUTER", "OVERLAPS", "PLACING", "PRIMARY", "REFERENCES",
+    "RIGHT", "SELECT", "SESSION_USER", "SIMILAR", "SOME", "SYMMETRIC", "TABLE", "THEN", "TO",
+    "TRAILING", "TRUE", "UNION", "UNIQUE", "USER", "USING", "VERBOSE", "WHEN", "WHERE", "WINDOW", "WITH"
 }
 
 class DDLGenerator:
@@ -32,26 +29,122 @@ class DDLGenerator:
     """
 
     @staticmethod
+    def _parse_type(type_str: str):
+        """
+        Parse types like 'VARCHAR(20)', 'NUMERIC(10, 2)', 'INT'
+        """
+        type_str = type_str.strip().upper()
+        
+        # Handle Arrays like VARCHAR[] or INT[]
+        is_array = False
+        if type_str.endswith('[]'):
+            is_array = True
+            type_str = type_str[:-2]
+
+        base_type = None
+        args = []
+
+        if '(' in type_str and type_str.endswith(')'):
+            match = re.match(r"([A-Z0-9_]+)\((.+)\)", type_str)
+            if match:
+                type_name = match.group(1)
+                args_str = match.group(2)
+                args = [int(a.strip()) if a.strip().isdigit() else a.strip() for a in args_str.split(',')]
+                
+                if type_name == 'VARCHAR': base_type = VARCHAR(*args)
+                elif type_name == 'CHAR': base_type = CHAR(*args)
+                elif type_name == 'NUMERIC': base_type = NUMERIC(*args)
+                # Add more parameterized types if needed
+                else: base_type = VARCHAR(*args) # Fallback
+        else:
+            type_name = type_str
+            if type_name == 'INT' or type_name == 'INTEGER': base_type = INTEGER()
+            elif type_name == 'BIGINT': base_type = BIGINT()
+            elif type_name == 'TEXT': base_type = Text()
+            elif type_name == 'DOUBLE PRECISION': base_type = DOUBLE_PRECISION()
+            elif type_name == 'FLOAT': base_type = FLOAT()
+            elif type_name == 'BOOLEAN': base_type = BOOLEAN()
+            elif type_name == 'JSON': base_type = JSON()
+            elif type_name == 'JSONB': base_type = JSONB()
+            elif type_name == 'DATE': base_type = DATE()
+            elif type_name == 'TIME': base_type = postgresql.TIME()
+            elif type_name == 'TIMESTAMP': base_type = TIMESTAMP()
+            elif type_name == 'TIMESTAMPTZ': base_type = PG_TIMESTAMP(timezone=True)
+            elif type_name == 'UUID': base_type = UUID()
+            else: base_type = VARCHAR() # Default fallback
+
+        if is_array:
+            return ARRAY(base_type)
+        return base_type
+
+    @staticmethod
+    def validate_schema(table_name: str, columns_schema: List[Dict[str, Any]], indexes_schema: List[Dict[str, Any]]) -> Tuple[bool, Optional[str]]:
+        """
+        Validate the table schema before creation.
+        Returns: (is_valid, error_message)
+        """
+        # 1. Check Table Name
+        if not re.match(r"^[a-z_][a-z0-9_]*$", table_name):
+            return False, f"表名 '{table_name}' 格式无效 (仅限小写字母, 数字, 下划线)"
+        if table_name.upper() in RESERVED_KEYWORDS:
+            return False, f"表名 '{table_name}' 是保留关键字"
+
+        # 2. Check Columns
+        col_names = set()
+        pk_defined = False
+        
+        if not columns_schema:
+             return False, "表必须至少包含一个字段"
+
+        for col in columns_schema:
+            name = col.get("name")
+            if not name:
+                return False, "字段名不能为空"
+            
+            if not re.match(r"^[a-z_][a-z0-9_]*$", name):
+                return False, f"字段名 '{name}' 格式无效"
+            
+            if name.upper() in RESERVED_KEYWORDS:
+                return False, f"字段名 '{name}' 是保留关键字"
+            
+            if name in col_names:
+                return False, f"字段名 '{name}' 重复"
+            col_names.add(name)
+
+            if col.get("is_pk"):
+                pk_defined = True
+
+        # 3. Check Primary Key (Warning or Error? Let's make it strict for now)
+        if not pk_defined:
+            return False, "必须定义主键 (Primary Key)"
+
+        # 4. Check Indexes
+        for idx in indexes_schema:
+            idx_cols = idx.get("columns", [])
+            if not idx_cols:
+                return False, f"索引 '{idx.get('name')}' 未指定任何列"
+            for c in idx_cols:
+                if c not in col_names:
+                    return False, f"索引引用的列 '{c}' 不存在"
+
+        return True, None
+
+    @staticmethod
     def generate_create_table_sqls(table_name: str, table_comment: str, columns_schema: List[Dict[str, Any]]) -> List[str]:
         """
-        生成建表 SQL 语句列表，包含：
-        1. CREATE TABLE ...
-        2. COMMENT ON TABLE ...
-        3. COMMENT ON COLUMN ...
+        生成建表 SQL 语句列表
         """
         metadata = MetaData()
         columns = []
-        comments = {} # col_name -> comment
+        comments = {} 
 
         for col_def in columns_schema:
             col_name = col_def["name"]
-            type_str = col_def["type"].split("(")[0].upper().strip() # 简单处理 'VARCHAR(20)' -> 'VARCHAR'
+            type_str = col_def["type"]
             is_pk = col_def.get("is_pk", False)
             comment = col_def.get("comment", "")
             
-            sql_type_cls = TYPE_MAPPING.get(type_str, VARCHAR)
-            # 实例化类型对象
-            sql_type = sql_type_cls()
+            sql_type = DDLGenerator._parse_type(type_str)
 
             col_obj = Column(col_name, sql_type, primary_key=is_pk)
             columns.append(col_obj)
@@ -62,8 +155,7 @@ class DDLGenerator:
         # 创建临时的 Table 对象
         table = Table(table_name, metadata, *columns)
 
-        # 生成 CREATE TABLE 语句 (针对 PostgreSQL)
-        # compile 返回的对象转为 string 即可
+        # 生成 CREATE TABLE 语句
         create_stmt = CreateTable(table).compile(dialect=postgresql.dialect())
         
         sql_lines = [str(create_stmt) + ";"]
@@ -84,14 +176,21 @@ class DDLGenerator:
     def generate_index_sqls(table_name: str, indexes_schema: List[Dict[str, Any]]) -> List[str]:
         sqls = []
         for idx in indexes_schema:
-            idx_name = idx["name"]
+            idx_name = idx.get("name", "").strip()
             cols = idx["columns"]
             is_unique = idx.get("unique", False)
             
+            # Auto-generate index name if missing
+            if not idx_name:
+                clean_cols = [c.replace('"', '').replace(' ', '') for c in cols]
+                base = "_".join(clean_cols)
+                # Truncate to avoid too long names (Postgres limit 63 chars usually)
+                idx_name = f"idx_{table_name}_{base}"[:60]
+
             unique_str = "UNIQUE" if is_unique else ""
             cols_str = ", ".join(cols)
             
-            # 简单的 SQL 拼接，生产环境可能需要更严谨的 quote_ident
-            sql = f"CREATE {unique_str} INDEX {idx_name} ON {table_name} ({cols_str});"
+            # Double check syntax: CREATE [UNIQUE] INDEX [IF NOT EXISTS] name ON table (col1, col2)
+            sql = f"CREATE {unique_str} INDEX IF NOT EXISTS {idx_name} ON {table_name} ({cols_str});"
             sqls.append(sql)
         return sqls

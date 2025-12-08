@@ -136,6 +136,31 @@ class ApiService {
     const response = await this.client.get('/categories');
     return response.data;
   }
+  
+  // ========== System API ==========
+
+  async getSystemLogs(service, lines = 100) {
+    const response = await this.client.get(`/system/logs/${service}`, {
+      params: { lines }
+    });
+    return response.data;
+  }
+
+
+  async createCategory(data) {
+    const response = await this.client.post('/categories', data);
+    return response.data;
+  }
+
+  async updateCategory(id, data) {
+    const response = await this.client.put(`/categories/${id}`, data);
+    return response.data;
+  }
+
+  async deleteCategory(id) {
+    const response = await this.client.delete(`/categories/${id}`);
+    return response.data;
+  }
 }
 
 export default new ApiService();

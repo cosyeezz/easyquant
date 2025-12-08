@@ -19,8 +19,9 @@ EasyQuant 是一个使用Python和Web技术构建的量化交易系统，支持�
 
 4.  **生产级数据仓库 (Data Warehouse)**:
     -   内置元数据驱动的数据表管理系统 (`Metadata Driven Data Warehouse`)。
-    -   支持严格的表设计流程：分类 -> 草稿 -> 发布 (Publish)。
-    -   利用 PostgreSQL 的高级特性（分区、JSONB、数组类型）优化存储。
+    -   支持严格的表设计流程：**分类 -> 草稿 -> 校验 -> 发布 (Publish)**。
+    -   自动生成并执行 DDL，支持 PostgreSQL 高级特性（JSONB、数组类型）。
+    -   严格的 Schema 校验机制，防止非法表结构发布。
 
 5.  **可视化 ETL 配置 (Visual ETL)**:
     -   支持可视化的 ETL 任务编排。
@@ -28,7 +29,9 @@ EasyQuant 是一个使用Python和Web技术构建的量化交易系统，支持�
     -   支持将数据处理结果精准写入已发布的数据表中。
 
 6.  **React 前端 (Dashboard)**:
-    -   前端应用通过定时**轮询 (Polling)**（例如每隔2秒）的方式，调用后端的 `GET` 接口来获取最新的事件数据，并刷新监控仪表盘。
+    -   **实时监控**: 通过轮询机制获取最新事件和系统日志。
+    -   **现代化 UI**: 基于 Tailwind CSS 的定制化组件库，提供流畅的交互体验。
+    -   **全功能管理**: 内置分类管理、数据表设计器、ETL 任务编排器。
 
 ### 架构图
 
@@ -51,6 +54,7 @@ EasyQuant 是一个使用Python和Web技术构建的量化交易系统，支持�
 |                        |     GET /api/v1/processes      |         |
 |                        |     CRUD /api/v1/etl           |         |
 |                        |     CRUD /api/v1/data-tables   |         |
+|                        |     GET /api/v1/system/logs    |         |
 |                        +--------------------------------+         |
 |                                      ^                            |
 +--------------------------------------|----------------------------+
@@ -74,7 +78,8 @@ easyquant/
 │   │   └── v1/
 │   │       ├── events.py       # v1 版本的事件查询 API
 │   │       ├── etl.py          # ETL 任务配置 API
-│   │       └── data_tables.py  # 数据表管理 API
+│   │       ├── data_tables.py  # 数据表管理 API
+│   │       └── system.py       # 系统日志监控 API
 │   ├── common/             # 后端内部通用模块
 │   │   └── event_service.py# 核心事件记录服务
 │   ├── etl/                # ETL 模块
@@ -88,11 +93,8 @@ easyquant/
 │   ├── live/               # 实盘模块
 │   ├── storage/            # 共享的、核心的数据存储模块
 │   │   ├── database.py     # 高性能异步数据库核心
+│   │   ├── ddl_generator.py # DDL生成与校验器
 │   │   └── models/         # SQLAlchemy 数据模型目录
-│   │       ├── base.py     # 通用模型基类 (含时间戳)
-│   │       ├── event.py    # Event 数据表的定义
-│   │       ├── etl_task_config.py # ETL 任务配置模型
-│   │       └── data_table_config.py # 数据表配置模型
 │   └── main.py             # 系统主入口和FastAPI服务
 ├── .env                    # (需要您手动创建) 环境变量文件
 ├── alembic.ini             # Alembic 配置文件
@@ -127,7 +129,7 @@ easyquant/
 
 4.  **启动后端服务:**
     ```sh
-    python server/main.py
+    python manage.py start
     ```
     服务将在 `http://localhost:8000` 启动。
     访问 `http://localhost:8000/docs` 查看API文档。
@@ -173,10 +175,9 @@ easyquant/
 系统采用严格的 **"配置(Config) -> 物理表(Physical Table)"** 分离模式，确保生产环境数据的安全性。
 
 1.  **草稿 (Draft)**: 新建的表配置默认为草稿状态。此时只存在于配置表中，物理数据库未创建。
-2.  **发布 (Publish)**: 点击发布后，系统会根据 Schema 自动生成并执行 DDL 语句，创建物理表。
-3.  **同步状态 (Sync State)**:
-    - **已同步 (Synced)**: 配置与物理表一致。
-    - **待同步 (Unsynced)**: 修改了已发布的配置（如新增字段），需要再次发布以应用变更。
+2.  **校验 (Validate)**: 系统会自动检查表名规范、保留字冲突、主键定义等。
+3.  **发布 (Publish)**: 点击发布后，系统会根据 Schema 自动生成并执行 DDL 语句，创建物理表。
+4.  **管理 (Manage)**: 支持复制表结构、管理数据分类，以及查看实时系统日志。
 
 ### 事件系统
 
@@ -217,6 +218,7 @@ async def my_task():
 - `GET /api/v1/processes` - 获取所有进程列表和最新状态
 - `CRUD /api/v1/data-tables` - 数据表管理
 - `CRUD /api/v1/etl` - ETL 任务管理
+- `GET /api/v1/system/logs` - 系统日志监控
 
 详细的API文档请访问: `http://localhost:8000/docs`
 
@@ -240,5 +242,5 @@ async def my_task():
 ### 前端功能模块
 - **数据表管理**: 元数据驱动的数据仓库管理，支持字段定义、索引定义、草稿/发布状态流转
 - **ETL任务配置**: 三步向导式配置（数据源 → Pipeline → 运行参数）
-- **进程监控**: 实时轮询显示任务执行状态和进度
+- **进程监控**: 实时轮询显示任务执行状态、进度及**实时后台日志**
 - **文件路径选择器**: 支持文件夹、单文件、多文件、按后缀筛选四种模式
