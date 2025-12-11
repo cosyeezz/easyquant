@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { ChevronDown, Check } from 'lucide-react'
+import { ChevronDown, Check, X } from 'lucide-react'
 
 export default function Select({ 
   value, 
@@ -7,7 +7,9 @@ export default function Select({
   options = [], 
   placeholder = '请选择', 
   disabled = false,
-  className = ''
+  className = '',
+  clearable = false,
+  onClear = () => {}
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef(null)
@@ -15,6 +17,8 @@ export default function Select({
   // 获取当前显示的 Label
   const selectedOption = options.find(opt => opt.value === value)
   const displayLabel = selectedOption ? selectedOption.label : placeholder
+  
+  const showClear = clearable && value && value !== 'all'
 
   // 点击外部关闭
   useEffect(() => {
@@ -36,6 +40,12 @@ export default function Select({
     onChange(val)
     setIsOpen(false)
   }
+  
+  const handleClear = (e) => {
+      e.stopPropagation()
+      onClear()
+      setIsOpen(false)
+  }
 
   return (
     <div 
@@ -48,15 +58,27 @@ export default function Select({
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
         className={`
-          w-full flex items-center justify-between px-3 py-2 text-left bg-white border rounded-lg shadow-sm transition-all
+          w-full flex items-center justify-between px-3 py-2 text-left bg-white border rounded-lg shadow-sm transition-all group
           ${disabled ? 'bg-slate-50 text-slate-400 cursor-not-allowed border-slate-200' : 'hover:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:border-primary-500 cursor-pointer'}
           ${isOpen ? 'border-primary-500 ring-2 ring-primary-100' : 'border-slate-300'}
         `}
       >
-        <span className={`block truncate ${!selectedOption ? 'text-slate-400' : 'text-slate-700'}`}>
+        <span className={`block truncate ${!selectedOption ? 'text-slate-400' : 'text-slate-700'} ${showClear ? 'pr-6' : ''}`}>
           {displayLabel}
         </span>
-        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        
+        <div className="flex items-center absolute right-2 top-1/2 -translate-y-1/2">
+            {showClear && (
+                <span 
+                    onClick={handleClear}
+                    className="p-0.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 mr-1 z-10"
+                    title="清除"
+                >
+                    <X className="w-3 h-3" />
+                </span>
+            )}
+            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        </div>
       </button>
 
       {/* Dropdown Menu */}

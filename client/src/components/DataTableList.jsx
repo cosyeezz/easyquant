@@ -1,13 +1,24 @@
 import { useState, useEffect } from 'react'
-import { Plus, Pencil, Trash2, Loader2, Database, Play, AlertTriangle, Copy, X, RefreshCw } from 'lucide-react'
+import { Plus, Pencil, Trash2, Loader2, Database, Play, AlertTriangle, Copy, X, RefreshCw, Search, RotateCcw } from 'lucide-react'
 import api from '../services/api'
 import Modal from './Modal'
+import Select from './ui/Select'
 
 function DataTableList({ onNavigate }) {
   const [tables, setTables] = useState([])
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  
+  // Filter States
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [selectedStatus, setSelectedStatus] = useState('all')
+  const [activeFilters, setActiveFilters] = useState({
+      query: '',
+      category: 'all',
+      status: 'all'
+  })
   
   // Modals
   const [deleteModal, setDeleteModal] = useState({ open: false, table: null, error: null })
@@ -73,6 +84,95 @@ function DataTableList({ onNavigate }) {
     return cat ? cat.name : '-'
   }
 
+  // Pre-defined palette for category badges (Looping assignment)
+  const CATEGORY_PALETTE = [
+    'bg-blue-50 text-blue-700 border-blue-200',
+    'bg-emerald-50 text-emerald-700 border-emerald-200',
+    'bg-violet-50 text-violet-700 border-violet-200',
+    'bg-amber-50 text-amber-700 border-amber-200',
+    'bg-rose-50 text-rose-700 border-rose-200',
+    'bg-cyan-50 text-cyan-700 border-cyan-200',
+    'bg-indigo-50 text-indigo-700 border-indigo-200',
+    'bg-teal-50 text-teal-700 border-teal-200',
+    'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200',
+    'bg-lime-50 text-lime-700 border-lime-200',
+  ]
+
+  const getCategoryStyle = (id) => {
+    if (!id) return 'bg-slate-50 text-slate-600 border-slate-200'
+    // Use modulo to cycle through colors based on ID. 
+    // This ensures consistency (same ID always gets same color) and supports infinite categories.
+    const index = id % CATEGORY_PALETTE.length
+    return CATEGORY_PALETTE[index]
+  }
+
+  const handleSearch = () => {
+      setActiveFilters({
+          query: searchQuery,
+          category: selectedCategory,
+          status: selectedStatus
+      })
+  }
+
+  const handleReset = () => {
+    setSearchQuery('')
+    setSelectedCategory('all')
+    setSelectedStatus('all')
+    setActiveFilters({
+        query: '',
+        category: 'all',
+        status: 'all'
+    })
+  }
+
+  const filteredTables = tables.filter(table => {
+    // 1. Text Search
+    let matchesSearch = true
+    if (activeFilters.query) {
+      const q = activeFilters.query.toLowerCase()
+      matchesSearch = (
+        table.name.toLowerCase().includes(q) ||
+        table.table_name.toLowerCase().includes(q) ||
+        (table.description && table.description.toLowerCase().includes(q))
+      )
+    }
+
+    // 2. Category Filter
+    let matchesCategory = true
+    if (activeFilters.category !== 'all') {
+      matchesCategory = table.category_id === parseInt(activeFilters.category)
+    }
+
+    // 3. Status Filter
+    let matchesStatus = true
+    if (activeFilters.status !== 'all') {
+      const isPublished = table.status === 'created' || table.status === 'CREATED'
+      const isSyncNeeded = !isPublished && table.last_published_at
+      const isDraft = !isPublished && !isSyncNeeded
+
+      if (activeFilters.status === 'published') matchesStatus = isPublished
+      if (activeFilters.status === 'sync_needed') matchesStatus = isSyncNeeded
+      if (activeFilters.status === 'draft') matchesStatus = isDraft
+    }
+
+    return matchesSearch && matchesCategory && matchesStatus
+  })
+
+  // Options for custom Select components
+  const categoryOptions = [
+      { label: '所有分类', value: 'all' },
+      ...categories.map(c => ({ label: c.name, value: String(c.id) })) 
+  ]
+  
+  const statusOptions = [
+      { label: '所有状态', value: 'all' },
+      { label: '已发布', value: 'published' },
+      { label: '待同步', value: 'sync_needed' },
+      { label: '草稿', value: 'draft' }
+  ]
+  
+  const hasActiveFilters = activeFilters.query || activeFilters.category !== 'all' || activeFilters.status !== 'all'
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
@@ -94,22 +194,103 @@ function DataTableList({ onNavigate }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold text-slate-800">数据表管理</h2>
-          <p className="mt-1 text-slate-600">管理系统中的数据库表元数据</p>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-3xl font-bold text-slate-800">数据表管理</h2>
+              <p className="mt-1 text-slate-600">管理系统中的数据库表元数据</p>
+            </div>
+            <button onClick={() => onNavigate('table-new')} className="btn-primary flex items-center gap-2 whitespace-nowrap">
+                <Plus className="w-5 h-5" />
+                新建数据表
+            </button>
         </div>
-        <button onClick={() => onNavigate('table-new')} className="btn-primary flex items-center gap-2">
-          <Plus className="w-5 h-5" />
-          新建数据表
-        </button>
+        
+        {/* Filter Toolbar */}
+        <div className="flex flex-col sm:flex-row gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm z-10 relative items-center">
+          {/* Search */}
+          <div className="relative flex-1 w-full">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="搜索表名、物理名..." 
+              className="input-field !pl-9 !pr-8 w-full"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            />
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Category Filter */}
+          <div className="w-full sm:w-40">
+            <Select 
+                value={selectedCategory}
+                onChange={setSelectedCategory}
+                options={categoryOptions}
+                placeholder="选择分类"
+                clearable={true}
+                onClear={() => setSelectedCategory('all')}
+            />
+          </div>
+
+          {/* Status Filter */}
+          <div className="w-full sm:w-40">
+             <Select 
+                value={selectedStatus}
+                onChange={setSelectedStatus}
+                options={statusOptions}
+                placeholder="选择状态"
+                clearable={true}
+                onClear={() => setSelectedStatus('all')}
+            />
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-3 pl-2 border-l border-slate-100 ml-1">
+            <button 
+              onClick={handleReset}
+              className="w-24 px-4 py-2 bg-white border border-slate-200 text-slate-600 hover:text-slate-800 hover:border-slate-300 hover:bg-slate-50 rounded-lg transition-all shadow-sm flex items-center justify-center gap-2"
+              title="重置所有条件"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span className="text-sm font-medium">重置</span>
+            </button>
+
+            <button 
+                onClick={handleSearch}
+                className="w-24 btn-primary px-4 py-2 flex items-center justify-center gap-2 whitespace-nowrap shadow-sm hover:shadow-md transition-all"
+            >
+                <Search className="w-4 h-4" />
+                查询
+            </button>
+          </div>
+        </div>
       </div>
 
-      {tables.length === 0 ? (
+      {filteredTables.length === 0 ? (
         <div className="card text-center py-12">
-          <Database className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-slate-700 mb-2">暂无数据表</h3>
-          <p className="text-slate-500 mb-4">点击"新建数据表"注册第一个数据表</p>
+          {hasActiveFilters ? (
+             <>
+               <Search className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+               <h3 className="text-lg font-semibold text-slate-700 mb-2">未找到匹配的结果</h3>
+               <p className="text-slate-500">尝试使用不同的关键词搜索</p>
+               <button onClick={handleReset} className="mt-4 text-primary-600 hover:text-primary-700 font-medium">清除搜索</button>
+             </>
+          ) : (
+             <>
+               <Database className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+               <h3 className="text-lg font-semibold text-slate-700 mb-2">暂无数据表</h3>
+               <p className="text-slate-500 mb-4">点击"新建数据表"注册第一个数据表</p>
+             </>
+          )}
         </div>
       ) : (
         <div className="card overflow-hidden p-0">
@@ -124,7 +305,7 @@ function DataTableList({ onNavigate }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {tables.map((table) => {
+              {filteredTables.map((table) => {
                 const isPublished = table.status === 'created' || table.status === 'CREATED';
                 const isSyncNeeded = !isPublished && table.last_published_at; // DRAFT + has published before = Sync Needed
                 
@@ -140,7 +321,7 @@ function DataTableList({ onNavigate }) {
                       <code className="px-2 py-1 bg-slate-100 rounded text-sm text-slate-700">{table.table_name}</code>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="badge bg-primary-50 text-primary-700 border border-primary-100">
+                      <span className={`badge border ${getCategoryStyle(table.category_id)}`}>
                         {getCategoryName(table.category_id)}
                       </span>
                     </td>
