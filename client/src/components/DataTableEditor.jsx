@@ -311,10 +311,9 @@ function DataTableEditor({ tableId, cloneFromId, onNavigate }) {
               onChange={(e) => updateForm('table_name', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
               className={`input-field ${validationErrors.table_name ? 'border-red-500 focus:border-red-500 focus:ring-red-200' : ''}`}
               placeholder="例如：daily_bars"
-              disabled={isPublished}
             />
             {validationErrors.table_name && <p className="text-xs text-red-500 mt-1">{validationErrors.table_name}</p>}
-            <p className="form-hint">只能包含小写字母、数字和下划线{isPublished && ' (已发布表不可重命名)'}</p>
+            <p className="form-hint">只能包含小写字母、数字和下划线</p>
           </div>
         </div>
 
@@ -562,7 +561,7 @@ function DataTableEditor({ tableId, cloneFromId, onNavigate }) {
             className="btn-primary flex items-center gap-2"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            保存内容
+            {tableId ? '更新配置' : '创建数据表'}
           </button>
         </div>
       </div>

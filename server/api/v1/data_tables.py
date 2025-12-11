@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, validator
@@ -58,6 +59,7 @@ class DataTableResponse(BaseModel):
     category_id: int
     description: str
     status: TableStatus
+    last_published_at: Optional[Any] = None
     columns_schema: List[Dict[str, Any]]
     indexes_schema: List[Dict[str, Any]]
     created_at: Any
@@ -206,83 +208,64 @@ async def update_data_table(table_id: int, data: DataTableUpdate, session: Async
     if not is_valid:
         raise HTTPException(status_code=400, detail=f"Schema Validation Error: {error_msg}")
 
-    if table.status == TableStatus.CREATED:
-        # 已发布表只允许有限修改 (这里之前已经放宽了限制，但我们可以加回一些检查，或者信任用户)
-        # 目前保持放宽，只检查表名变更（通常不允许变表名）
-        if table.table_name != data.table_name:
-             raise HTTPException(status_code=400, detail="Cannot rename a published table")
+    # --- Snapshot Comparison ---
+    old_table_name = table.table_name
+    old_cols = table.columns_schema
+    old_idxs = table.indexes_schema
+    old_desc = table.description
     
+    new_table_name = data.table_name
+    new_cols = [c.dict() for c in data.columns_schema]
+    new_idxs = [i.dict() for i in data.indexes_schema]
+    new_desc = data.description
+    
+    has_renamed = old_table_name != new_table_name
+    has_schema_changed = (old_cols != new_cols) or (old_idxs != new_idxs) or (old_desc != new_desc)
+    
+    # Check physical existence
+    physical_exists = (table.status == TableStatus.CREATED) or (table.last_published_at is not None)
+
+    logger.info(f"Update Table {table_id} | Renamed: {has_renamed} ({old_table_name}->{new_table_name}) | SchemaChanged: {has_schema_changed} | Physical: {physical_exists} | Status: {table.status}")
+
+    # 1. Handle Physical Rename Immediately
+    if physical_exists and has_renamed:
+        try:
+            rename_sql = text(f"ALTER TABLE {old_table_name} RENAME TO {new_table_name}")
+            await session.execute(rename_sql)
+            logger.info(f"Renamed physical table {old_table_name} to {new_table_name}")
+        except Exception as e:
+            await session.rollback()
+            err = str(e)
+            if "does not exist" in err:
+                logger.warning(f"Failed to rename {old_table_name} (does not exist?), proceeding with config update.")
+            else:
+                raise HTTPException(status_code=400, detail=f"Failed to rename physical table: {err}")
+
+    # 2. Update Config Fields
     table.name = data.name
-    # table_name update is allowed only for DRAFT, but frontend disables it for CREATED.
-    # If backend receives it, we can either ignore or error.
-    if table.status == TableStatus.DRAFT:
-        table.table_name = data.table_name
-        
+    table.table_name = new_table_name 
     table.category_id = data.category_id
-    table.description = data.description
-    table.columns_schema = [c.dict() for c in data.columns_schema]
-    table.indexes_schema = [i.dict() for i in data.indexes_schema]
+    table.description = new_desc
+    table.columns_schema = new_cols
+    table.indexes_schema = new_idxs
+    
+    # 3. Update Status Logic
+    # If any physical attribute changed, force DRAFT to trigger Sync flow
+    if physical_exists and (has_renamed or has_schema_changed):
+        table.status = TableStatus.DRAFT
     
     await session.commit()
     await session.refresh(table)
     return table
 
-@router.post("/data-tables/{table_id}/publish")
-async def publish_data_table(table_id: int, session: AsyncSession = Depends(get_session)):
-    stmt = select(DataTableConfig).where(DataTableConfig.id == table_id)
-    table = (await session.execute(stmt)).scalar_one_or_none()
-    
-    if not table:
-        raise HTTPException(status_code=404, detail="Data table not found")
-        
-    if table.status == TableStatus.CREATED:
-        raise HTTPException(status_code=400, detail="Table is already published")
-        
-    # 1. Validate again
-    is_valid, error_msg = DDLGenerator.validate_schema(
-        table.table_name, 
-        table.columns_schema,
-        table.indexes_schema
-    )
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=error_msg)
-        
-    # 2. Generate DDL
-    try:
-        ddls = DDLGenerator.generate_create_table_sqls(
-            table.table_name, 
-            table.description, 
-            table.columns_schema
-        )
-        idx_ddls = DDLGenerator.generate_index_sqls(
-            table.table_name,
-            table.indexes_schema
-        )
-        all_sqls = ddls + idx_ddls
-        
-        # 3. Execute DDL
-        for sql in all_sqls:
-            await session.execute(text(sql))
-            
-        # 4. Update Status
-        table.status = TableStatus.CREATED
-        await session.commit()
-        
-    except Exception as e:
-        await session.rollback()
-        logger.exception(f"Failed to publish table {table_id}")
-        # Clean up if partial creation happened? 
-        # Ideally DDLs are not transactional in some DBs, but Postgres supports transactional DDL.
-        # So rollback should drop the table if created inside transaction.
-        raise HTTPException(status_code=500, detail=f"Failed to publish table: {str(e)}")
-        
-    return {"message": "Table published successfully", "status": "CREATED"}
+
+
+from datetime import datetime
+
+# ... (imports remain same, just ensure datetime is there)
 
 @router.post("/data-tables/{id}/publish")
 async def publish_table(id: int, session: AsyncSession = Depends(get_session)):
-    """
-    将草稿状态的表配置应用到物理数据库。
-    """
     stmt = select(DataTableConfig).where(DataTableConfig.id == id)
     result = await session.execute(stmt)
     config = result.scalar_one_or_none()
@@ -291,46 +274,82 @@ async def publish_table(id: int, session: AsyncSession = Depends(get_session)):
         raise HTTPException(status_code=404, detail="Table config not found")
     
     if config.status == TableStatus.CREATED:
-        raise HTTPException(status_code=400, detail="Table is already published")
+        raise HTTPException(status_code=400, detail="Table is already published/synced")
 
-    # 1. Generate DDLs
-    try:
-        ddl_sqls = DDLGenerator.generate_create_table_sqls(
-            config.table_name, 
-            config.description,
-            config.columns_schema
-        )
-        idx_sqls = DDLGenerator.generate_index_sqls(
-            config.table_name, 
-            config.indexes_schema
-        )
-        all_sqls = ddl_sqls + idx_sqls
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"DDL Generation failed: {str(e)}")
+    # Determine mode: Create or Sync
+    # Check if physical table exists
+    def check_table_exists(sync_session):
+        # run_sync provides a synchronous Session object
+        insp = inspect(sync_session.connection())
+        return insp.has_table(config.table_name)
+    
+    table_exists = await session.run_sync(check_table_exists)
+    
+    sqls_to_execute = []
 
-    # 2. Execute DDLs
-    # 注意: execute(text(...)) 需要在事务中运行
     try:
-        # Check if table physically exists
-        # 简单检查：尝试 select 1 from table，如果报错则不存在
-        # 或者捕获 create table 的 DuplicateTable 错误
-        # 这里直接执行，依赖 DB 报错
-        for sql in all_sqls:
+        if table_exists:
+            # --- Sync Mode ---
+            def get_db_info(sync_session):
+                insp = inspect(sync_session.connection())
+                cols = insp.get_columns(config.table_name)
+                # Filter out PK index usually named {table}_pkey
+                indexes = insp.get_indexes(config.table_name) 
+                return cols, indexes
+
+            db_cols, db_indexes = await session.run_sync(get_db_info)
+
+            # 0. Sync Table Comment
+            if config.description:
+                safe_desc = config.description.replace("'", "''")
+                sqls_to_execute.append(f"COMMENT ON TABLE {config.table_name} IS '{safe_desc}';")
+
+            # 1. Sync Columns (Add/Drop/Comment)
+            sqls_to_execute.extend(DDLGenerator.generate_sync_sqls(config.table_name, db_cols, config.columns_schema))
+            
+            # 2. Sync Indexes (Drop All + Re-create All) - Brutal but effective
+            for idx in db_indexes:
+                # Avoid dropping Primary Key index (usually ends with _pkey or matches PK constraint)
+                # Inspect returns indexes, PK is separate usually.
+                idx_name = idx['name']
+                sqls_to_execute.append(f"DROP INDEX IF EXISTS {idx_name};")
+            
+            sqls_to_execute.extend(DDLGenerator.generate_index_sqls(config.table_name, config.indexes_schema))
+            
+        else:
+            # --- Create Mode ---
+            ddl_sqls = DDLGenerator.generate_create_table_sqls(
+                config.table_name, 
+                config.description,
+                config.columns_schema
+            )
+            idx_sqls = DDLGenerator.generate_index_sqls(
+                config.table_name, 
+                config.indexes_schema
+            )
+            sqls_to_execute = ddl_sqls + idx_sqls
+
+        # Execute SQLs
+        logger.info(f"Executing SQLs for table {config.table_name}: {sqls_to_execute}")
+        for sql in sqls_to_execute:
             await session.execute(text(sql))
         
-        # 3. Update Status
+        # Update Status
         config.status = TableStatus.CREATED
+        config.last_published_at = datetime.utcnow()
         await session.commit()
         
-        return {"message": f"Table '{config.table_name}' published successfully", "executed_sqls": all_sqls}
+        return {
+            "message": f"Table '{config.table_name}' {'synced' if table_exists else 'published'} successfully", 
+            "executed_sqls": sqls_to_execute
+        }
         
     except Exception as e:
         await session.rollback()
-        logger.exception(f"Failed to publish table {id}")
-        # 转换更友好的错误信息
+        logger.exception(f"Failed to publish/sync table {id}")
         err_msg = str(e)
         if "already exists" in err_msg:
-             raise HTTPException(status_code=400, detail=f"Physical table '{config.table_name}' already exists in database.")
+             raise HTTPException(status_code=400, detail=f"Conflict: {err_msg}")
         raise HTTPException(status_code=500, detail=f"Database Execution failed: {err_msg}")
 
 @router.delete("/data-tables/{id}")

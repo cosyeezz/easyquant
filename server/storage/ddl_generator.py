@@ -194,3 +194,52 @@ class DDLGenerator:
             sql = f"CREATE {unique_str} INDEX IF NOT EXISTS {idx_name} ON {table_name} ({cols_str});"
             sqls.append(sql)
         return sqls
+
+    @staticmethod
+    def generate_sync_sqls(table_name: str, current_db_columns: List[Dict[str, Any]], new_schema_columns: List[Dict[str, Any]]) -> List[str]:
+        """
+        生成同步表结构的 DDL (Add/Drop/Alter)
+        current_db_columns: [{'name': 'id', 'type': INTEGER(), ...}, ...] (来自 inspect)
+        new_schema_columns: [{'name': 'id', 'type': 'INT', ...}, ...] (来自 config)
+        """
+        sqls = []
+        
+        # Build maps
+        db_col_map = {c['name']: c for c in current_db_columns}
+        new_col_map = {c['name']: c for c in new_schema_columns}
+        
+        # 1. Handle ADD and ALTER
+        for col in new_schema_columns:
+            name = col['name']
+            type_str = col['type']
+            comment = col.get('comment', '')
+            
+            # Parse target type
+            target_type = DDLGenerator._parse_type(type_str).compile(dialect=postgresql.dialect())
+            
+            if name not in db_col_map:
+                # ADD
+                sqls.append(f"ALTER TABLE {table_name} ADD COLUMN {name} {target_type};")
+                if comment:
+                    safe_comment = comment.replace("'", "''")
+                    sqls.append(f"COMMENT ON COLUMN {table_name}.{name} IS '{safe_comment}';")
+            else:
+                # Column exists, check for comment update
+                db_comment = db_col_map[name].get('comment')
+                # Config comment might be None or empty string, normalize to None or empty for comparison
+                # Usually db returns None if no comment.
+                new_comment = comment or None
+                
+                if db_comment != new_comment:
+                    safe_comment = (new_comment or "").replace("'", "''")
+                    sqls.append(f"COMMENT ON COLUMN {table_name}.{name} IS '{safe_comment}';")
+
+                # ALTER TYPE? (Skipped for safety as discussed)
+                pass
+
+        # 2. Handle DROP
+        for name in db_col_map:
+            if name not in new_col_map:
+                sqls.append(f"ALTER TABLE {table_name} DROP COLUMN {name};")
+        
+        return sqls

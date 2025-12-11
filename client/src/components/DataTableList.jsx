@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Pencil, Trash2, Loader2, Database, Play, AlertTriangle, Copy, X } from 'lucide-react'
+import { Plus, Pencil, Trash2, Loader2, Database, Play, AlertTriangle, Copy, X, RefreshCw } from 'lucide-react'
 import api from '../services/api'
 import Modal from './Modal'
 
@@ -126,6 +126,8 @@ function DataTableList({ onNavigate }) {
             <tbody className="divide-y divide-slate-100">
               {tables.map((table) => {
                 const isPublished = table.status === 'created' || table.status === 'CREATED';
+                const isSyncNeeded = !isPublished && table.last_published_at; // DRAFT + has published before = Sync Needed
+                
                 return (
                   <tr key={table.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4">
@@ -147,6 +149,10 @@ function DataTableList({ onNavigate }) {
                         <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium border border-emerald-200">
                           已发布
                         </span>
+                      ) : isSyncNeeded ? (
+                        <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium border border-purple-200 flex items-center gap-1 w-max">
+                           待同步
+                        </span>
                       ) : (
                         <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium border border-amber-200">
                           草稿
@@ -155,16 +161,22 @@ function DataTableList({ onNavigate }) {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
+                        {/* Publish / Sync Button */}
                         {!isPublished && (
                           <button 
                             onClick={() => setPublishModal({ open: true, table, error: null })} 
-                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 active:scale-95 transition-all shadow-sm shadow-primary-500/20"
-                            title="发布并创建物理表"
+                            className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white rounded-lg transition-all shadow-sm ${
+                                isSyncNeeded 
+                                ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/20' 
+                                : 'bg-primary-600 hover:bg-primary-700 shadow-primary-500/20'
+                            }`}
+                            title={isSyncNeeded ? "同步结构变更到数据库 (新增列)" : "发布并创建物理表"}
                           >
-                            <Play className="w-3 h-3" />
-                            发布
+                            {isSyncNeeded ? <RefreshCw className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                            {isSyncNeeded ? '更新结构' : '发布'}
                           </button>
                         )}
+                        
                         <button onClick={() => onNavigate('table-new', table.id)} className="btn-icon" title="复制表结构">
                           <Copy className="w-4 h-4" />
                         </button>
@@ -184,9 +196,7 @@ function DataTableList({ onNavigate }) {
         </div>
       )}
 
-      {/* Delete Modal - Reimplemented using Custom Modal component won't allow showing error inside easily unless modified. 
-          So we'll use a custom inline implementation similar to Publish Modal for better control.
-      */}
+      {/* Delete Modal */}
       {deleteModal.open && (
          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fadeIn p-4">
           <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-xl animate-slideUp">
@@ -242,29 +252,41 @@ function DataTableList({ onNavigate }) {
         </div>
       )}
 
-      {/* Publish Modal */}
+      {/* Publish / Sync Modal */}
       {publishModal.open && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fadeIn p-4">
           <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-xl animate-slideUp">
             <div className="flex items-start gap-3">
-              <div className="p-2 bg-amber-100 rounded-full">
-                <AlertTriangle className="w-6 h-6 text-amber-600" />
+              <div className={`p-2 rounded-full ${publishModal.table?.last_published_at ? 'bg-purple-100 text-purple-600' : 'bg-amber-100 text-amber-600'}`}>
+                {publishModal.table?.last_published_at ? <RefreshCw className="w-6 h-6" /> : <AlertTriangle className="w-6 h-6" />}
               </div>
               <div className="flex-1">
-                <h3 className="font-semibold text-lg text-slate-800">确认发布</h3>
+                <h3 className="font-semibold text-lg text-slate-800">
+                    {publishModal.table?.last_published_at ? '同步表结构变更' : '确认发布'}
+                </h3>
                 
                 <div className="mt-2 text-slate-600 text-sm">
-                  <p className="mb-2">您即将发布表 <span className="font-semibold text-slate-800">{publishModal.table?.name}</span>。</p>
-                  <p>此操作将：</p>
-                  <ul className="list-disc list-inside ml-2 mt-1 space-y-1">
-                    <li>在数据库中创建物理表 <code className="bg-slate-100 px-1 rounded">{publishModal.table?.table_name}</code></li>
-                    <li>锁定表结构（不可再修改字段定义）</li>
-                  </ul>
+                  <p className="mb-2">您即将{publishModal.table?.last_published_at ? '同步' : '发布'}表 <span className="font-semibold text-slate-800">{publishModal.table?.name}</span>。</p>
+                  
+                  {publishModal.table?.last_published_at ? (
+                      <div className="p-3 bg-purple-50 text-purple-800 rounded-lg border border-purple-100 space-y-2">
+                          <p className="font-medium">变更模式: 增量同步 (Sync)</p>
+                          <ul className="list-disc list-inside text-xs space-y-1">
+                            <li>检测新增字段并执行 <code className="bg-purple-100 px-1 rounded">ADD COLUMN</code></li>
+                            <li>注意：删除或重命名字段可能不会自动同步</li>
+                          </ul>
+                      </div>
+                  ) : (
+                      <ul className="list-disc list-inside ml-2 mt-1 space-y-1">
+                        <li>在数据库中创建物理表 <code className="bg-slate-100 px-1 rounded">{publishModal.table?.table_name}</code></li>
+                        <li>锁定表结构（不可再修改字段定义）</li>
+                      </ul>
+                  )}
                 </div>
 
                 {publishModal.error && (
                    <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm break-words">
-                     <div className="font-semibold mb-1">发布失败:</div>
+                     <div className="font-semibold mb-1">操作失败:</div>
                      {publishModal.error}
                    </div>
                 )}
@@ -282,10 +304,14 @@ function DataTableList({ onNavigate }) {
               <button 
                 onClick={handlePublish} 
                 disabled={publishing} 
-                className="btn-primary flex items-center gap-2"
+                className={`flex items-center gap-2 text-white px-4 py-2 rounded-lg font-medium transition-all ${
+                     publishModal.table?.last_published_at 
+                     ? 'bg-purple-600 hover:bg-purple-700' 
+                     : 'bg-primary-600 hover:bg-primary-700'
+                }`}
               >
-                {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                {publishing ? '执行中...' : '确认发布'}
+                {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : (publishModal.table?.last_published_at ? <RefreshCw className="w-4 h-4" /> : <Play className="w-4 h-4" />)}
+                {publishing ? '执行中...' : (publishModal.table?.last_published_at ? '确认同步' : '确认发布')}
               </button>
             </div>
           </div>
