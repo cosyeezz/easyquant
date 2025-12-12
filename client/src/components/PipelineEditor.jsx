@@ -141,7 +141,7 @@ function HandlerItem(props) {
             <button 
                onClick={() => setShowExecSettings(!showExecSettings)} 
                className={`btn-icon !p-1.5 mr-2 ${showExecSettings ? 'bg-purple-100 text-purple-600' : ''}`}
-               title="并行执行设置 (列选择与拷贝)"
+               title="设置输入列 (只处理特定列)"
             >
               <Settings className="w-4 h-4" />
             </button>
@@ -163,29 +163,20 @@ function HandlerItem(props) {
       {showExecSettings && parentMode === 'parallel' && (
         <div className="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-100 text-sm">
            <h5 className="font-semibold text-purple-800 mb-2 flex items-center gap-2">
-             <Zap className="w-3 h-3" /> 并行执行配置
+             <Zap className="w-3 h-3" /> 输入数据范围 (Input Scope)
            </h5>
            <div className="grid gap-3">
              <div>
-               <label className="block text-xs font-medium text-purple-700 mb-1">输入列选择 (Input Columns)</label>
+               <label className="block text-xs font-medium text-purple-700 mb-1">选择需要的列 (Select Columns)</label>
                <SubsetEditor 
                   subset={execOptions.select_columns || []} 
                   columns={columns} 
                   onChange={cols => updateExecOptions({ select_columns: cols })} 
                />
-               <p className="text-[10px] text-purple-600 mt-1">留空则传入所有列。指定列可显著减少内存占用。</p>
-             </div>
-             <div>
-               <label className="block text-xs font-medium text-purple-700 mb-1">数据拷贝模式 (Copy Mode)</label>
-               <select 
-                 value={execOptions.copy_mode || 'auto'}
-                 onChange={e => updateExecOptions({ copy_mode: e.target.value })}
-                 className="input-field !py-1 !text-xs !bg-white"
-               >
-                 <option value="auto">Auto (Slice Copy if cols selected, else Deep Copy)</option>
-                 <option value="deep">Force Deep Copy (Safest)</option>
-                 <option value="none">No Copy / Reference (Fastest, Read-only safe)</option>
-               </select>
+               <p className="text-[10px] text-purple-600 mt-1">
+                 只将选中的列复制给该处理器。未选中的列会被忽略，能显著降低内存消耗并提高速度。
+                 <br/>留空则复制所有列。
+               </p>
              </div>
            </div>
         </div>
