@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 import logging
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ class BaseHandler(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def handle(self, data: Any, context: Optional[Dict[str, Any]] = None) -> Any:
+    async def handle(self, data: Any, context: Dict[str, Any] | None = None) -> Any:
         """
         处理传入的数据并返回处理结果。
         

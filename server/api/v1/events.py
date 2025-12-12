@@ -1,5 +1,5 @@
 # server/api/v1/events.py
-from typing import List, Optional
+from typing import List
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query, HTTPException
@@ -21,7 +21,7 @@ class EventResponse(BaseModel):
     id: int
     process_name: str
     event_name: str
-    payload: Optional[dict]
+    payload: dict | None
     created_at: datetime
     updated_at: datetime
 
@@ -34,8 +34,8 @@ class EventResponse(BaseModel):
 
 @router.get("/events", response_model=List[EventResponse])
 async def get_events(
-    process_name: Optional[str] = Query(None, description="按进程名筛选"),
-    event_name: Optional[str] = Query(None, description="按事件名筛选"),
+    process_name: str | None = Query(None, description="按进程名筛选"),
+    event_name: str | None = Query(None, description="按事件名筛选"),
     limit: int = Query(100, ge=1, le=1000, description="返回的最大事件数"),
     offset: int = Query(0, ge=0, description="跳过的事件数"),
     session: AsyncSession = Depends(get_session)

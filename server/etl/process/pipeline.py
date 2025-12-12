@@ -1,4 +1,4 @@
-from typing import List, Any, Callable, Union, Dict, Optional
+from typing import List, Any, Callable, Dict
 import asyncio
 import logging
 import inspect
@@ -6,29 +6,30 @@ from .base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
-HandlerType = Union[BaseHandler, Callable[[Any], Any]]
+HandlerType = BaseHandler | Callable[[Any], Any]
 
 class Pipeline:
     """
     一个异步处理管道，按顺序执行一系列的处理器 (Handler)。
     """
-    def __init__(self, handlers: List[HandlerType]):
+    def __init__(self, handlers: List[HandlerType] | None = None):
         """
         初始化一个处理管道。
         :param handlers: 一个由 Handler 组成的列表。
         """
-        self._handlers = handlers
+        self._handlers = handlers or []
+
+    def add_step(self, handler: HandlerType):
+        self._handlers.append(handler)
 
     @classmethod
-    def create(cls, handlers: List[HandlerType] = None) -> 'Pipeline':
+    def create(cls, handlers: List[HandlerType] | None = None) -> 'Pipeline':
         """
         创建一个 Pipeline 实例的工厂方法。
         """
-        if handlers is None:
-            handlers = []
         return cls(handlers)
 
-    async def run(self, initial_data: Any, context: Optional[Dict[str, Any]] = None) -> Any:
+    async def run(self, initial_data: Any, context: Dict[str, Any] | None = None) -> Any:
         """
         异步执行管道中的所有处理器。
 

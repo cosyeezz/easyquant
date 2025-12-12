@@ -1,4 +1,4 @@
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Tuple
 import re
 from sqlalchemy import MetaData, Table, Column
 from sqlalchemy.schema import CreateTable
@@ -78,7 +78,7 @@ class DDLGenerator:
         return base_type
 
     @staticmethod
-    def validate_schema(table_name: str, columns_schema: List[Dict[str, Any]], indexes_schema: List[Dict[str, Any]]) -> Tuple[bool, Optional[str]]:
+    def validate_schema(table_name: str, columns_schema: List[Dict[str, Any]], indexes_schema: List[Dict[str, Any]]) -> Tuple[bool, str | None]:
         """
         Validate the table schema before creation.
         Returns: (is_valid, error_message)

@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 import pandas as pd
 from server.etl.process.base import BaseHandler
 
@@ -34,7 +34,7 @@ class ColumnMappingHandler(BaseHandler):
             }
         }
 
-    async def handle(self, data: Any, context: Optional[Dict[str, Any]] = None) -> Any:
+    async def handle(self, data: Any, context: Dict[str, Any] | None = None) -> Any:
         """
         执行重命名操作。
         """

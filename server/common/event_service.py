@@ -1,5 +1,4 @@
 # server/common/event_service.py
-from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from server.storage.models.event import Event
 
@@ -7,7 +6,7 @@ async def record_event(
     session: AsyncSession,
     process_name: str,
     event_name: str,
-    payload: Optional[dict] = None
+    payload: dict | None = None
 ) -> Event:
     """
     在数据库中创建一条新的事件记录。

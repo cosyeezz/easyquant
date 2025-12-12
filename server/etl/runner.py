@@ -2,7 +2,7 @@ import logging
 import time
 import traceback
 import pandas as pd
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 from sqlalchemy import select
 
 from server.storage.database import AsyncSessionFactory

@@ -2,7 +2,7 @@ import os
 import glob
 import pandas as pd
 from datetime import datetime
-from typing import List, Optional
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Body, BackgroundTasks
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,12 +31,12 @@ async def _run_task_background(task_id: int):
 
 class ETLTaskConfigBase(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     source_type: str
     source_config: dict
     pipeline_config: List[dict]
-    batch_size: Optional[int] = 1000
-    schedule: Optional[str] = None
+    batch_size: int | None = 1000
+    schedule: str | None = None
 
 class ETLTaskConfigCreate(ETLTaskConfigBase):
     pass

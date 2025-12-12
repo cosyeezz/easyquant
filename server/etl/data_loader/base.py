@@ -5,7 +5,7 @@ import asyncio
 import functools
 import logging
 import pandas as pd
-from typing import AsyncGenerator, List, Any, Tuple, Optional
+from typing import AsyncGenerator, List, Any, Tuple
 
 # 获取一个模块级别的 logger
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ class BaseLoader(abc.ABC):
     框架会自动处理并行调度、背压(backpressure)和内存管理。
     """
 
-    def __init__(self, max_queue_size: int = 100, max_concurrent_workers: int = None):
+    def __init__(self, max_queue_size: int = 100, max_concurrent_workers: int | None = None):
         """
         初始化基类加载器。
         :param max_queue_size: 内部处理队列的最大尺寸，用于内存管理和背压。
@@ -74,7 +74,7 @@ class BaseLoader(abc.ABC):
         """
         return await self._get_sources()
 
-    async def _process_completed_task(self, task) -> Tuple[Any, Optional[pd.DataFrame], bool]:
+    async def _process_completed_task(self, task) -> Tuple[Any, pd.DataFrame | None, bool]:
         """
         处理单个完成的任务。
 

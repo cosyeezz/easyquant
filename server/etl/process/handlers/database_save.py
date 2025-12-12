@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, List
 import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,7 +20,7 @@ class DatabaseSaveHandler(BaseHandler):
     def __init__(self, target_table_id: int):
         self.target_table_id = target_table_id
         # 简单的内存缓存，避免每批次都查数据库元数据
-        self._table_config_cache: Optional[Dict[str, Any]] = None
+        self._table_config_cache: Dict[str, Any] | None = None
 
     @classmethod
     def metadata(cls) -> Dict[str, Any]:
@@ -83,7 +83,7 @@ class DatabaseSaveHandler(BaseHandler):
         }
         return self._table_config_cache
 
-    async def handle(self, data: Any, context: Optional[Dict[str, Any]] = None) -> Any:
+    async def handle(self, data: Any, context: Dict[str, Any] | None = None) -> Any:
         if not isinstance(data, pd.DataFrame):
             if data is None:
                 return None

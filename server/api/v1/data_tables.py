@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, validator
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -59,7 +59,7 @@ class DataTableResponse(BaseModel):
     category_id: int
     description: str
     status: TableStatus
-    last_published_at: Optional[Any] = None
+    last_published_at: Any | None = None
     columns_schema: List[Dict[str, Any]]
     indexes_schema: List[Dict[str, Any]]
     created_at: Any
@@ -72,7 +72,7 @@ class CategoryResponse(BaseModel):
     id: int
     code: str
     name: str
-    description: Optional[str]
+    description: str | None
 
     class Config:
         orm_mode = True
@@ -80,11 +80,11 @@ class CategoryResponse(BaseModel):
 class CategoryCreate(BaseModel):
     code: str = Field(..., pattern="^[a-z0-9_]+$", description="唯一标识代码")
     name: str = Field(..., description="显示名称")
-    description: Optional[str] = None
+    description: str | None = None
 
 class CategoryUpdate(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
 
 # --- Categories API ---
 
