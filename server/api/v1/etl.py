@@ -3,7 +3,7 @@ import glob
 import pandas as pd
 from datetime import datetime
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, BackgroundTasks
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
@@ -11,11 +11,21 @@ from pydantic import BaseModel
 from server.storage.database import get_session
 from server.storage.models.etl_task_config import ETLTaskConfig
 from server.etl.process.registry import registry
+from server.etl.runner import ETLRunner
 
 # 自动发现处理器
 registry.auto_discover("server.etl.process.handlers")
 
 router = APIRouter()
+
+# --- Background Task Wrapper ---
+
+async def _run_task_background(task_id: int):
+    """
+    后台任务包装器，实例化 Runner 并执行
+    """
+    runner = ETLRunner(task_id)
+    await runner.run()
 
 # --- Pydantic Schemas ---
 
@@ -87,7 +97,7 @@ def preview_source(request: SourcePreviewRequest):
 
 @router.get("/etl-configs", response_model=List[ETLTaskConfigResponse])
 async def list_etl_configs(session: AsyncSession = Depends(get_session)):
-    result = await session.execute(select(ETLTaskConfig))
+    result = await session.execute(select(ETLTaskConfig).order_by(ETLTaskConfig.id.desc()))
     return result.scalars().all()
 
 @router.post("/etl-configs", response_model=ETLTaskConfigResponse)
@@ -96,15 +106,24 @@ async def create_etl_config(config: ETLTaskConfigCreate, session: AsyncSession =
     session.add(db_config)
     await session.commit()
     await session.refresh(db_config)
-    
-    # 转换 datetime 为 isoformat string 以适配 Pydantic
-    # (Pydantic v2通常能自动处理 datetime，但为了保险起见，如果 response model 定义了 str，FastAPI 会尝试转换)
-    # 实际上 Pydantic 的 datetime 类型更安全，但这里我们先不改 Response Model 的类型定义
-    # 修正: Response Model 里的 created_at 是 str? SQLAlchemy 是 datetime.
-    # 最好让 Pydantic 处理转换。上面 Response Model 定义里 created_at 是 str，
-    # pydantic v2 默认不会自动把 datetime 转 str 除非配置了 json_encoders 或 手动。
-    # 更简单的做法是把 Response Model 的 created_at 改为 datetime 类型。
     return db_config
+
+@router.post("/etl-configs/{config_id}/run", status_code=202)
+async def run_etl_config(
+    config_id: int, 
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    触发执行 ETL 任务
+    """
+    result = await session.execute(select(ETLTaskConfig).where(ETLTaskConfig.id == config_id))
+    config = result.scalar_one_or_none()
+    if not config:
+        raise HTTPException(status_code=404, detail="Task config not found")
+    
+    background_tasks.add_task(_run_task_background, config_id)
+    return {"message": "Task execution started", "task_id": config_id}
 
 @router.get("/etl-configs/{config_id}", response_model=ETLTaskConfigResponse)
 async def get_etl_config(config_id: int, session: AsyncSession = Depends(get_session)):

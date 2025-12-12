@@ -76,10 +76,21 @@ async def bulk_insert_df(df: pd.DataFrame, table_name: str, session: AsyncSessio
     records = list(df.itertuples(index=False, name=None))
     columns = list(df.columns)
 
-    async def _insert(conn):
-        # 获取底层的 asyncpg 连接
-        raw_conn = await conn.get_raw_connection()
-        await raw_conn.copy_records_to_table(
+    async def _insert_implementation(async_conn):
+        # 获取底层的 asyncpg 连接 (Driver Connection)
+        # async_conn 是 SQLAlchemy 的 AsyncConnection
+        raw_conn = await async_conn.get_raw_connection()
+        # raw_conn 是 asyncpg.connection.Connection (适配器)
+        # 这里的 raw_conn.driver_connection 才是真正的 asyncpg connection
+        # 但是 SQLAlchemy 的 adapater 代理了 copy_records_to_table 吗？
+        # 通常 raw_conn 直接暴露了 driver 方法，或者我们需要 raw_conn.driver_connection
+        # 经查，AsyncPGAdapter (raw_conn) 暴露了 driver_connection
+        if hasattr(raw_conn, 'driver_connection'):
+             pg_conn = raw_conn.driver_connection
+        else:
+             pg_conn = raw_conn # Fallback
+
+        await pg_conn.copy_records_to_table(
             table_name,
             records=records,
             columns=columns,
@@ -88,15 +99,17 @@ async def bulk_insert_df(df: pd.DataFrame, table_name: str, session: AsyncSessio
 
     try:
         if session is not None:
-            # 推荐：使用传入的 session
-            await _insert(session)
+            # 使用传入 session 的当前连接
+            # session.connection() 是一个 AsyncConnection
+            conn = await session.connection() 
+            await _insert_implementation(conn)
             logger.info(f"成功向表 '{table_name}' 插入 {len(df)} 条数据（使用会话连接）。")
         else:
             # 回退：使用全局引擎
             logger.warning(f"未提供 session，使用全局引擎连接池（可能导致连接争抢）")
             async with async_engine.connect() as conn:
                 async with conn.begin():
-                    await _insert(conn)
+                    await _insert_implementation(conn)
                     logger.info(f"成功向表 '{table_name}' 插入 {len(df)} 条数据（使用全局引擎）。")
     except Exception as e:
         logger.error(f"向表 '{table_name}' 批量插入数据失败: {e}", exc_info=True)

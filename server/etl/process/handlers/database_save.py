@@ -27,15 +27,14 @@ class DatabaseSaveHandler(BaseHandler):
         return {
             "name": "DatabaseSaveHandler",
             "label": "数据库入库 (Save to DB)",
-            "description": "将数据保存到指定的物理表。",
+            "description": "将数据保存到指定的物理表。如果表定义了主键或唯一索引，将自动使用 Upsert 模式。",
             "params_schema": {
                 "type": "object",
                 "properties": {
                     "target_table_id": {
                         "type": "integer",
                         "title": "目标数据表",
-                        "description": "选择要在其中存储数据的数据表配置",
-                        # 前端应使用下拉框渲染此字段，数据源来自 /api/v1/data-tables
+                        "description": "选择要在其中存储数据的数据表",
                         "widget": "select", 
                         "dataSource": "/api/v1/data-tables"
                     }
@@ -46,7 +45,7 @@ class DatabaseSaveHandler(BaseHandler):
 
     async def _get_table_config(self, session: AsyncSession) -> Dict[str, Any]:
         """
-        获取并缓存表配置元数据
+        获取并缓存表配置元数据，智能推断 Upsert 的冲突键
         """
         if self._table_config_cache:
             return self._table_config_cache
@@ -58,8 +57,26 @@ class DatabaseSaveHandler(BaseHandler):
         if not config:
             raise ValueError(f"DatabaseSaveHandler: 找不到 ID 为 {self.target_table_id} 的数据表配置")
         
-        unique_keys = config.schema_definition.get("unique_keys", []) if config.schema_definition else []
+        if not config.table_name:
+            raise ValueError(f"数据表 '{config.name}' 尚未发布，没有物理表名")
+
+        # 确定 Upsert Key
+        # 优先级 1: 主键 (PK)
+        unique_keys = []
+        if config.columns_schema:
+            pk_cols = [col["name"] for col in config.columns_schema if col.get("is_pk")]
+            if pk_cols:
+                unique_keys = pk_cols
         
+        # 优先级 2: 如果没有主键，找第一个唯一索引
+        if not unique_keys and config.indexes_schema:
+            for idx in config.indexes_schema:
+                if idx.get("unique") and idx.get("columns"):
+                    unique_keys = idx["columns"]
+                    break
+        
+        logger.info(f"Handler Init: Table '{config.table_name}', Upsert Keys: {unique_keys}")
+
         self._table_config_cache = {
             "table_name": config.table_name,
             "unique_keys": unique_keys
@@ -68,8 +85,6 @@ class DatabaseSaveHandler(BaseHandler):
 
     async def handle(self, data: Any, context: Optional[Dict[str, Any]] = None) -> Any:
         if not isinstance(data, pd.DataFrame):
-            # 如果不是 DataFrame，跳过或记录警告？
-            # 对于 ETL，如果上一步没产生数据（None），这里应该直接返回
             if data is None:
                 return None
             logger.warning(f"DatabaseSaveHandler 接收到了非 DataFrame 数据类型: {type(data)}，已跳过入库。")
@@ -90,13 +105,16 @@ class DatabaseSaveHandler(BaseHandler):
 
         try:
             if unique_keys:
-                # 如果定义了唯一键，使用 Upsert
+                # 智能校验：确保 DataFrame 包含所有 unique keys
+                missing_keys = [k for k in unique_keys if k not in data.columns]
+                if missing_keys:
+                    raise ValueError(f"Upsert 失败: DataFrame 缺少唯一键列 {missing_keys}。请检查 Pipeline 之前的步骤是否正确映射了列名。")
+
                 await bulk_upsert_df(data, table_name, unique_keys, session)
             else:
-                # 否则使用普通 Insert
                 await bulk_insert_df(data, table_name, session)
             
-            # 记录处理行数到 context (可选，供 Runner 统计)
+            # 记录处理行数
             if "stats" in context and isinstance(context["stats"], dict):
                  context["stats"]["saved_rows"] = context["stats"].get("saved_rows", 0) + len(data)
 
