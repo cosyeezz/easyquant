@@ -120,10 +120,14 @@ async def bulk_upsert_df(
     df: pd.DataFrame,
     table_name: str,
     unique_keys: List[str],
-    session: AsyncSession
+    session: AsyncSession,
+    ignore_conflicts: bool = False
 ):
     """
     使用临时表和 COPY 命令高性能地 "upsert" DataFrame 数据到 PostgreSQL。
+    
+    :param ignore_conflicts: 如果为 True，则遇到冲突时跳过 (DO NOTHING)。
+                             如果为 False (默认)，则更新冲突记录 (DO UPDATE)。
     """
     if df.empty:
         logger.warning(f"尝试向表 '{table_name}' 更新一个空的 DataFrame，操作已跳过。")
@@ -138,7 +142,7 @@ async def bulk_upsert_df(
             raise ValueError(f"unique_key '{key}' 不存在于 DataFrame 列中: {list(df.columns)}")
 
     temp_table_name = f"temp_{table_name}_{pd.Timestamp.now().strftime('%Y%m%d%H%M%S%f')}"
-    logger.info(f"开始向表 '{table_name}' 批量更新 {len(df)} 条数据，使用临时表 '{temp_table_name}'...")
+    logger.info(f"开始向表 '{table_name}' 批量{'合并(Ignore)' if ignore_conflicts else '更新(Upsert)'} {len(df)} 条数据，使用临时表 '{temp_table_name}'...")
 
     # 安全校验
     if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', table_name):
@@ -158,23 +162,26 @@ async def bulk_upsert_df(
         await bulk_insert_df(df, temp_table_name, session)
 
         update_cols = [col for col in df.columns if col not in unique_keys]
-        if not update_cols:
-            merge_sql = text(f"""
-                INSERT INTO {table_name} ({', '.join(df.columns)})
-                SELECT * FROM {temp_table_name}
-                ON CONFLICT ({', '.join(unique_keys)}) DO NOTHING
-            """)
+        
+        # 构建 Conflict Action
+        if ignore_conflicts:
+             conflict_action = "DO NOTHING"
         else:
-            update_clause = ", ".join([f"{col} = EXCLUDED.{col}" for col in update_cols])
-            merge_sql = text(f"""
-                INSERT INTO {table_name} ({', '.join(df.columns)})
-                SELECT * FROM {temp_table_name}
-                ON CONFLICT ({', '.join(unique_keys)}) DO UPDATE
-                SET {update_clause}
-            """)
+             if not update_cols:
+                 # 如果没有非主键列可更新，Upsert 退化为 Ignore
+                 conflict_action = "DO NOTHING"
+             else:
+                 update_clause = ", ".join([f"{col} = EXCLUDED.{col}" for col in update_cols])
+                 conflict_action = f"DO UPDATE SET {update_clause}"
+
+        merge_sql = text(f"""
+            INSERT INTO {table_name} ({', '.join(df.columns)})
+            SELECT * FROM {temp_table_name}
+            ON CONFLICT ({', '.join(unique_keys)}) {conflict_action}
+        """)
         
         await session.execute(merge_sql)
-        logger.info(f"成功向表 '{table_name}' 批量更新 {len(df)} 条数据。")
+        logger.info(f"成功向表 '{table_name}' 批量处理 {len(df)} 条数据。")
 
     except Exception as e:
         logger.error(f"向表 '{table_name}' 批量更新数据失败: {e}", exc_info=True)

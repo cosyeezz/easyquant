@@ -17,8 +17,9 @@ class DatabaseSaveHandler(BaseHandler):
     支持 Upsert（如果配置了唯一键）或 Insert。
     """
 
-    def __init__(self, target_table_id: int):
+    def __init__(self, target_table_id: int, conflict_mode: str = 'upsert'):
         self.target_table_id = target_table_id
+        self.conflict_mode = conflict_mode
         # 简单的内存缓存，避免每批次都查数据库元数据
         self._table_config_cache: Dict[str, Any] | None = None
 
@@ -27,7 +28,7 @@ class DatabaseSaveHandler(BaseHandler):
         return {
             "name": "DatabaseSaveHandler",
             "label": "数据库入库 (Save to DB)",
-            "description": "将数据保存到指定的物理表。如果表定义了主键或唯一索引，将自动使用 Upsert 模式。",
+            "description": "将数据保存到指定的物理表。支持多种写入冲突处理模式。",
             "params_schema": {
                 "type": "object",
                 "properties": {
@@ -37,9 +38,17 @@ class DatabaseSaveHandler(BaseHandler):
                         "description": "选择要在其中存储数据的数据表",
                         "widget": "select", 
                         "dataSource": "/api/v1/data-tables"
+                    },
+                    "conflict_mode": {
+                        "type": "string",
+                        "title": "写入模式",
+                        "description": "遇到主键/唯一索引冲突时的处理策略",
+                        "default": "upsert",
+                        "enum": ["upsert", "ignore", "insert"],
+                        "enumNames": ["更新 (Upsert) - 存在则覆盖", "忽略 (Ignore) - 存在则跳过", "插入 (Insert) - 冲突则报错"]
                     }
                 },
-                "required": ["target_table_id"]
+                "required": ["target_table_id", "conflict_mode"]
             }
         }
 
@@ -75,7 +84,7 @@ class DatabaseSaveHandler(BaseHandler):
                     unique_keys = idx["columns"]
                     break
         
-        logger.info(f"Handler Init: Table '{config.table_name}', Upsert Keys: {unique_keys}")
+        logger.info(f"Handler Init: Table '{config.table_name}', Mode: {self.conflict_mode}, Keys: {unique_keys}")
 
         self._table_config_cache = {
             "table_name": config.table_name,
@@ -104,22 +113,39 @@ class DatabaseSaveHandler(BaseHandler):
         unique_keys = table_info["unique_keys"]
 
         try:
-            if unique_keys:
-                # 智能校验：确保 DataFrame 包含所有 unique keys
-                missing_keys = [k for k in unique_keys if k not in data.columns]
-                if missing_keys:
-                    raise ValueError(f"Upsert 失败: DataFrame 缺少唯一键列 {missing_keys}。请检查 Pipeline 之前的步骤是否正确映射了列名。")
-
-                await bulk_upsert_df(data, table_name, unique_keys, session)
-            else:
+            # 模式路由
+            if self.conflict_mode == 'insert':
+                # 纯插入，冲突报错
                 await bulk_insert_df(data, table_name, session)
+            
+            elif self.conflict_mode == 'ignore':
+                if unique_keys:
+                    # 忽略冲突
+                    await bulk_upsert_df(data, table_name, unique_keys, session, ignore_conflicts=True)
+                else:
+                    # 如果没有唯一键，Ignore 等同于 Insert (因为没有冲突来源)
+                    # 实际上如果没唯一键，upsert 会抛异常，所以这里自动退化
+                    await bulk_insert_df(data, table_name, session)
+            
+            else: # upsert (default)
+                if unique_keys:
+                    # 智能校验
+                    missing_keys = [k for k in unique_keys if k not in data.columns]
+                    if missing_keys:
+                        raise ValueError(f"Upsert 失败: DataFrame 缺少唯一键列 {missing_keys}。")
+                    
+                    await bulk_upsert_df(data, table_name, unique_keys, session, ignore_conflicts=False)
+                else:
+                    # 如果没有唯一键，Upsert 无法执行，退化为 Insert
+                    logger.warning(f"表 '{table_name}' 未定义唯一键，Upsert 模式自动退化为 Insert。")
+                    await bulk_insert_df(data, table_name, session)
             
             # 记录处理行数
             if "stats" in context and isinstance(context["stats"], dict):
                  context["stats"]["saved_rows"] = context["stats"].get("saved_rows", 0) + len(data)
 
         except Exception as e:
-            logger.error(f"入库失败 (Table: {table_name}): {e}")
+            logger.error(f"入库失败 (Table: {table_name}, Mode: {self.conflict_mode}): {e}")
             raise
 
         # 返回数据以便后续可能的 Handler 继续使用
