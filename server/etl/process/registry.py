@@ -37,7 +37,16 @@ class HandlerRegistry:
         """
         根据名称获取处理器类。
         """
-        return self._handlers.get(name)
+        handler = self._handlers.get(name)
+        if not handler:
+            raise ValueError(f"Handler '{name}' not found in registry.")
+        return handler
+
+    def get_handler_class(self, name: str) -> Type[BaseHandler]:
+        """
+        get_handler 的别名，更明确的命名。
+        """
+        return self.get_handler(name)
 
     def get_all_handlers_metadata(self) -> List[Dict[str, Any]]:
         """
