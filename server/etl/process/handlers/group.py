@@ -73,15 +73,22 @@ class GroupHandler(BaseHandler):
 
         from server.etl.process.registry import HandlerRegistry
 
-        self.initialized_handlers = []
+        self.handlers_with_conf = [] # Store tuple (instance, config)
         for h_conf in self.handlers_config:
             name = h_conf.get('name')
             params = h_conf.get('params', {})
             
+            # 过滤掉内部控制参数，避免传给 Handler 报错
+            # 但我们需要保留它们在 conf 里以便 handle 方法使用
+            # 实际上 Handler 的 __init__通常有 **kwargs 或明确参数。
+            # 为了安全，我们在实例化时移除 _exec_options，但在保存 conf 时保留。
+            
+            clean_params = {k: v for k, v in params.items() if k != '_exec_options'}
+            
             try:
                 handler_cls = HandlerRegistry.get_handler_class(name)
-                handler_instance = handler_cls(**params)
-                self.initialized_handlers.append(handler_instance)
+                handler_instance = handler_cls(**clean_params)
+                self.handlers_with_conf.append((handler_instance, h_conf))
             except Exception as e:
                 logger.error(f"GroupHandler 初始化子处理器 '{name}' 失败: {e}")
                 raise ValueError(f"无法初始化子处理器 {name}: {str(e)}")
@@ -99,7 +106,7 @@ class GroupHandler(BaseHandler):
         if self.mode == 'sequential':
             # === 顺序模式 ===
             current_data = data
-            for handler in self.initialized_handlers:
+            for handler, _ in self.handlers_with_conf:
                 if asyncio.iscoroutinefunction(handler.handle):
                     current_data = await handler.handle(current_data, context)
                 else:
@@ -120,10 +127,47 @@ class GroupHandler(BaseHandler):
                     raise
 
             tasks = []
-            for handler in self.initialized_handlers:
-                # 创建副本
-                data_copy = data.copy(deep=True) if is_df else copy.deepcopy(data)
-                tasks.append(run_safe(handler, data_copy))
+            for handler, conf in self.handlers_with_conf:
+                # === 智能数据准备 ===
+                exec_opts = conf.get('params', {}).get('_exec_options', {})
+                select_cols = exec_opts.get('select_columns', [])
+                copy_mode = exec_opts.get('copy_mode', 'auto')
+
+                sub_data = data
+                
+                # 1. 列切片
+                if is_df and select_cols:
+                    # 检查列是否存在，容错处理
+                    existing_cols = [c for c in select_cols if c in data.columns]
+                    if existing_cols:
+                        sub_data = data[existing_cols]
+                    # 如果列都不存在，可能传了个空 DF，视具体需求
+
+                # 2. 拷贝控制
+                final_input = sub_data
+                
+                if copy_mode == 'none':
+                    # 零拷贝：直接传引用。极快。
+                    # 风险：Handler 修改数据会影响主线程和其他分支。
+                    pass 
+                
+                elif copy_mode == 'deep':
+                    # 强制深拷贝
+                    final_input = sub_data.copy(deep=True) if is_df else copy.deepcopy(sub_data)
+                    
+                else: # 'auto' (default)
+                    # 如果做了列切片，Pandas 默认会返回一个新的 View 或 Copy。
+                    # 为安全起见，只要是切片了，我们显式 copy 一次确保独立性。
+                    # 如果没切片（全量），则必须 Deep Copy 才能并行安全。
+                    if is_df:
+                        if select_cols:
+                             final_input = sub_data.copy() # Slice copy (memory efficient)
+                        else:
+                             final_input = sub_data.copy(deep=True) # Full copy
+                    else:
+                        final_input = copy.deepcopy(sub_data)
+
+                tasks.append(run_safe(handler, final_input))
 
             if not tasks:
                 return data
@@ -133,27 +177,25 @@ class GroupHandler(BaseHandler):
             
             # === 合并策略 ===
             if self.merge_strategy == 'passthrough':
-                # 忽略结果，返回原始数据
                 return data
             
             elif self.merge_strategy == 'merge_columns':
                 if not is_df:
-                    logger.warning("GroupHandler: 'merge_columns' 策略仅支持 pandas DataFrame，已退化为 passthrough。")
                     return data
                 
-                # 开始合并
-                # 简单策略：遍历 result 的所有列，直接赋值回原 data
                 for res in results:
                     if not isinstance(res, pd.DataFrame):
                         continue
                     
+                    # 将结果的列合并回 data
+                    # 如果使用了 select_columns，Handler 返回的可能只是那几列的处理结果
+                    # 直接赋值回去即可
                     for col in res.columns:
                         data[col] = res[col]
                 
                 return data
 
             else:
-                logger.warning(f"GroupHandler: 未知的合并策略 '{self.merge_strategy}'，已退化为 passthrough。")
                 return data
 
         else:

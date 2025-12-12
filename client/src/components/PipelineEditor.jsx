@@ -7,7 +7,8 @@ export default function PipelineEditor({
   availableHandlers, 
   columns, 
   dataTables, 
-  onChange 
+  onChange,
+  parentMode = 'sequential' // 新增: 知道父级是并行还是串行
 }) {
   
   const handleAdd = (handlerName) => {
@@ -61,6 +62,7 @@ export default function PipelineEditor({
           onUpdate={(params) => handleUpdate(index, params)}
           onRemove={() => handleRemove(index)}
           onMove={(dir) => handleMove(index, dir)}
+          parentMode={parentMode}
         />
       ))}
 
@@ -93,13 +95,20 @@ export default function PipelineEditor({
 }
 
 function HandlerItem(props) {
-  const { handler, onUpdate, availableHandlers } = props
+  const { handler, onUpdate, availableHandlers, parentMode, columns } = props
   const isGroup = handler.name === 'GroupHandler'
+  const [showExecSettings, setShowExecSettings] = useState(false)
 
   // 样式区分：普通卡片 vs 组卡片
   const containerClass = isGroup
     ? "border-2 border-indigo-100 bg-indigo-50/30 rounded-xl p-4 transition-all"
     : "border border-slate-200 bg-white rounded-xl p-4 hover:border-slate-300 hover:shadow-sm transition-all"
+
+  // 并行模式下的执行配置
+  const execOptions = handler.params._exec_options || {}
+  const updateExecOptions = (opts) => {
+    onUpdate({ ...handler.params, _exec_options: { ...execOptions, ...opts } })
+  }
 
   return (
     <div className={containerClass}>
@@ -128,6 +137,16 @@ function HandlerItem(props) {
 
         {/* Controls */}
         <div className="flex items-center gap-1 opacity-60 hover:opacity-100">
+          {parentMode === 'parallel' && (
+            <button 
+               onClick={() => setShowExecSettings(!showExecSettings)} 
+               className={`btn-icon !p-1.5 mr-2 ${showExecSettings ? 'bg-purple-100 text-purple-600' : ''}`}
+               title="并行执行设置 (列选择与拷贝)"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          )}
+
           <button onClick={() => props.onMove(-1)} disabled={props.isFirst} className="btn-icon !p-1.5 disabled:opacity-20">
             <ChevronUp className="w-4 h-4" />
           </button>
@@ -139,6 +158,38 @@ function HandlerItem(props) {
           </button>
         </div>
       </div>
+
+      {/* Execution Settings Panel (Only in Parallel Mode) */}
+      {showExecSettings && parentMode === 'parallel' && (
+        <div className="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-100 text-sm">
+           <h5 className="font-semibold text-purple-800 mb-2 flex items-center gap-2">
+             <Zap className="w-3 h-3" /> 并行执行配置
+           </h5>
+           <div className="grid gap-3">
+             <div>
+               <label className="block text-xs font-medium text-purple-700 mb-1">输入列选择 (Input Columns)</label>
+               <SubsetEditor 
+                  subset={execOptions.select_columns || []} 
+                  columns={columns} 
+                  onChange={cols => updateExecOptions({ select_columns: cols })} 
+               />
+               <p className="text-[10px] text-purple-600 mt-1">留空则传入所有列。指定列可显著减少内存占用。</p>
+             </div>
+             <div>
+               <label className="block text-xs font-medium text-purple-700 mb-1">数据拷贝模式 (Copy Mode)</label>
+               <select 
+                 value={execOptions.copy_mode || 'auto'}
+                 onChange={e => updateExecOptions({ copy_mode: e.target.value })}
+                 className="input-field !py-1 !text-xs !bg-white"
+               >
+                 <option value="auto">Auto (Slice Copy if cols selected, else Deep Copy)</option>
+                 <option value="deep">Force Deep Copy (Safest)</option>
+                 <option value="none">No Copy / Reference (Fastest, Read-only safe)</option>
+               </select>
+             </div>
+           </div>
+        </div>
+      )}
 
       {/* Body / Recursive Content */}
       <div className="pl-2">
@@ -218,6 +269,7 @@ function GroupEditor({ handler, onUpdate, availableHandlers, columns, dataTables
            availableHandlers={availableHandlers}
            columns={columns}
            dataTables={dataTables}
+           parentMode={mode} // Pass current mode down
         />
       </div>
     </div>
