@@ -61,7 +61,7 @@ function ETLTaskEditor({ taskId, onNavigate }) {
     } else if (handlerName === 'TypeConversionHandler') {
       newHandler.params = {}
     } else if (handlerName === 'DatabaseSaveHandler') {
-      newHandler.params = { target_table_id: null }
+      newHandler.params = { target_table_id: null, conflict_mode: 'upsert' }
     }
     updateForm('pipeline_config', [...form.pipeline_config, newHandler])
   }
@@ -382,8 +382,9 @@ function HandlerCard({ handler, index, columns, dataTables, onUpdate, onRemove, 
       {handler.name === 'DatabaseSaveHandler' && (
         <DatabaseSaveEditor
           targetTableId={handler.params.target_table_id}
+          conflictMode={handler.params.conflict_mode || 'upsert'}
           dataTables={dataTables}
-          onChange={(target_table_id) => onUpdate({ ...handler.params, target_table_id })}
+          onChange={(updates) => onUpdate({ ...handler.params, ...updates })}
         />
       )}
     </div>
@@ -524,25 +525,45 @@ function TypeConversionEditor({ conversions, columns, onChange }) {
   )
 }
 
-function DatabaseSaveEditor({ targetTableId, dataTables, onChange }) {
+function DatabaseSaveEditor({ targetTableId, conflictMode, dataTables, onChange }) {
   return (
-    <div>
-      <label className="form-label">目标数据表</label>
-      <select
-        value={targetTableId || ''}
-        onChange={(e) => onChange(e.target.value ? parseInt(e.target.value) : null)}
-        className="input-field"
-      >
-        <option value="">请选择数据表</option>
-        {dataTables.map((table) => (
-          <option key={table.id} value={table.id}>
-            {table.name} ({table.table_name})
-          </option>
-        ))}
-      </select>
-      {dataTables.length === 0 && (
-        <p className="form-hint text-warning-600">暂无数据表，请先在"数据表"页面创建</p>
-      )}
+    <div className="space-y-4">
+      <div>
+        <label className="form-label">目标数据表</label>
+        <select
+          value={targetTableId || ''}
+          onChange={(e) => onChange({ target_table_id: e.target.value ? parseInt(e.target.value) : null })}
+          className="input-field"
+        >
+          <option value="">请选择数据表</option>
+          {dataTables.map((table) => (
+            <option key={table.id} value={table.id}>
+              {table.name} ({table.table_name})
+            </option>
+          ))}
+        </select>
+        {dataTables.length === 0 && (
+          <p className="form-hint text-warning-600">暂无数据表，请先在"数据表"页面创建</p>
+        )}
+      </div>
+
+      <div>
+        <label className="form-label">冲突处理模式 (写入策略)</label>
+        <select
+          value={conflictMode || 'upsert'}
+          onChange={(e) => onChange({ conflict_mode: e.target.value })}
+          className="input-field"
+        >
+          <option value="upsert">更新 (Upsert) - 存在则覆盖 (默认)</option>
+          <option value="ignore">忽略 (Ignore) - 存在则跳过</option>
+          <option value="insert">插入 (Insert) - 冲突则报错</option>
+        </select>
+        <p className="form-hint">
+          {conflictMode === 'upsert' && '需要表定义主键或唯一索引。'}
+          {conflictMode === 'ignore' && '需要表定义主键或唯一索引。'}
+          {conflictMode === 'insert' && '最高效。但如果数据重复会写入失败。'}
+        </p>
+      </div>
     </div>
   )
 }
