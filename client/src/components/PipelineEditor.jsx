@@ -153,41 +153,60 @@ function HandlerItem(props) {
 }
 
 function GroupEditor({ handler, onUpdate, availableHandlers, columns, dataTables }) {
-  const { mode, handlers } = handler.params
+  const { mode, handlers, merge_strategy } = handler.params
 
   return (
     <div className="space-y-4">
       {/* Group Configuration */}
-      <div className="flex items-center gap-4 bg-white/50 p-3 rounded-lg border border-indigo-100">
-         <div className="flex-1">
-            <label className="text-xs font-semibold text-indigo-600 uppercase mb-1 block">Execution Mode</label>
-            <div className="flex gap-2">
-              <button 
-                onClick={() => onUpdate({...handler.params, mode: 'sequential'})}
-                className={`px-3 py-1.5 rounded text-sm flex items-center gap-2 transition-colors ${
-                  mode === 'sequential' 
-                  ? 'bg-indigo-600 text-white shadow-sm' 
-                  : 'bg-white text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <Layers className="w-3 h-3" /> 顺序执行
-              </button>
-              <button 
-                onClick={() => onUpdate({...handler.params, mode: 'parallel'})}
-                className={`px-3 py-1.5 rounded text-sm flex items-center gap-2 transition-colors ${
-                  mode === 'parallel' 
-                  ? 'bg-purple-600 text-white shadow-sm' 
-                  : 'bg-white text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <Zap className="w-3 h-3" /> 并行分发
-              </button>
-            </div>
+      <div className="flex flex-col gap-3 bg-white/50 p-3 rounded-lg border border-indigo-100">
+         <div className="flex items-start justify-between gap-4">
+           <div className="flex-1">
+              <label className="text-xs font-semibold text-indigo-600 uppercase mb-1 block">Execution Mode</label>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => onUpdate({...handler.params, mode: 'sequential'})}
+                  className={`px-3 py-1.5 rounded text-sm flex items-center gap-2 transition-colors ${
+                    mode === 'sequential' 
+                    ? 'bg-indigo-600 text-white shadow-sm' 
+                    : 'bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Layers className="w-3 h-3" /> 顺序执行
+                </button>
+                <button 
+                  onClick={() => onUpdate({...handler.params, mode: 'parallel'})}
+                  className={`px-3 py-1.5 rounded text-sm flex items-center gap-2 transition-colors ${
+                    mode === 'parallel' 
+                    ? 'bg-purple-600 text-white shadow-sm' 
+                    : 'bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Zap className="w-3 h-3" /> 并行分发
+                </button>
+              </div>
+           </div>
+           
+           {mode === 'parallel' && (
+             <div className="flex-1">
+               <label className="text-xs font-semibold text-purple-600 uppercase mb-1 block">Merge Strategy</label>
+               <select 
+                 value={merge_strategy || 'passthrough'}
+                 onChange={(e) => onUpdate({...handler.params, merge_strategy: e.target.value})}
+                 className="input-field text-sm !py-1.5 !bg-white"
+               >
+                 <option value="passthrough">忽略分支结果 (Passthrough)</option>
+                 <option value="merge_columns">合并所有列 (Merge Columns)</option>
+               </select>
+             </div>
+           )}
          </div>
-         <div className="text-xs text-slate-500 max-w-[200px] leading-tight">
+
+         <div className="text-xs text-slate-500 leading-tight">
             {mode === 'sequential' 
               ? '按顺序依次执行子步骤。上一步的输出是下一步的输入。' 
-              : '同时执行所有子步骤。每个步骤接收输入数据的独立副本。'}
+              : merge_strategy === 'merge_columns'
+                ? '同时执行所有步骤。最后将各分支产生的新列合并回主数据流 (注意列名冲突)。'
+                : '同时执行所有步骤。通常用于入库或报警。主流程将忽略分支返回值，继续传递原始数据。'}
          </div>
       </div>
 
