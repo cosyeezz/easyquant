@@ -147,13 +147,24 @@ async def update_etl_config(config_id: int, update_data: ETLTaskConfigUpdate, se
     await session.refresh(config)
     return config
 
+from server.storage.models.event import Event # Add import
+
+# ... existing imports ...
+
 @router.delete("/etl-configs/{config_id}")
 async def delete_etl_config(config_id: int, session: AsyncSession = Depends(get_session)):
+    # 1. 查找并删除配置
     result = await session.execute(select(ETLTaskConfig).where(ETLTaskConfig.id == config_id))
     config = result.scalar_one_or_none()
     if not config:
         raise HTTPException(status_code=404, detail="Task config not found")
     
     await session.delete(config)
+    
+    # 2. 清理关联的历史进程事件
+    # 这样可以确保它从前端的“进程监控”列表中消失
+    process_name = f"ETL_Task_{config_id}"
+    await session.execute(delete(Event).where(Event.process_name == process_name))
+
     await session.commit()
     return {"message": "Deleted successfully"}

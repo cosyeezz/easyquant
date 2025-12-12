@@ -26,6 +26,8 @@ EasyQuant 是一个使用Python和Web技术构建的量化交易系统，支持�
 5.  **可视化 ETL 配置 (Visual ETL)**:
     -   支持可视化的 ETL 任务编排。
     -   **Loader -> Pipeline -> Handler** 架构。
+    -   **高级流程控制**: 支持**逻辑节点 (Group Nodes)** 和**并行处理 (Parallel Processing)**，通过嵌套和分支逻辑构建复杂的 ETL 工作流。
+    -   **高性能引擎**: 采用智能列切片和异步并发技术，支持大数据集的高效分发与合并。
     -   支持将数据处理结果精准写入已发布的数据表中。
 
 6.  **React 前端 (Dashboard)**:

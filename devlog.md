@@ -1,3 +1,47 @@
+# 开发日志 (2025-12-12)
+
+## 概述
+
+本日开发实现了 **ETL 并行处理引擎** 与 **可视化编排器** 的重大突破。引入了基于递归容器的 `GroupHandler`，使系统支持复杂的逻辑分叉与合并。同时，我们通过智能的“列切片拷贝”机制，解决了并行处理大数据集时的内存瓶颈，并重构了前端编辑器以提供直观的交互体验。
+
+## 详细工作项
+
+### 1. 并行处理引擎 (Parallel Processing Engine)
+- **GroupHandler (逻辑节点)**:
+    - 实现了基于递归的 `GroupHandler`，支持将一组处理器封装为一个逻辑节点。
+    - **双模式执行**:
+        - `sequential`: 顺序执行模式，用于逻辑分组。
+        - `parallel`: 并行执行模式，基于 `asyncio.gather` 实现多分支并发。
+    - **Split-Apply-Combine**:
+        - 实现了 `merge_strategy='merge_columns'`，允许不同分支处理数据的不同列，最终自动合并回主数据流。
+- **内存优化**:
+    - 实现了**智能列切片 (Smart Column Slicing)**。
+    - 在并行分发时，允许用户指定分支所需的“输入列”。系统会自动执行切片拷贝 (`df[cols].copy()`) 而非全量深拷贝，极大降低了内存开销。
+- **DatabaseSaveHandler 增强**:
+    - 增加了 `conflict_mode` 选项 (`upsert` / `ignore` / `insert`)。
+    - 底层 `bulk_upsert_df` 支持了 `ON CONFLICT DO NOTHING`，提供了更灵活的入库策略。
+
+### 2. 前端可视化重构
+- **递归编辑器 (Recursive Editor)**:
+    - 开发了 `PipelineEditor.jsx`，支持无限层级的 Handler 嵌套渲染。
+    - 设计了清晰的容器化 UI，通过颜色和边框区分“顺序组”与“并行组”。
+- **交互优化**:
+    - **一屏适配 (One-Screen Layout)**: 重构了 `ETLTaskEditor`，采用 Flex 布局和局部滚动，确保核心操作区始终在视口内，无需页面级滚动。
+    - **表单校验**: 增强了任务名称、描述和数据源路径的必填校验，提供友好的错误提示。
+    - **样式修复**: 修复了删除按钮“无框”的视觉问题，为图标按钮添加了统一的边框样式。
+    - 提取了 `HandlerEditors` 组件库，解耦了特定 Handler 的 UI 逻辑。
+    - 为并行节点设计了极简的“输入列选择”面板，屏蔽了复杂的底层拷贝参数，降低了用户认知负担。
+
+### 3. 系统架构
+- **注册表升级**: 完善了 `server/etl/process/registry.py`，支持了更健壮的模块自动发现和类获取接口。
+- **数据一致性**: 修复了 ETL 任务删除逻辑，现在删除任务配置时会同步清理 `events` 表中的历史运行记录，解决了进程监控中的“幽灵任务”问题。
+
+## 下一步计划
+1.  **端到端测试**: 运行一个真实的 ETL 任务，验证 CSV -> Parallel Processing -> Database 的完整流程。
+2.  **Runner 集成**: 确保 `ETLRunner` 能正确调度这些复杂的 Handler 结构。
+
+---
+
 # 开发日志 (2025-12-11)
 
 ## 概述
