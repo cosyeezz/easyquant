@@ -1,3 +1,28 @@
+# 开发日志 (2025-12-13)
+
+## 概述
+
+本日开发实现了 **数据库连接的智能 SSH 隧道** 功能。为了解决本地开发环境连接远程数据库的安全与便捷性问题，我们引入了自动化的 IP 检测与隧道建立机制。现在，系统能够智能判断运行环境：在服务器本机自动直连，在远程开发机自动建立 SSH 隧道，无需手动修改代码或维护多套配置。
+
+## 详细工作项
+
+### 1. 智能数据库连接 (Smart Database Connection)
+- **自动隧道 (Auto SSH Tunnel)**:
+    - 在 `server/storage/database.py` 中集成了 `sshtunnel` 库。
+    - 实现了启动时的环境检测逻辑：
+        1. 解析 `DATABASE_URL` 域名 IP。
+        2. 获取本机公网 IP (via `httpx`).
+        3. 若 IP 不一致（远程模式）且配置了 SSH 用户，自动启动 `SSHTunnelForwarder`。
+        4. 动态重写 `DATABASE_URL` 指向本地隧道端口。
+    - 若 IP 一致（服务器模式），自动降级为 `localhost` 直连，确保生产环境性能。
+- **配置兼容性**:
+    - 仅需在 `.env` 中增加 SSH 凭据 (`SSH_USER`, `SSH_HOST` 等)，原有 `DATABASE_URL` 无需变更。
+
+### 2. 依赖管理
+- 引入了 `sshtunnel` 库到 `requirements.txt`。
+
+---
+
 # 开发日志 (2025-12-12)
 
 ## 概述

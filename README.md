@@ -121,6 +121,14 @@ easyquant/
       ```
       DATABASE_URL="postgresql+asyncpg://user:password@localhost/easyquant_dev"
       ```
+    - **(可选) 远程连接配置**: 如果您在本地开发且数据库在远程服务器（且未开放 5432 端口），请配置 SSH 信息，系统会自动建立安全隧道：
+      ```ini
+      SSH_USER=root
+      SSH_PASSWORD=your_ssh_password
+      # SSH_HOST=ds.cosyee.cn  # 默认使用 DATABASE_URL 中的域名
+      # SSH_PORT=22            # 默认 22
+      # SSH_PKEY=/path/to/key  # 可选：私钥路径
+      ```
 
 3.  **执行数据库迁移:**
     (请在配置好 `.env` 文件后，告知我来为您运行此步骤)
