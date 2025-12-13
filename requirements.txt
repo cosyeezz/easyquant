@@ -8,6 +8,7 @@ sqlalchemy
 asyncpg
 psycopg2-binary
 alembic
+sshtunnel
 
 # 数据处理
 pandas

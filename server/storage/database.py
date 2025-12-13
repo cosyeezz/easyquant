@@ -9,10 +9,12 @@
 """
 import os
 import re
+import socket
+import logging
 import pandas as pd
+import httpx
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy import text
-import logging
 from collections.abc import AsyncGenerator
 from typing import List
 from dotenv import load_dotenv
@@ -21,17 +23,98 @@ from dotenv import load_dotenv
 # 从 .env 文件加载环境变量
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("未在环境变量中找到 DATABASE_URL，请在 .env 文件中设置。")
+
+# --- 智能 SSH 隧道配置 ---
+# 只有在配置了 SSH 用户名的情况下才尝试启用智能逻辑
+SSH_USER = os.getenv("SSH_USER")
+ssh_tunnel = None
+
+if SSH_USER:
+    try:
+        from sshtunnel import SSHTunnelForwarder
+        from sqlalchemy.engine.url import make_url
+
+        url_obj = make_url(DATABASE_URL)
+        db_host = url_obj.host
+        db_port = url_obj.port or 5432
+        
+        # 1. 获取目标数据库域名的解析 IP
+        try:
+            target_ip = socket.gethostbyname(db_host)
+        except Exception:
+            target_ip = None
+            
+        # 2. 获取当前机器的公网 IP
+        current_ip = None
+        try:
+            # 设置短超时，避免阻塞启动
+            with httpx.Client(timeout=3.0) as client:
+                resp = client.get("https://api.ipify.org")
+                if resp.status_code == 200:
+                    current_ip = resp.text.strip()
+        except Exception as e:
+            logger.warning(f"无法获取本机公网 IP，将默认启用 SSH 隧道: {e}")
+
+        logger.info(f"IP 检测: 目标({db_host})={target_ip}, 本机={current_ip}")
+
+        # 3. 决策逻辑
+        is_server_local = False
+        if target_ip and current_ip and target_ip == current_ip:
+            is_server_local = True
+        
+        if is_server_local:
+            # --- 场景 A: 在服务器本机 ---
+            logger.info("检测到当前运行在数据库服务器本机，切换为 localhost 直连模式。")
+            # 替换 Host 为 localhost，保留原端口 (通常服务器本机 5432 是开放的，或者走 local socket)
+            # 如果 pg_hba.conf 限制了 socket，这里走 TCP localhost
+            new_url_obj = url_obj.set(host='127.0.0.1')
+            DATABASE_URL = str(new_url_obj)
+            
+        else:
+            # --- 场景 B: 在本地/远程开发机 ---
+            logger.info(f"检测到远程环境 (本机 IP != 目标 IP)，正在启动 SSH 隧道连接至 {db_host}...")
+            
+            ssh_host = os.getenv("SSH_HOST", db_host) # 如果没配 SSH_HOST，默认用数据库域名
+            ssh_port = int(os.getenv("SSH_PORT", 22))
+            ssh_password = os.getenv("SSH_PASSWORD")
+            ssh_pkey = os.getenv("SSH_PKEY")
+            
+            ssh_args = {
+                "ssh_address_or_host": (ssh_host, ssh_port),
+                "ssh_username": SSH_USER,
+                "remote_bind_address": ('127.0.0.1', db_port), # 假设数据库监听在服务器本地环回
+            }
+            
+            if ssh_password:
+                ssh_args["ssh_password"] = ssh_password
+            if ssh_pkey:
+                ssh_args["ssh_pkey"] = ssh_pkey
+
+            ssh_tunnel = SSHTunnelForwarder(**ssh_args)
+            ssh_tunnel.start()
+            
+            logger.info(f"SSH 隧道已建立: localhost:{ssh_tunnel.local_bind_port} -> {ssh_host} -> 127.0.0.1:{db_port}")
+            
+            # 替换 DATABASE_URL 指向隧道
+            new_url_obj = url_obj.set(host='127.0.0.1', port=ssh_tunnel.local_bind_port)
+            DATABASE_URL = str(new_url_obj)
+
+    except ImportError:
+        logger.warning("已配置 SSH_USER 但未安装 'sshtunnel'，将尝试直接连接。")
+    except Exception as e:
+        logger.error(f"SSH 隧道自动配置失败: {e}。将尝试直接连接。", exc_info=True)
+
 
 # 确保 URL schema 是 asyncpg 兼容的
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
 elif DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
-
-logger = logging.getLogger(__name__)
 
 
 # --- 异步引擎和会话工厂 (采纳您的优秀实现) ---
