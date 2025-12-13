@@ -21,6 +21,12 @@
 ### 2. 依赖管理
 - 引入了 `sshtunnel` 库到 `requirements.txt`。
 
+### 3. 前端交互 (UI/UX)
+- **ETL 流程可视化 (Pipeline Visualizer)**:
+    - 集成了 `React Flow` 库，开发了 `PipelineVisualizer.jsx` 组件。
+    - 实现了 Pipeline 结构的自动图形化渲染，支持展示串行、并行及嵌套分组（Recursive Groups）的复杂逻辑。
+    - **分栏编辑体验**: 在 `ETLTaskEditor` 的 Pipeline 编辑步骤中采用了左右分栏布局（左侧表单编辑，右侧实时预览），极大提升了复杂任务编排的直观性和可维护性。
+
 ---
 
 # 开发日志 (2025-12-12)

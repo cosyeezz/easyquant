@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, Save, Loader2, Eye } from 'lucide-react'
 import api from '../services/api'
 import FilePathPicker from './FilePathPicker'
 import PipelineEditor from './PipelineEditor'
+import PipelineVisualizer from './PipelineVisualizer'
 
 function ETLTaskEditor({ taskId, onNavigate }) {
   const [step, setStep] = useState(1)
@@ -244,14 +245,28 @@ function ETLTaskEditor({ taskId, onNavigate }) {
               </div>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-6">
-              <PipelineEditor
-                pipeline={form.pipeline_config}
-                onChange={(newPipeline) => updateForm('pipeline_config', newPipeline)}
-                availableHandlers={handlers}
-                columns={columns}
-                dataTables={dataTables}
-              />
+            <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
+              {/* Left: Editor */}
+              <div className="flex-1 overflow-y-auto p-6 border-r border-slate-100 min-w-[400px]">
+                <PipelineEditor
+                  pipeline={form.pipeline_config}
+                  onChange={(newPipeline) => updateForm('pipeline_config', newPipeline)}
+                  availableHandlers={handlers}
+                  columns={columns}
+                  dataTables={dataTables}
+                />
+              </div>
+
+              {/* Right: Visualizer */}
+              <div className="flex-1 bg-slate-50 relative min-h-[300px] lg:min-h-0">
+                 <div className="absolute inset-0">
+                    <PipelineVisualizer pipeline={form.pipeline_config} />
+                 </div>
+                 {/* Label overlay */}
+                 <div className="absolute top-4 right-4 bg-white/80 backdrop-blur px-3 py-1 rounded-full text-xs font-semibold text-slate-500 shadow-sm border border-slate-200 pointer-events-none z-10">
+                    Live Preview
+                 </div>
+              </div>
             </div>
           </div>
         )}
