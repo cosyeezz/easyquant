@@ -4,6 +4,7 @@ import api from '../services/api'
 import FilePathPicker from './FilePathPicker'
 import PipelineEditor from './PipelineEditor'
 import PipelineVisualizer from './PipelineVisualizer'
+import FlowEditor from './FlowEditor'
 
 function ETLTaskEditor({ taskId, onNavigate }) {
   const [step, setStep] = useState(1)
@@ -13,6 +14,7 @@ function ETLTaskEditor({ taskId, onNavigate }) {
   const [columns, setColumns] = useState([])
   const [previewLoading, setPreviewLoading] = useState(false)
   const [dataTables, setDataTables] = useState([])
+  const [useCanvas, setUseCanvas] = useState(false) // Toggle for Canvas Mode
   
   const [error, setError] = useState(null)
 
@@ -28,7 +30,11 @@ function ETLTaskEditor({ taskId, onNavigate }) {
 
   useEffect(() => {
     api.getHandlers().then(setHandlers).catch(console.error)
-    api.getDataTables().then(setDataTables).catch(console.error)
+    // Fetch all tables (large page_size) for dropdown
+    api.getDataTables({ page_size: 1000 }).then(res => {
+        setDataTables(res.items || [])
+    }).catch(console.error)
+    
     if (taskId) {
       api.getETLConfig(taskId).then(data => {
         setForm(data)
@@ -243,31 +249,54 @@ function ETLTaskEditor({ taskId, onNavigate }) {
                   构建数据清洗与转换流程
                 </p>
               </div>
+              <div className="flex items-center gap-2">
+                 <span className="text-sm text-slate-600">编辑器模式:</span>
+                 <button 
+                   onClick={() => setUseCanvas(!useCanvas)}
+                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all border ${
+                     useCanvas 
+                     ? 'bg-primary-50 border-primary-200 text-primary-700' 
+                     : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                   }`}
+                 >
+                   {useCanvas ? '🎨 画布模式 (Canvas)' : '📝 列表模式 (Classic)'}
+                 </button>
+              </div>
             </div>
             
-            <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
-              {/* Left: Editor */}
-              <div className="flex-1 overflow-y-auto p-6 border-r border-slate-100 min-w-[400px]">
-                <PipelineEditor
-                  pipeline={form.pipeline_config}
-                  onChange={(newPipeline) => updateForm('pipeline_config', newPipeline)}
-                  availableHandlers={handlers}
-                  columns={columns}
-                  dataTables={dataTables}
-                />
-              </div>
+            {useCanvas ? (
+                <div className="flex-1 min-h-0 bg-slate-100">
+                    <FlowEditor 
+                        initialNodes={[]} 
+                        initialEdges={[]}
+                        onSave={(nodes, edges) => console.log('Save Graph:', nodes, edges)}
+                    />
+                </div>
+            ) : (
+                <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
+                {/* Left: Editor */}
+                <div className="flex-1 overflow-y-auto p-6 border-r border-slate-100 min-w-[400px]">
+                    <PipelineEditor
+                    pipeline={form.pipeline_config}
+                    onChange={(newPipeline) => updateForm('pipeline_config', newPipeline)}
+                    availableHandlers={handlers}
+                    columns={columns}
+                    dataTables={dataTables}
+                    />
+                </div>
 
-              {/* Right: Visualizer */}
-              <div className="flex-1 bg-slate-50 relative min-h-[300px] lg:min-h-0">
-                 <div className="absolute inset-0">
-                    <PipelineVisualizer pipeline={form.pipeline_config} />
-                 </div>
-                 {/* Label overlay */}
-                 <div className="absolute top-4 right-4 bg-white/80 backdrop-blur px-3 py-1 rounded-full text-xs font-semibold text-slate-500 shadow-sm border border-slate-200 pointer-events-none z-10">
-                    Live Preview
-                 </div>
-              </div>
-            </div>
+                {/* Right: Visualizer */}
+                <div className="flex-1 bg-slate-50 relative min-h-[300px] lg:min-h-0">
+                    <div className="absolute inset-0">
+                        <PipelineVisualizer pipeline={form.pipeline_config} />
+                    </div>
+                    {/* Label overlay */}
+                    <div className="absolute top-4 right-4 bg-white/80 backdrop-blur px-3 py-1 rounded-full text-xs font-semibold text-slate-500 shadow-sm border border-slate-200 pointer-events-none z-10">
+                        Live Preview
+                    </div>
+                </div>
+                </div>
+            )}
           </div>
         )}
 

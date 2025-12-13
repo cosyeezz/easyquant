@@ -1,69 +1,131 @@
-import { useState, useEffect, useRef } from 'react'
-import { Activity, Clock, Database, FileText, TrendingUp, AlertTriangle, CheckCircle, Loader2, RefreshCw } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Activity, Clock, Database, FileText, TrendingUp, AlertTriangle, CheckCircle, Loader2, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import api from '../services/api'
 import { useWebSocket } from '../hooks/useWebSocket'
 
-// Internal LogViewer Component
-function LogViewer({ autoRefresh }) {
-  // Use independent WebSocket connection for logs to avoid re-render noise in main App
-  const { logs, subscribeLogs, unsubscribeLogs, status } = useWebSocket()
+// Internal LogViewer Component (Pure UI)
+function LogViewer({ autoRefresh, logs, status, onToggleSubscribe }) {
   const scrollRef = useRef(null)
+  
+  // Initialize state from localStorage (persist user preference)
+  const [isExpanded, setIsExpanded] = useState(() => {
+      return localStorage.getItem('logViewer.isExpanded') === 'true'
+  })
+  const [isSubscribed, setIsSubscribed] = useState(() => {
+      return localStorage.getItem('logViewer.isSubscribed') === 'true'
+  })
 
+  // Sync subscription state on mount (if persisted as true)
   useEffect(() => {
-    if (status === 'connected') {
-        subscribeLogs()
-    }
-    return () => {
-        if (status === 'connected') unsubscribeLogs()
-    }
-  }, [status, subscribeLogs, unsubscribeLogs])
+      if (onToggleSubscribe) {
+          onToggleSubscribe(isSubscribed)
+      }
+  }, []) // Run once on mount
+
+  // Handle subscription toggle
+  const handleSubscribeToggle = (e) => {
+      e.stopPropagation() // Prevent header click
+      const newState = !isSubscribed
+      setIsSubscribed(newState)
+      localStorage.setItem('logViewer.isSubscribed', newState)
+      
+      if (onToggleSubscribe) {
+          onToggleSubscribe(newState)
+      }
+
+      // Auto-expand if subscribing
+      if (newState) {
+          setIsExpanded(true)
+          localStorage.setItem('logViewer.isExpanded', 'true')
+      }
+  }
+
+  // Handle expand toggle
+  const handleExpandToggle = (e) => {
+      e.preventDefault()
+      const newState = !isExpanded
+      setIsExpanded(newState)
+      localStorage.setItem('logViewer.isExpanded', newState)
+  }
 
   // Auto-scroll to bottom
   useEffect(() => {
-    if (autoRefresh && scrollRef.current) {
-        scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    if (autoRefresh && isExpanded && scrollRef.current) {
+        const timer = setTimeout(() => {
+            if (scrollRef.current) {
+                scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+            }
+        }, 0)
+        return () => clearTimeout(timer)
     }
-  }, [logs, autoRefresh])
+  }, [logs, autoRefresh, isExpanded])
 
   return (
     <div className="card mt-8">
-      <div className="card-header flex justify-between items-center">
+      <div 
+        className="card-header flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors select-none"
+        onClick={handleExpandToggle}
+      >
         <div className="flex items-center gap-2">
+           {isExpanded ? <ChevronDown className="w-5 h-5 text-slate-400" /> : <ChevronRight className="w-5 h-5 text-slate-400" />}
            <FileText className="w-5 h-5 text-primary-600" />
-           系统实时日志 (WebSocket)
+           <span className="font-medium text-slate-700">系统实时日志</span>
         </div>
-        <div className="flex items-center gap-2 text-xs">
-           <span className={`w-2 h-2 rounded-full ${status === 'connected' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-           {status === 'connected' ? '已连接' : '断开'}
+        
+        <div className="flex items-center gap-4">
+           {/* Subscription Toggle */}
+           <button
+             onClick={handleSubscribeToggle}
+             className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium transition-all border ${
+               isSubscribed 
+                 ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100' 
+                 : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+             }`}
+           >
+             <div className={`w-2 h-2 rounded-full ${isSubscribed ? 'bg-emerald-500' : 'bg-slate-400'}`}></div>
+             {isSubscribed ? '接收中' : '已暂停'}
+           </button>
+
+           <div className="flex items-center gap-2 text-xs">
+              <span className={`w-2 h-2 rounded-full ${status === 'connected' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+              {status === 'connected' ? 'WS连接' : 'WS断开'}
+           </div>
         </div>
       </div>
       
-      <div 
-        ref={scrollRef}
-        className="bg-slate-900 rounded-lg p-4 font-mono text-xs md:text-sm h-96 overflow-y-auto shadow-inner border border-slate-700"
-      >
-        {logs.length === 0 ? (
-          <div className="text-slate-500 italic">等待日志推送...</div>
-        ) : (
-          logs.map((log, index) => (
-            <div key={index} className="whitespace-pre-wrap text-emerald-400 border-b border-slate-800/50 pb-0.5 mb-0.5 last:border-0 hover:bg-slate-800/50 font-mono">
-              {log.full_text || log.message}
+      {isExpanded && (
+        <div 
+            ref={scrollRef}
+            className="bg-slate-900 rounded-b-lg p-4 font-mono text-xs md:text-sm h-96 overflow-y-auto shadow-inner border-t border-slate-700"
+        >
+            {(!logs || logs.length === 0) ? (
+            <div className="text-slate-500 italic">
+                {isSubscribed ? "等待日志推送..." : "日志流已暂停，点击右上角按钮开始接收。"}
             </div>
-          ))
-        )}
-      </div>
+            ) : (
+            (logs || []).map((log, index) => (
+                <div key={index} className="whitespace-pre-wrap text-emerald-400 border-b border-slate-800/50 pb-0.5 mb-0.5 last:border-0 hover:bg-slate-800/50 font-mono">
+                {log.full_text || log.message}
+                </div>
+            ))
+            )}
+        </div>
+      )}
     </div>
   )
 }
 
 function ProcessMonitor() {
-  // WebSocket hook for process list updates
+  // WebSocket hook for process list updates AND logs
   const { 
     processes: wsProcesses, 
     status: wsStatus, 
+    logs: wsLogs,
     subscribeProcesses, 
     unsubscribeProcesses,
+    subscribeLogs,
+    unsubscribeLogs,
     // Real-time events
     processRealtimeEvents,
     subscribeProcessEvents,
@@ -143,6 +205,17 @@ function ProcessMonitor() {
         }
     }
   }, [selectedProcess, wsStatus, subscribeProcessEvents, unsubscribeProcessEvents, clearProcessEvents])
+
+  // 处理日志订阅开关 (仅在展开时订阅)
+  // Fix: Wrap in useCallback to prevent infinite loop in LogViewer's useEffect
+  const handleLogSubscribe = useCallback((shouldSubscribe) => {
+      if (wsStatus !== 'connected') return
+      if (shouldSubscribe) {
+          subscribeLogs()
+      } else {
+          unsubscribeLogs()
+      }
+  }, [wsStatus, subscribeLogs, unsubscribeLogs])
 
   // 合并显示事件 (实时 + 历史)
   // 简单的去重策略：过滤掉 id 已经存在于历史中的实时事件（防止边界重叠）
@@ -311,56 +384,12 @@ function ProcessMonitor() {
         </div>
       )}
 
-      {/* Detailed Event Log */}
-      {selectedProcess && displayEvents.length > 0 && (
-        <div className="card">
-          <div className="card-header flex justify-between">
-            <div className="flex items-center gap-2">
-                <Activity className="w-5 h-5 text-primary-600" />
-                {selectedProcess} - 事件日志
-            </div>
-            <span className="text-xs text-slate-400">实时连接中...</span>
-          </div>
-
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {displayEvents.map((event) => (
-              <div
-                key={event.id}
-                className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
-              >
-                <div className="flex-shrink-0 mt-1">
-                  {event.event_name.includes('error') ? (
-                    <AlertTriangle className="w-5 h-5 text-danger-600" />
-                  ) : event.event_name.includes('completed') ? (
-                    <CheckCircle className="w-5 h-5 text-success-600" />
-                  ) : (
-                    <Activity className="w-5 h-5 text-primary-600" />
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-slate-800">{event.event_name}</span>
-                    <span className="text-xs text-slate-500">
-                      {formatDistanceToNow(new Date(event.created_at), {
-                        addSuffix: true,
-                      })}
-                    </span>
-                  </div>
-
-                  {event.payload && (
-                    <pre className="text-xs text-slate-600 bg-white p-2 rounded border border-slate-200 overflow-x-auto">
-                      {JSON.stringify(event.payload, null, 2)}
-                    </pre>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <LogViewer autoRefresh={autoRefresh} />
+      <LogViewer 
+        autoRefresh={autoRefresh} 
+        logs={wsLogs} 
+        status={wsStatus} 
+        onToggleSubscribe={handleLogSubscribe}
+      />
     </div>
   )
 }

@@ -78,13 +78,25 @@ async def system_status_worker():
     每 2 秒推送到 'system.status' 频道。
     """
     process = psutil.Process()
+    # 静态数据：系统总内存（MB）
+    sys_total_mb = psutil.virtual_memory().total / 1024 / 1024
+    
     while True:
         try:
+            # 动态数据：系统内存使用率
+            # 注意：虽然 total 不变，但 available/percent 是会变的，所以仍需调用 virtual_memory()
+            # 但我们可以只取 percent，或者 psutil 有更高效的方法吗？
+            # psutil.virtual_memory() 会读取 /proc/meminfo，这是一次系统调用。
+            # 既然需要 percent，就必须调它。
+            sys_mem = psutil.virtual_memory()
+            
             # 获取系统状态
             status_data = {
                 "uptime": time.time() - process.create_time(),
                 "cpu_percent": process.cpu_percent(),
-                "memory_mb": process.memory_info().rss / 1024 / 1024,
+                "memory_mb": process.memory_info().rss / 1024 / 1024, # 进程内存
+                "sys_memory_percent": sys_mem.percent,                # 系统内存使用率
+                "sys_memory_total_mb": sys_total_mb,                  # 系统总内存 (Static)
                 "timestamp": time.time(),
                 "status": "running"
             }

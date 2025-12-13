@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Activity, Database, Server, Table2, Cpu } from 'lucide-react'
+import { Activity, Database, Server, Table2, Cpu, Layers } from 'lucide-react'
 import ProcessMonitor from './components/ProcessMonitor'
 import ETLTaskList from './components/ETLTaskList'
 import ETLTaskEditor from './components/ETLTaskEditor'
@@ -44,8 +44,8 @@ function App() {
             </div>
 
             <div className="flex items-center gap-3">
-              {/* Connection Status & CPU Metric */}
-              <div className={`flex items-center gap-3 px-4 py-2 rounded-lg border transition-all ${
+              {/* Connection Status & System Metrics */}
+              <div className={`flex items-center gap-4 px-4 py-2 rounded-lg border transition-all ${
                   status === 'connected' 
                   ? 'bg-emerald-50 border-emerald-100 text-emerald-700' 
                   : 'bg-rose-50 border-rose-100 text-rose-700'
@@ -56,10 +56,20 @@ function App() {
                 </div>
                 
                 {status === 'connected' && systemStatus && (
-                    <div className="flex items-center gap-2 pl-3 border-l border-emerald-200/50">
-                        <Cpu className="w-4 h-4 opacity-75" />
-                        <span className="text-sm font-mono">{systemStatus.cpu_percent.toFixed(1)}%</span>
-                    </div>
+                    <>
+                        <div className="flex items-center gap-2 pl-4 border-l border-emerald-200/50">
+                            <Cpu className="w-4 h-4 opacity-75" />
+                            <span className="text-sm font-mono font-bold text-slate-500">CPU:</span>
+                            <span className="text-sm font-mono">{systemStatus.cpu_percent.toFixed(1)}%</span>
+                        </div>
+                        <div className="flex items-center gap-2 pl-4 border-l border-emerald-200/50">
+                            <Layers className="w-4 h-4 opacity-75" />
+                            <span className="text-sm font-mono font-bold text-slate-500">MEM:</span>
+                            <span className="text-sm font-mono">
+                                {Math.round(systemStatus.memory_mb)} MB / {Math.round(systemStatus.sys_memory_total_mb / 1024)} GB
+                            </span>
+                        </div>
+                    </>
                 )}
               </div>
             </div>

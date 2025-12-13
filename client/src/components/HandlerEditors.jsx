@@ -134,7 +134,10 @@ export function TypeConversionEditor({ conversions = {}, columns = [], onChange 
   )
 }
 
-export function DatabaseSaveEditor({ targetTableId, conflictMode, dataTables, onChange }) {
+export function DatabaseSaveEditor({ targetTableId, conflictMode, dataTables = [], onChange }) {
+  // Ensure dataTables is an array to prevent crashes
+  const safeDataTables = Array.isArray(dataTables) ? dataTables : []
+  
   return (
     <div className="space-y-4">
       <div>
@@ -145,13 +148,13 @@ export function DatabaseSaveEditor({ targetTableId, conflictMode, dataTables, on
           className="input-field"
         >
           <option value="">请选择数据表</option>
-          {dataTables.map((table) => (
+          {safeDataTables.map((table) => (
             <option key={table.id} value={table.id}>
               {table.name} ({table.table_name})
             </option>
           ))}
         </select>
-        {dataTables.length === 0 && (
+        {safeDataTables.length === 0 && (
           <p className="form-hint text-warning-600">暂无数据表，请先在"数据表"页面创建</p>
         )}
       </div>
