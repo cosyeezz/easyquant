@@ -58,39 +58,47 @@ async def get_events(
         raise HTTPException(status_code=500, detail=f"查询事件失败: {str(e)}")
 
 
+async def get_processes_list(session: AsyncSession):
+    """
+    Core logic to fetch process list and latest status.
+    Reusable for API and WebSocket workers.
+    """
+    query = select(distinct(Event.process_name))
+    result = await session.execute(query)
+    process_names = result.scalars().all()
+
+    processes = []
+    for name in process_names:
+        latest_query = (
+            select(Event)
+            .where(Event.process_name == name)
+            .order_by(desc(Event.created_at))
+            .limit(1)
+        )
+        result = await session.execute(latest_query)
+        latest_event = result.scalar_one_or_none()
+
+        if latest_event:
+            # 使用 EventResponse 模型来验证和格式化最新事件
+            latest_event_response = EventResponse.model_validate(latest_event)
+            # Dump to dict to make it JSON serializable for WebSocket
+            processes.append({
+                "name": name,
+                "latest_event": latest_event_response.model_dump(mode='json'),
+                "last_seen": latest_event.created_at.isoformat() # ISO format for JSON
+            })
+    
+    # 按最后活跃时间倒序排序
+    processes.sort(key=lambda p: p["last_seen"], reverse=True)
+    return processes
+
+
 @router.get("/processes")
 async def get_processes(session: AsyncSession = Depends(get_session)):
     """
     获取所有活跃进程的列表和最新状态
     """
     try:
-        query = select(distinct(Event.process_name))
-        result = await session.execute(query)
-        process_names = result.scalars().all()
-
-        processes = []
-        for name in process_names:
-            latest_query = (
-                select(Event)
-                .where(Event.process_name == name)
-                .order_by(desc(Event.created_at))
-                .limit(1)
-            )
-            result = await session.execute(latest_query)
-            latest_event = result.scalar_one_or_none()
-
-            if latest_event:
-                # 使用 EventResponse 模型来验证和格式化最新事件
-                latest_event_response = EventResponse.model_validate(latest_event)
-                processes.append({
-                    "name": name,
-                    "latest_event": latest_event_response,
-                    "last_seen": latest_event.created_at
-                })
-        
-        # 按最后活跃时间倒序排序
-        processes.sort(key=lambda p: p["last_seen"], reverse=True)
-
-        return processes
+        return await get_processes_list(session)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"查询进程列表失败: {str(e)}")

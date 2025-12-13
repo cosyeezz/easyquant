@@ -1,13 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-// 根据当前环境自动决定 WS 地址
-// 开发环境下 Vite 代理了 /api，但 WebSocket 代理可能导致 Origin/Host 头不一致被后端拒绝 (403)
-// 这里我们直接连接后端端口 8000，利用 CORS 允许跨域连接
+// 动态判断 WebSocket URL
+// 在开发环境中，Vite 代理会处理 /ws，但在生产或某些设置中可能需要完整 URL
+const WS_PORT = '8000';
 const WS_PROTOCOL = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const WS_HOST = window.location.hostname; // localhost or ip
-const WS_PORT = '8001'; 
-
-const WS_URL = `${WS_PROTOCOL}//${WS_HOST}:${WS_PORT}/ws/system`;
+const WS_URL = `${WS_PROTOCOL}//${window.location.hostname}:${WS_PORT}/ws/system`;
 
 export function useWebSocket() {
   const ws = useRef(null);
@@ -15,6 +12,10 @@ export function useWebSocket() {
   const [systemStatus, setSystemStatus] = useState(null);
   // 日志流作为一个专门的状态
   const [logs, setLogs] = useState([]);
+  // 进程列表流
+  const [processes, setProcesses] = useState([]);
+  // 特定进程的实时事件流
+  const [processRealtimeEvents, setProcessRealtimeEvents] = useState([]);
 
   const connect = useCallback(() => {
     if (ws.current?.readyState === WebSocket.OPEN || ws.current?.readyState === WebSocket.CONNECTING) return;
@@ -37,6 +38,8 @@ export function useWebSocket() {
 
         if (channel === 'system.status') {
           setSystemStatus(data);
+        } else if (channel === 'system.processes') {
+          setProcesses(data);
         } else if (channel === 'logs') {
           // 追加日志，限制缓冲区大小
           setLogs(prev => {
@@ -44,6 +47,9 @@ export function useWebSocket() {
             if (newLogs.length > 500) return newLogs.slice(-500);
             return newLogs;
           });
+        } else if (channel && channel.startsWith('process.events.')) {
+           // 实时进程事件
+           setProcessRealtimeEvents(prev => [data, ...prev]); // 新的在前面，或者后面？通常列表显示是新的在上面
         }
       } catch (e) {
         console.error("WS Parse Error:", e);
@@ -85,11 +91,46 @@ export function useWebSocket() {
       }
   }, []);
 
+  const subscribeProcesses = useCallback(() => {
+      if (ws.current?.readyState === WebSocket.OPEN) {
+          ws.current.send(JSON.stringify({ action: 'subscribe', channels: ['system.processes'] }));
+      }
+  }, []);
+
+  const unsubscribeProcesses = useCallback(() => {
+      if (ws.current?.readyState === WebSocket.OPEN) {
+          ws.current.send(JSON.stringify({ action: 'unsubscribe', channels: ['system.processes'] }));
+      }
+  }, []);
+
+  const subscribeProcessEvents = useCallback((processName) => {
+      if (ws.current?.readyState === WebSocket.OPEN && processName) {
+          ws.current.send(JSON.stringify({ action: 'subscribe', channels: [`process.events.${processName}`] }));
+      }
+  }, []);
+
+  const unsubscribeProcessEvents = useCallback((processName) => {
+      if (ws.current?.readyState === WebSocket.OPEN && processName) {
+          ws.current.send(JSON.stringify({ action: 'unsubscribe', channels: [`process.events.${processName}`] }));
+      }
+  }, []);
+  
+  const clearProcessEvents = useCallback(() => {
+      setProcessRealtimeEvents([]);
+  }, []);
+
   return { 
       status, 
       systemStatus, 
       logs,
+      processes,
+      processRealtimeEvents,
       subscribeLogs,
-      unsubscribeLogs
+      unsubscribeLogs,
+      subscribeProcesses,
+      unsubscribeProcesses,
+      subscribeProcessEvents,
+      unsubscribeProcessEvents,
+      clearProcessEvents
   };
 }

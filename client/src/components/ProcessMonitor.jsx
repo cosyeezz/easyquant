@@ -58,14 +58,47 @@ function LogViewer({ autoRefresh }) {
 }
 
 function ProcessMonitor() {
+  // WebSocket hook for process list updates
+  const { 
+    processes: wsProcesses, 
+    status: wsStatus, 
+    subscribeProcesses, 
+    unsubscribeProcesses,
+    // Real-time events
+    processRealtimeEvents,
+    subscribeProcessEvents,
+    unsubscribeProcessEvents,
+    clearProcessEvents
+  } = useWebSocket()
+  
   const [processes, setProcesses] = useState([])
   const [selectedProcess, setSelectedProcess] = useState(null)
-  const [processEvents, setProcessEvents] = useState([])
+  
+  // 分离历史事件和实时事件
+  const [historyEvents, setHistoryEvents] = useState([])
+  
   const [loading, setLoading] = useState(true)
   const [autoRefresh, setAutoRefresh] = useState(true)
-  // ... existing code ...
+  
+  // 订阅进程列表更新
+  useEffect(() => {
+      if (wsStatus === 'connected') {
+          subscribeProcesses()
+      }
+      return () => {
+          if (wsStatus === 'connected') unsubscribeProcesses()
+      }
+  }, [wsStatus, subscribeProcesses, unsubscribeProcesses])
 
-  // 轮询获取进程数据
+  // 当 WebSocket 数据到来时更新本地状态
+  useEffect(() => {
+      if (wsProcesses && wsProcesses.length > 0) {
+          setProcesses(wsProcesses)
+          setLoading(false)
+      }
+  }, [wsProcesses])
+
+  // 初始加载一次 (HTTP Fallback for faster first paint)
   useEffect(() => {
     const fetchProcesses = async () => {
       try {
@@ -77,35 +110,46 @@ function ProcessMonitor() {
         setLoading(false)
       }
     }
-
     fetchProcesses()
+  }, [])
 
-    if (autoRefresh) {
-      const interval = setInterval(fetchProcesses, 2000) // 每2秒刷新
-      return () => clearInterval(interval)
-    }
-  }, [autoRefresh])
-
-  // 获取选中进程的详细事件
+  // 选中进程变化时：拉取历史 + 订阅实时
   useEffect(() => {
     if (!selectedProcess) return
 
-    const fetchEvents = async () => {
+    // 1. 清理上一轮的实时数据
+    clearProcessEvents()
+    setHistoryEvents([])
+    
+    // 2. 订阅新的实时流
+    if (wsStatus === 'connected') {
+        subscribeProcessEvents(selectedProcess)
+    }
+
+    // 3. 拉取历史数据
+    const fetchHistory = async () => {
       try {
         const events = await api.getProcessEvents(selectedProcess, 100)
-        setProcessEvents(events)
+        setHistoryEvents(events)
       } catch (error) {
         console.error('Failed to fetch process events:', error)
       }
     }
+    fetchHistory()
 
-    fetchEvents()
-
-    if (autoRefresh) {
-      const interval = setInterval(fetchEvents, 2000)
-      return () => clearInterval(interval)
+    return () => {
+        if (wsStatus === 'connected') {
+            unsubscribeProcessEvents(selectedProcess)
+        }
     }
-  }, [selectedProcess, autoRefresh])
+  }, [selectedProcess, wsStatus, subscribeProcessEvents, unsubscribeProcessEvents, clearProcessEvents])
+
+  // 合并显示事件 (实时 + 历史)
+  // 简单的去重策略：过滤掉 id 已经存在于历史中的实时事件（防止边界重叠）
+  const displayEvents = [
+      ...processRealtimeEvents.filter(rt => !historyEvents.some(h => h.id === rt.id)),
+      ...historyEvents
+  ]
 
   // 解析事件payload中的状态信息
   const parseProcessStatus = (event) => {
@@ -145,7 +189,7 @@ function ProcessMonitor() {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <Loader2 className="w-12 h-12 text-primary-600 animate-spin mx-auto mb-4" />
-          <p className="text-slate-600">加载进程数据中...</p>
+          <p className="text-slate-600">正在建立实时连接...</p>
         </div>
       </div>
     )
@@ -157,22 +201,9 @@ function ProcessMonitor() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold text-slate-800">进程监控</h2>
-          <p className="mt-1 text-slate-600">实时监控所有ETL进程的运行状态</p>
+          <p className="mt-1 text-slate-600">实时监控所有ETL进程的运行状态 (WebSocket Full-Duplex)</p>
         </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setAutoRefresh(!autoRefresh)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
-              autoRefresh
-                ? 'bg-success-100 text-success-700 hover:bg-success-200'
-                : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-            }`}
-          >
-            <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'animate-spin' : ''}`} />
-            {autoRefresh ? '自动刷新' : '已暂停'}
-          </button>
-        </div>
+        {/* Removed Auto Refresh Button as it's no longer needed */}
       </div>
 
       {/* Process List */}
@@ -281,15 +312,18 @@ function ProcessMonitor() {
       )}
 
       {/* Detailed Event Log */}
-      {selectedProcess && processEvents.length > 0 && (
+      {selectedProcess && displayEvents.length > 0 && (
         <div className="card">
-          <div className="card-header">
-            <Activity className="w-5 h-5 text-primary-600" />
-            {selectedProcess} - 事件日志
+          <div className="card-header flex justify-between">
+            <div className="flex items-center gap-2">
+                <Activity className="w-5 h-5 text-primary-600" />
+                {selectedProcess} - 事件日志
+            </div>
+            <span className="text-xs text-slate-400">实时连接中...</span>
           </div>
 
           <div className="space-y-2 max-h-96 overflow-y-auto">
-            {processEvents.map((event) => (
+            {displayEvents.map((event) => (
               <div
                 key={event.id}
                 className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"

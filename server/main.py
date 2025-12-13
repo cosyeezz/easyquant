@@ -8,6 +8,13 @@ import sys
 import logging
 from pathlib import Path
 
+# --- Path Fix ---
+# Ensure project root is in sys.path so that 'from server.api...' works
+BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+# ----------------
+
 # --- 日志配置 ---
 # 确保 logs 目录存在 (假设在项目根目录运行)
 LOG_DIR = Path("logs")
@@ -77,10 +84,27 @@ from server.api.v1 import etl as etl_v1
 from server.api.v1 import data_tables as data_tables_v1
 from server.api.v1 import system as system_v1
 from server.bootstrap import check_and_bootstrap
-from server.common.websocket_manager import manager, WebSocketLogHandler, log_broadcast_worker, system_status_worker
+from server.common.websocket_manager import manager
+from server.api.v1.system import WebSocketLogHandler, log_broadcast_worker, system_status_worker
+from server.storage.database import AsyncSessionFactory
+from server.api.v1.events import get_processes_list
 from fastapi import WebSocket, WebSocketDisconnect
 import json
 import asyncio
+
+async def processes_broadcast_worker():
+    """
+    后台任务：每 2 秒广播一次最新的进程列表。
+    """
+    while True:
+        try:
+            async with AsyncSessionFactory() as session:
+                processes = await get_processes_list(session)
+                await manager.broadcast("system.processes", processes)
+            await asyncio.sleep(2)
+        except Exception as e:
+            logger.error(f"Error in processes broadcaster: {e}")
+            await asyncio.sleep(5)
 
 # ================= Lifespan (启动/关闭事件) =================
 
@@ -92,6 +116,7 @@ async def lifespan(app: FastAPI):
     # 使用 asyncio.create_task 将其放入后台运行
     broadcast_task = asyncio.create_task(log_broadcast_worker())
     status_task = asyncio.create_task(system_status_worker())
+    processes_task = asyncio.create_task(processes_broadcast_worker())
     
     # 2. 配置 WebSocket 日志拦截器
     # 将其实例化并添加到 root logger，这样所有日志都会自动流向 WebSocket
@@ -111,9 +136,11 @@ async def lifespan(app: FastAPI):
     # 取消后台任务
     broadcast_task.cancel()
     status_task.cancel()
+    processes_task.cancel()
     try:
         await broadcast_task
         await status_task
+        await processes_task
     except asyncio.CancelledError:
         pass
 
@@ -191,10 +218,10 @@ if __name__ == "__main__":
     print("=" * 60)
     print("EasyQuant 事件服务")
     print("=" * 60)
-    print(f"API 文档: http://127.0.0.1:8001/docs")
-    print(f"事件查询: GET  http://127.0.0.1:8001/api/v1/events")
+    print(f"API 文档: http://127.0.0.1:8000/docs")
+    print(f"事件查询: GET  http://127.0.0.1:8000/api/v1/events")
     print("=" * 60)
 
     # log_config=None: 防止 uvicorn 覆盖我们自定义的 logging 配置
-    # Port changed to 8001 to avoid zombie process on 8000
-    uvicorn.run("server.main:app", host="0.0.0.0", port=8001, log_config=None, reload=True)
+    # Port changed to 8000
+    uvicorn.run("server.main:app", host="0.0.0.0", port=8000, log_config=None, reload=True)

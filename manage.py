@@ -118,12 +118,12 @@ def get_client_port():
 def force_stop(service_name):
     """
     通过查找端口占用强制停止服务。
-    Server: 8001 (Changed from 8000 to avoid conflicts)
+    Server: 8000 (Standard)
     Client: 动态读取 (默认 3000)
     """
     ports = []
     if service_name in ["server", "all"]:
-        ports.append(8001)
+        ports.append(8000)
     if service_name in ["client", "all"]:
         ports.append(get_client_port())
 
@@ -251,6 +251,9 @@ def start_services(target="all"):
     current_pythonpath = run_env.get("PYTHONPATH", "")
     run_env["PYTHONPATH"] = str(PROJECT_ROOT) + (path_sep + current_pythonpath if current_pythonpath else "")
     
+    # 显式注入环境变量前缀 (仅非 Windows)，解决 shell=True 丢失 env 的问题
+    env_prefix = "EASYQUANT_LAUNCHER=1 " if platform.system() != "Windows" else ""
+
     print("=" * 50)
     print(f"Starting EasyQuant ({target}) on {platform.system()}...")
     print(f"Logs directory: {LOG_DIR}")
@@ -266,7 +269,7 @@ def start_services(target="all"):
         server_console_err_log = LOG_DIR / "server_console.err.log"
         
         # Use shell redirection to avoid file descriptor issues when parent exits
-        cmd_str = f'"{sys.executable}" -u server/main.py > "{server_console_log}" 2> "{server_console_err_log}"'
+        cmd_str = f'{env_prefix}"{sys.executable}" -u server/main.py > "{server_console_log}" 2> "{server_console_err_log}"'
         
         try:
             server_proc = subprocess.Popen(
@@ -299,7 +302,7 @@ def start_services(target="all"):
         
         # npm run dev
         npm_cmd_str = " ".join(NPM_CMD)
-        cmd_str = f'{npm_cmd_str} > "{client_log}" 2> "{client_err_log}"'
+        cmd_str = f'{env_prefix}{npm_cmd_str} > "{client_log}" 2> "{client_err_log}"'
 
         try:
             client_proc = subprocess.Popen(

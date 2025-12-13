@@ -39,7 +39,7 @@ EasyQuant 是一个使用Python和Web技术构建的量化交易系统，支持�
 
 ```
 +-----------------------------------------------------+
-| FastAPI 服务 (Port 8001)                            |
+| 后端 (Backend) | FastAPI | Python | RESTful API & WebSocket | Port 8000 |
 |                                                     |
 |  +-----------------+   record_event()   +---------+  |
 |  |   后台任务(ETL)   | -----------------> | Event   |  |
@@ -141,8 +141,8 @@ easyquant/
     ```sh
     python manage.py start
     ```
-    服务将在 `http://localhost:8001` 启动。
-    访问 `http://localhost:8001/docs` 查看API文档。
+    服务将在 `http://localhost:8000` 启动。
+    访问 `http://localhost:8000/docs` 查看API文档。
 
 ### 前端应用
 
@@ -192,18 +192,28 @@ easyquant/
     - **检索**: 支持按表名、物理名、描述进行模糊搜索，并可按分类和状态进行组合筛选。
     - **可视化**: 自动为不同分类分配协调的颜色标签，提升列表可读性。
 
-### 实时日志与监控
+### 实时日志与监控 (Real-time Observability)
 
-系统采用**结构化日志 (Structured Logging)** + **WebSocket 推送** 的双重策略。
+系统采用 **全 WebSocket 事件流 (Full WebSocket Event Stream)** 架构，实现了真正的事件驱动监控，彻底摒弃了传统的 HTTP 轮询。
 
-- **实时查看**: 前端页面的“进程监控”模块集成了 WebSocket 终端，可毫秒级展示后端产生的 INFO/ERROR 日志。
-- **持久化存储**:
-    - `logs/server.log`: 核心业务日志 (INFO+)。
-    - `logs/server.err.log`: 错误日志 (ERROR+)。
-    - `logs/server_console.log`: 进程控制台兜底日志。
+-   **架构优势**:
+    -   **零延迟**: 后端事件产生 (`record_event`) 后，毫秒级推送到前端。
+    -   **低负载**: 按需订阅，无无效轮询请求，极大降低了服务器和网络压力。
+    -   **混合模式**: 前端采用“**历史(HTTP) + 增量(WebSocket)**”的混合策略，既保证了数据完整性，又实现了实时性。
+
+-   **WebSocket 频道 (Channels)**:
+    -   `system.status`: 推送服务器 CPU、内存、运行时间心跳 (2s/次)。
+    -   `system.processes`: 推送所有后台进程的最新状态摘要 (2s/次)。
+    -   `logs`: 推送所有 `INFO` 级别以上的系统日志 (实时)。
+    -   `process.events.{process_name}`: **[动态频道]** 仅当用户在前端查看特定进程时订阅，实时推送该进程产生的详细事件。
+
+-   **持久化存储**:
+    -   `logs/server.log`: 核心业务日志 (INFO+)。
+    -   `logs/server.err.log`: 错误日志 (ERROR+)。
 
 **开发规范**:
-- 严禁在生产代码中使用 `print()`。必须使用 Python 标准库 `logging` 模块 (`logger.info`, `logger.error`)。
+-   严禁在生产代码中使用 `print()`。必须使用 Python 标准库 `logging` 模块。
+
 
 ## API文档
 
@@ -214,15 +224,15 @@ easyquant/
 - `GET /api/v1/processes` - 获取所有进程列表和最新状态
 - `CRUD /api/v1/data-tables` - 数据表管理
 - `CRUD /api/v1/etl` - ETL 任务管理
-- `GET /api/v1/system/logs` - 系统日志监控 (Legacy HTTP)
+- `GET /api/v1/system/logs` - 系统日志监控
 
-详细的API文档请访问: `http://localhost:8001/docs`
+详细的API文档请访问: `http://localhost:8000/docs`
 
 ## 技术栈
 
 ### 后端
 - Python 3.10+
-- FastAPI - Web框架 (Port 8001)
+- FastAPI - Web框架 (Port 8000)
 - SQLAlchemy - ORM
 - PostgreSQL - 数据库
 - asyncpg - 异步数据库驱动
