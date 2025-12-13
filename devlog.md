@@ -4,9 +4,42 @@
 
 本日开发实现了 **数据库连接的智能 SSH 隧道** 功能。为了解决本地开发环境连接远程数据库的安全与便捷性问题，我们引入了自动化的 IP 检测与隧道建立机制。现在，系统能够智能判断运行环境：在服务器本机自动直连，在远程开发机自动建立 SSH 隧道，无需手动修改代码或维护多套配置。
 
+同时，我们对数据库连接性能进行了深度对标测试，确立了内网直连为生产环境首选方案。此外，我们系统性地解决了**日志乱码**、**重复请求**以及**日志分级**等关键运维问题，提升了系统的健壮性。
+
+下午，我们进一步升级了系统的**实时通信能力**和**数据管理性能**。引入了基于 WebSocket 的通用消息总线，实现了毫秒级的日志推送和系统状态监控。同时，针对数据表管理模块进行了服务端分页与过滤的重构，并清理了大量历史遗留代码，系统架构焕然一新。
+
 ## 详细工作项
 
-### 1. 智能数据库连接 (Smart Database Connection)
+### 1. 实时通信架构 (WebSocket Infrastructure)
+- **通用 Pub/Sub 总线**:
+    - 在 `server/common/websocket_manager.py` 中实现了支持频道订阅（Channel Subscription）的 `ConnectionManager`。
+    - 支持客户端动态订阅/退订频道（如 `logs`, `system.status`）。
+    - **后端实现**: 新增 `/ws/system` 端点，集成了心跳广播（CPU/内存/运行时间）和实时日志流。
+    - **前端实现**: 开发了 `useWebSocket` Hook，封装了自动重连、频道订阅和状态管理逻辑。
+- **实时日志 (Real-time Logs)**:
+    - 实现了 `WebSocketLogHandler`，拦截 Python 标准日志并实时推送到前端。
+    - 前端 `ProcessMonitor` 组件移除了低效的 HTTP 轮询，改用 WebSocket 实时接收日志流，延迟降低至 <50ms。
+- **系统状态监控**:
+    - 在 `App` 顶栏新增了实时连接状态指示灯（在线/离线）和服务器 CPU 使用率显示。
+
+### 2. 数据表管理升级 (Data Table Performance)
+- **服务端分页与过滤**:
+    - 重构了 `GET /api/v1/data-tables` 接口，支持 `page`, `page_size`, `search`, `category_id`, `status` 参数。
+    - 响应结构升级为 `{ "total": 100, "items": [...] }`。
+- **前端重构**:
+    - 重写了 `DataTableList.jsx`，移除了纯前端过滤逻辑，对接了新的服务端 API。
+    - 实现了标准的翻页控件和防抖搜索。
+
+### 3. 运维与稳定性 (DevOps & Stability)
+- **端口迁移 (Port Migration)**:
+    - 为了解决 Windows 平台下顽固僵尸进程占用 8000 端口的问题，将后端默认服务端口迁移至 **8001**。
+    - 同步更新了 `manage.py`、`vite.config.js` 和前端连接配置。
+- **CORS 增强**:
+    - 显式配置了 `CORSMiddleware` 的 `allow_origins`，加入了 `http://localhost:3000`，确保 WebSocket 连接的安全性与连通性。
+- **代码清理 (Cleanup)**:
+    - 删除了 `benchmark_*.py`, `debug_*.py`, `fix_tables.py` 等 10+ 个开发阶段的临时脚本，保持项目根目录整洁。
+
+### 4. 智能数据库连接 (Smart Database Connection)
 - **自动隧道 (Auto SSH Tunnel)**:
     - 在 `server/storage/database.py` 中集成了 `sshtunnel` 库。
     - 实现了启动时的环境检测逻辑：
@@ -15,17 +48,10 @@
         3. 若 IP 不一致（远程模式）且配置了 SSH 用户，自动启动 `SSHTunnelForwarder`。
         4. 动态重写 `DATABASE_URL` 指向本地隧道端口。
     - 若 IP 一致（服务器模式），自动降级为 `localhost` 直连，确保生产环境性能。
-- **配置兼容性**:
-    - 仅需在 `.env` 中增加 SSH 凭据 (`SSH_USER`, `SSH_HOST` 等)，原有 `DATABASE_URL` 无需变更。
-
-### 2. 依赖管理
-- 引入了 `sshtunnel` 库到 `requirements.txt`。
-
-### 3. 前端交互 (UI/UX)
-- **ETL 流程可视化 (Pipeline Visualizer)**:
-    - 集成了 `React Flow` 库，开发了 `PipelineVisualizer.jsx` 组件。
-    - 实现了 Pipeline 结构的自动图形化渲染，支持展示串行、并行及嵌套分组（Recursive Groups）的复杂逻辑。
-    - **分栏编辑体验**: 在 `ETLTaskEditor` 的 Pipeline 编辑步骤中采用了左右分栏布局（左侧表单编辑，右侧实时预览），极大提升了复杂任务编排的直观性和可维护性。
+- **性能基准测试**:
+    - 编写了 `benchmark_comparison.py`，实测对比了 SSH 远程连接与内网直连的性能。
+    - **结论**: 远程连接（含 SSH 开销）平均耗时 ~225ms，内网直连平均耗时 ~1.7ms。内网性能优势达 135 倍。
+    - **决策**: 将 `.env.example` 默认配置更新为内网地址，强烈建议在内网环境部署生产服务。
 
 ---
 

@@ -1,14 +1,18 @@
 import { useState } from 'react'
-import { Activity, Database, Server, Table2 } from 'lucide-react'
+import { Activity, Database, Server, Table2, Cpu } from 'lucide-react'
 import ProcessMonitor from './components/ProcessMonitor'
 import ETLTaskList from './components/ETLTaskList'
 import ETLTaskEditor from './components/ETLTaskEditor'
 import DataTableList from './components/DataTableList'
 import DataTableEditor from './components/DataTableEditor'
+import { useWebSocket } from './hooks/useWebSocket'
 
 function App() {
   const [activeTab, setActiveTab] = useState('etl')
   const [editId, setEditId] = useState(null)
+  
+  // Global WebSocket Connection (for System Status)
+  const { status, systemStatus } = useWebSocket()
 
   const handleNavigate = (tab, id = null) => {
     setActiveTab(tab)
@@ -39,10 +43,24 @@ function App() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-success-50 rounded-lg">
-                <div className="w-2 h-2 bg-success-500 rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium text-success-700">系统运行中</span>
+            <div className="flex items-center gap-3">
+              {/* Connection Status & CPU Metric */}
+              <div className={`flex items-center gap-3 px-4 py-2 rounded-lg border transition-all ${
+                  status === 'connected' 
+                  ? 'bg-emerald-50 border-emerald-100 text-emerald-700' 
+                  : 'bg-rose-50 border-rose-100 text-rose-700'
+              }`}>
+                <div className="flex items-center gap-2">
+                    <div className={`w-2.5 h-2.5 rounded-full ${status === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></div>
+                    <span className="text-sm font-semibold">{status === 'connected' ? '在线' : '离线'}</span>
+                </div>
+                
+                {status === 'connected' && systemStatus && (
+                    <div className="flex items-center gap-2 pl-3 border-l border-emerald-200/50">
+                        <Cpu className="w-4 h-4 opacity-75" />
+                        <span className="text-sm font-mono">{systemStatus.cpu_percent.toFixed(1)}%</span>
+                    </div>
+                )}
               </div>
             </div>
           </div>

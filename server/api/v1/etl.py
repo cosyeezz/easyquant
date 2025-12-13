@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from server.storage.database import get_session
 from server.storage.models.etl_task_config import ETLTaskConfig
+from server.storage.models.event import Event
 from server.etl.process.registry import registry
 from server.etl.runner import ETLRunner
 
@@ -71,27 +72,35 @@ class SourcePreviewRequest(BaseModel):
 @router.post("/etl/preview-source")
 def preview_source(request: SourcePreviewRequest):
     """
-    预览数据源列名 (用于 CSV 文件夹)。
+    预览数据源列名 (用于 CSV 文件或文件夹)。
     """
+    path = request.source_config.get("path")
+    if not path or not os.path.exists(path):
+        raise HTTPException(status_code=400, detail="路径不存在或无效")
+
+    target_file = None
+
     if request.source_type == "csv_dir":
-        path = request.source_config.get("path")
-        if not path or not os.path.exists(path):
-            raise HTTPException(status_code=400, detail="路径不存在或无效")
-        
         # 查找第一个 CSV 文件
         csv_files = glob.glob(os.path.join(path, "*.csv"))
         if not csv_files:
             raise HTTPException(status_code=400, detail="该目录下没有找到 CSV 文件")
+        target_file = csv_files[0]
         
-        try:
-            # 读取第一行获取列名
-            df = pd.read_csv(csv_files[0], nrows=0)
-            return {"columns": list(df.columns), "preview_file": os.path.basename(csv_files[0])}
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"读取 CSV 失败: {str(e)}")
-            
+    elif request.source_type == "csv_file":
+        if not os.path.isfile(path):
+            raise HTTPException(status_code=400, detail="指定路径不是一个文件")
+        target_file = path
+        
     else:
         raise HTTPException(status_code=400, detail=f"不支持的预览源类型: {request.source_type}")
+    
+    try:
+        # 读取第一行获取列名
+        df = pd.read_csv(target_file, nrows=0)
+        return {"columns": list(df.columns), "preview_file": os.path.basename(target_file)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"读取 CSV 失败: {str(e)}")
 
 # --- ETL Task Config CRUD ---
 
@@ -146,10 +155,6 @@ async def update_etl_config(config_id: int, update_data: ETLTaskConfigUpdate, se
     await session.commit()
     await session.refresh(config)
     return config
-
-from server.storage.models.event import Event # Add import
-
-# ... existing imports ...
 
 @router.delete("/etl-configs/{config_id}")
 async def delete_etl_config(config_id: int, session: AsyncSession = Depends(get_session)):

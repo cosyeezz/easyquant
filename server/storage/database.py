@@ -20,8 +20,8 @@ from typing import List
 from dotenv import load_dotenv
 
 # --- 统一配置加载 ---
-# 从 .env 文件加载环境变量
-load_dotenv()
+# 从 .env 文件加载环境变量 (强制覆盖，防止系统变量干扰)
+load_dotenv(override=True)
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,16 @@ ssh_tunnel = None
 
 if SSH_USER:
     try:
+        # --- Monkey Patch for paramiko 3.0+ compatibility ---
+        # paramiko 3.0+ removed DSSKey support, but sshtunnel still references it.
+        # We patch it before importing sshtunnel to prevent AttributeError.
+        import paramiko
+        if not hasattr(paramiko, 'DSSKey'):
+            class DSSKey:
+                pass
+            paramiko.DSSKey = DSSKey
+        # ----------------------------------------------------
+
         from sshtunnel import SSHTunnelForwarder
         from sqlalchemy.engine.url import make_url
 
@@ -100,9 +110,8 @@ if SSH_USER:
             
             logger.info(f"SSH 隧道已建立: localhost:{ssh_tunnel.local_bind_port} -> {ssh_host} -> 127.0.0.1:{db_port}")
             
-            # 替换 DATABASE_URL 指向隧道
-            new_url_obj = url_obj.set(host='127.0.0.1', port=ssh_tunnel.local_bind_port)
-            DATABASE_URL = str(new_url_obj)
+            # 手动重组 URL 以避免 SQLAlchemy URL 对象可能的序列化问题
+            DATABASE_URL = f"postgresql+asyncpg://{url_obj.username}:{url_obj.password}@127.0.0.1:{ssh_tunnel.local_bind_port}/{url_obj.database}"
 
     except ImportError:
         logger.warning("已配置 SSH_USER 但未安装 'sshtunnel'，将尝试直接连接。")

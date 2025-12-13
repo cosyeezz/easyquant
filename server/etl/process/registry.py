@@ -1,8 +1,11 @@
 import inspect
 import pkgutil
 import importlib
+import logging
 from typing import Dict, Type, List, Any
 from server.etl.process.base import BaseHandler
+
+logger = logging.getLogger(__name__)
 
 class HandlerRegistry:
     """
@@ -76,7 +79,7 @@ class HandlerRegistry:
                             and obj is not BaseHandler):
                             self.register(obj)
         except Exception as e:
-            print(f"Error discovering handlers in {package_path}: {e}")
+            logger.error(f"Error discovering handlers in {package_path}: {e}")
 
 # 全局单例实例
 registry = HandlerRegistry()

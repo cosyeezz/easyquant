@@ -1,67 +1,57 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Activity, Clock, Database, FileText, TrendingUp, AlertTriangle, CheckCircle, Loader2, RefreshCw } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import api from '../services/api'
+import { useWebSocket } from '../hooks/useWebSocket'
 
 // Internal LogViewer Component
 function LogViewer({ autoRefresh }) {
-  const [activeTab, setActiveTab] = useState('server') // 'server' or 'client'
-  const [logs, setLogs] = useState([])
-  const [loading, setLoading] = useState(false)
+  // Use independent WebSocket connection for logs to avoid re-render noise in main App
+  const { logs, subscribeLogs, unsubscribeLogs, status } = useWebSocket()
+  const scrollRef = useRef(null)
 
   useEffect(() => {
-    fetchLogs()
-    
-    if (autoRefresh) {
-      const interval = setInterval(fetchLogs, 3000)
-      return () => clearInterval(interval)
+    if (status === 'connected') {
+        subscribeLogs()
     }
-  }, [activeTab, autoRefresh])
+    return () => {
+        if (status === 'connected') unsubscribeLogs()
+    }
+  }, [status, subscribeLogs, unsubscribeLogs])
 
-  const fetchLogs = async () => {
-    try {
-      // Use 100 lines for tail
-      const data = await api.getSystemLogs(activeTab, 100)
-      setLogs(data.lines || [])
-    } catch (err) {
-      console.error('Failed to fetch logs', err)
+  // Auto-scroll to bottom
+  useEffect(() => {
+    if (autoRefresh && scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }
+  }, [logs, autoRefresh])
 
   return (
     <div className="card mt-8">
       <div className="card-header flex justify-between items-center">
         <div className="flex items-center gap-2">
            <FileText className="w-5 h-5 text-primary-600" />
-           系统日志
+           系统实时日志 (WebSocket)
         </div>
-        <div className="flex bg-slate-100 rounded-lg p-1">
-          <button
-            onClick={() => setActiveTab('server')}
-            className={`px-3 py-1 text-sm font-medium rounded-md transition-all ${activeTab === 'server' ? 'bg-white text-primary-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            Backend (Server)
-          </button>
-          <button
-            onClick={() => setActiveTab('client')}
-            className={`px-3 py-1 text-sm font-medium rounded-md transition-all ${activeTab === 'client' ? 'bg-white text-primary-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            Frontend (Client)
-          </button>
+        <div className="flex items-center gap-2 text-xs">
+           <span className={`w-2 h-2 rounded-full ${status === 'connected' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+           {status === 'connected' ? '已连接' : '断开'}
         </div>
       </div>
       
-      <div className="bg-slate-900 rounded-lg p-4 font-mono text-xs md:text-sm h-96 overflow-y-auto shadow-inner border border-slate-700">
+      <div 
+        ref={scrollRef}
+        className="bg-slate-900 rounded-lg p-4 font-mono text-xs md:text-sm h-96 overflow-y-auto shadow-inner border border-slate-700"
+      >
         {logs.length === 0 ? (
-          <div className="text-slate-500 italic">暂无日志或日志文件为空</div>
+          <div className="text-slate-500 italic">等待日志推送...</div>
         ) : (
-          logs.map((line, index) => (
-            <div key={index} className="whitespace-pre-wrap text-emerald-400 border-b border-slate-800/50 pb-0.5 mb-0.5 last:border-0 hover:bg-slate-800/50">
-              {line}
+          logs.map((log, index) => (
+            <div key={index} className="whitespace-pre-wrap text-emerald-400 border-b border-slate-800/50 pb-0.5 mb-0.5 last:border-0 hover:bg-slate-800/50 font-mono">
+              {log.full_text || log.message}
             </div>
           ))
         )}
-        {/* Scroll anchor could be added here */}
       </div>
     </div>
   )

@@ -30,15 +30,21 @@ import server.storage.models.etl_task_config
 import server.storage.models.data_table_config
 target_metadata = Base.metadata
 
-# 3. Read the database URL from the environment variable (fail fast)
+# 3. Read the database URL from the server configuration (reusing SSH Tunnel logic)
 def get_url():
-    url = os.getenv("DATABASE_URL")
+    # Import DATABASE_URL from server.storage.database
+    # This ensures we use the SSH-tunneled URL if active
+    from server.storage.database import DATABASE_URL
+    
+    url = DATABASE_URL
     if not url:
-        raise ValueError("未在环境变量中找到 DATABASE_URL，请在 .env 文件中设置。")
+        raise ValueError("DATABASE_URL not found in server.storage.database module.")
     
     # Alembic's sync engine needs a non-asyncpg URL
-    if url.startswith("postgresql+asyncpg://"):
-        url = url.replace("postgresql+asyncpg://", "postgresql://", 1)
+    if "asyncpg" in url:
+        # e.g., postgresql+asyncpg://... -> postgresql://...
+        url = url.replace("+asyncpg", "")
+        
     return url
 
 # --- CUSTOMIZATION ENDS HERE ---

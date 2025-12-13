@@ -5,6 +5,54 @@ EasyQuant FastAPI 事件服务
 """
 import os
 import sys
+import logging
+from pathlib import Path
+
+# --- 日志配置 ---
+# 确保 logs 目录存在 (假设在项目根目录运行)
+LOG_DIR = Path("logs")
+LOG_DIR.mkdir(exist_ok=True)
+
+# 定义格式器
+formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+# 1. 全量日志 (server.log) - 包含 INFO 及以上
+file_handler_info = logging.FileHandler(LOG_DIR / "server.log", mode="a", encoding="utf-8")
+file_handler_info.setLevel(logging.INFO)
+file_handler_info.setFormatter(formatter)
+
+# 2. 错误日志 (server.err.log) - 仅包含 ERROR 及以上
+file_handler_err = logging.FileHandler(LOG_DIR / "server.err.log", mode="a", encoding="utf-8")
+file_handler_err.setLevel(logging.ERROR)
+file_handler_err.setFormatter(formatter)
+
+# 3. 控制台输出 (StreamHandler) - 默认输出到 stderr (便于 uvicorn 捕获)
+stream_handler = logging.StreamHandler(sys.stdout) # 强制到 stdout，避免被重定向到 err.log
+stream_handler.setLevel(logging.INFO)
+stream_handler.setFormatter(formatter)
+
+# 获取根记录器并应用配置
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+
+# 清除可能存在的默认 handler (如 uvicorn 自动添加的) 避免重复
+root_logger.handlers = []
+
+root_logger.addHandler(file_handler_info)
+root_logger.addHandler(file_handler_err)
+root_logger.addHandler(stream_handler)
+
+# 专门针对 uvicorn 的日志进行调整，使其也使用我们的 handler
+logging.getLogger("uvicorn").handlers = []
+logging.getLogger("uvicorn.access").handlers = []
+logging.getLogger("uvicorn.error").handlers = []
+# 将 uvicorn 日志传播到根记录器
+logging.getLogger("uvicorn").propagate = True
+logging.getLogger("uvicorn.access").propagate = True
+logging.getLogger("uvicorn.error").propagate = True
+
+
+logger = logging.getLogger(__name__)
 
 # --- Startup Check ---
 if os.environ.get("EASYQUANT_LAUNCHER") != "1":
@@ -29,16 +77,27 @@ from server.api.v1 import etl as etl_v1
 from server.api.v1 import data_tables as data_tables_v1
 from server.api.v1 import system as system_v1
 from server.bootstrap import check_and_bootstrap
-
-# 设置日志
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from server.common.websocket_manager import manager, WebSocketLogHandler, log_broadcast_worker, system_status_worker
+from fastapi import WebSocket, WebSocketDisconnect
+import json
+import asyncio
 
 # ================= Lifespan (启动/关闭事件) =================
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 启动前逻辑
+    # --- 启动前逻辑 ---
+    
+    # 1. 启动日志广播后台任务
+    # 使用 asyncio.create_task 将其放入后台运行
+    broadcast_task = asyncio.create_task(log_broadcast_worker())
+    status_task = asyncio.create_task(system_status_worker())
+    
+    # 2. 配置 WebSocket 日志拦截器
+    # 将其实例化并添加到 root logger，这样所有日志都会自动流向 WebSocket
+    ws_handler = WebSocketLogHandler()
+    logging.getLogger().addHandler(ws_handler)
+    
     try:
         await check_and_bootstrap()
     except Exception as e:
@@ -48,8 +107,15 @@ async def lifespan(app: FastAPI):
     
     yield
     
-    # 关闭后逻辑 (如果需要清理资源，如关闭 DB 连接池，虽然 database.py 会自动处理)
-    pass
+    # --- 关闭后逻辑 ---
+    # 取消后台任务
+    broadcast_task.cancel()
+    status_task.cancel()
+    try:
+        await broadcast_task
+        await status_task
+    except asyncio.CancelledError:
+        pass
 
 # ================= FastAPI 应用 =================
 
@@ -63,13 +129,43 @@ app = FastAPI(
 # 配置 CORS，允许前端跨域访问
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 生产环境应该设置为具体的前端域名
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173", # Vite default
+        "*"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ================= API 路由 =================
+
+# WebSocket 实时数据流端点
+@app.websocket("/ws/system")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            # 接收客户端指令
+            data_str = await websocket.receive_text()
+            try:
+                msg = json.loads(data_str)
+                action = msg.get("action")
+                if action == "subscribe":
+                    channels = msg.get("channels", [])
+                    manager.subscribe(websocket, channels)
+                elif action == "unsubscribe":
+                    channels = msg.get("channels", [])
+                    manager.unsubscribe(websocket, channels)
+            except json.JSONDecodeError:
+                pass
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        manager.disconnect(websocket)
 
 # 健康检查端点
 @app.get("/")
@@ -95,8 +191,10 @@ if __name__ == "__main__":
     print("=" * 60)
     print("EasyQuant 事件服务")
     print("=" * 60)
-    print(f"API 文档: http://127.0.0.1:8000/docs")
-    print(f"事件查询: GET  http://127.0.0.1:8000/api/v1/events")
+    print(f"API 文档: http://127.0.0.1:8001/docs")
+    print(f"事件查询: GET  http://127.0.0.1:8001/api/v1/events")
     print("=" * 60)
 
-    uvicorn.run("server.main:app", host="0.0.0.0", port=8000, log_level="info", reload=True)
+    # log_config=None: 防止 uvicorn 覆盖我们自定义的 logging 配置
+    # Port changed to 8001 to avoid zombie process on 8000
+    uvicorn.run("server.main:app", host="0.0.0.0", port=8001, log_config=None, reload=True)

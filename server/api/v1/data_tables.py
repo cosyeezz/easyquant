@@ -146,11 +146,59 @@ async def delete_category(id: int, session: AsyncSession = Depends(get_session))
 
 # --- Data Tables API ---
 
-@router.get("/data-tables", response_model=List[DataTableResponse])
-async def list_tables(session: AsyncSession = Depends(get_session)):
-    stmt = select(DataTableConfig).order_by(DataTableConfig.id.desc())
+from typing import List, Dict, Any, Optional
+from sqlalchemy import func
+
+# ... (Previous Pydantic Models)
+
+class DataTableListResponse(BaseModel):
+    total: int
+    items: List[DataTableResponse]
+
+# ...
+
+@router.get("/data-tables", response_model=DataTableListResponse)
+async def list_tables(
+    page: int = 1,
+    page_size: int = 20,
+    search: Optional[str] = None,
+    category_id: Optional[int] = None,
+    status: Optional[TableStatus] = None,
+    session: AsyncSession = Depends(get_session)
+):
+    # Base query
+    query = select(DataTableConfig)
+    
+    # Filters
+    filters = []
+    if search:
+        search_term = f"%{search}%"
+        filters.append(
+            (DataTableConfig.name.ilike(search_term)) | 
+            (DataTableConfig.table_name.ilike(search_term)) |
+            (DataTableConfig.description.ilike(search_term))
+        )
+    if category_id is not None:
+        filters.append(DataTableConfig.category_id == category_id)
+    if status is not None:
+        filters.append(DataTableConfig.status == status)
+    
+    if filters:
+        query = query.where(*filters)
+    
+    # Count total (before pagination)
+    count_stmt = select(func.count()).select_from(query.subquery())
+    total_result = await session.execute(count_stmt)
+    total = total_result.scalar() or 0
+    
+    # Pagination
+    offset = (page - 1) * page_size
+    stmt = query.order_by(DataTableConfig.id.desc()).offset(offset).limit(page_size)
+    
     result = await session.execute(stmt)
-    return result.scalars().all()
+    items = result.scalars().all()
+    
+    return {"total": total, "items": items}
 
 @router.get("/data-tables/{id}", response_model=DataTableResponse)
 async def get_table(id: int, session: AsyncSession = Depends(get_session)):

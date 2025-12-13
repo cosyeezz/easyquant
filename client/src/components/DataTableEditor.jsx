@@ -64,15 +64,14 @@ function DataTableEditor({ tableId, cloneFromId, onNavigate }) {
   const refreshCategories = async () => {
     const cats = await api.getTableCategories()
     setCategories(cats)
+    return cats
   }
 
   const loadData = async () => {
     try {
       setLoading(true)
-      await refreshCategories()
+      const cats = await refreshCategories()
       
-      const cats = await api.getTableCategories()
-      setCategories(cats)
       let initialCategoryId = cats.length > 0 ? cats[0].id : ''
 
       if (tableId) {

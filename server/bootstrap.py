@@ -1,5 +1,7 @@
 import logging
 import os
+import subprocess
+import sys
 from sqlalchemy import select, text
 from alembic import command
 from alembic.config import Config
@@ -20,25 +22,13 @@ DEFAULT_CATEGORIES = [
 def run_db_migrations():
     """
     使用 Alembic 自动执行数据库迁移，确保表结构最新。
-    这相当于在命令行运行 'alembic upgrade head'。
+    注意：在 Windows 环境下，迁移操作已移交至 manage.py 启动脚本中执行，
+    此处仅作为日志占位，或保留给非 Windows 环境的兼容性。
     """
-    try:
-        logger.info("Checking and applying database migrations...")
-        
-        # 假设 alembic.ini 在当前工作目录下（通常是项目根目录）
-        alembic_cfg_path = "alembic.ini"
-        if not os.path.exists(alembic_cfg_path):
-            raise FileNotFoundError(f"Cannot find alembic.ini at {os.getcwd()}")
-            
-        alembic_cfg = Config(alembic_cfg_path)
-        
-        # 执行 upgrade head
-        command.upgrade(alembic_cfg, "head")
-        
-        logger.info("Database migrations applied successfully.")
-    except Exception as e:
-        logger.critical(f"Failed to apply database migrations: {e}")
-        raise RuntimeError("Database migration failed. Cannot start application.") from e
+    logger.info("Database migrations should have been handled by the startup script (manage.py).")
+    # 之前这里尝试使用 command.upgrade 或 subprocess 调用 alembic，但在 SSH 隧道场景下
+    # 极易导致进程锁死或崩溃。因此现在架构上改为由外部串行执行。
+    pass
 
 async def check_and_bootstrap():
     """

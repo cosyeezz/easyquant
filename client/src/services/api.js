@@ -102,8 +102,9 @@ class ApiService {
 
   // ========== Data Table API ==========
 
-  async getDataTables() {
-    const response = await this.client.get('/data-tables');
+  async getDataTables(params = {}) {
+    // params: { page, page_size, search, category_id, status }
+    const response = await this.client.get('/data-tables', { params });
     return response.data;
   }
 

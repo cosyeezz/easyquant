@@ -53,7 +53,7 @@ def kill_process_on_port(port):
     print(f"Cleaning up process on port {port}...")
     if platform.system() == "Windows":
         try:
-            # 查找 PID: netstat -ano | findstr :8000
+            # 查找 PID: netstat -ano | findstr :<port>
             output = subprocess.check_output(f"netstat -ano | findstr :{port}", shell=True).decode()
             for line in output.splitlines():
                 if "LISTENING" in line:
@@ -118,50 +118,72 @@ def get_client_port():
 def force_stop(service_name):
     """
     通过查找端口占用强制停止服务。
-    Server: 8000
+    Server: 8001 (Changed from 8000 to avoid conflicts)
     Client: 动态读取 (默认 3000)
     """
     ports = []
     if service_name in ["server", "all"]:
-        ports.append(8000)
+        ports.append(8001)
     if service_name in ["client", "all"]:
         ports.append(get_client_port())
 
     for port in ports:
         print(f"[{service_name.upper() if service_name != 'all' else 'SYSTEM'}] Checking port {port}...")
-        try:
-            # 使用 lsof 查找占用端口的 PID
-            # -t: terse (only PIDs)
-            # -i: internet files
-            result = subprocess.run(
-                ["lsof", "-t", "-i", f":{port}"], 
-                capture_output=True, 
-                text=True
-            )
-            pids = result.stdout.strip().split('\n')
-            pids = [p for p in pids if p] # filter empty strings
+        
+        pids = set()
+        if platform.system() == "Windows":
+            try:
+                # Windows: netstat -ano | findstr :<port>
+                # 注意：findstr 可能返回非零值如果没找到，这会抛出 CalledProcessError
+                cmd = f"netstat -ano | findstr :{port}"
+                output = subprocess.check_output(cmd, shell=True).decode()
+                for line in output.splitlines():
+                    parts = line.strip().split()
+                    # TCP 0.0.0.0:8000 0.0.0.0:0 LISTENING 1234
+                    # 必须确保是 LISTENING 状态且端口精确匹配
+                    if len(parts) >= 5 and "LISTENING" in parts:
+                         local_addr = parts[1]
+                         pid = parts[-1]
+                         if local_addr.endswith(f":{port}"):
+                             pids.add(pid)
+            except subprocess.CalledProcessError:
+                # findstr 没找到匹配项
+                pass
+            except Exception as e:
+                print(f"  Error checking port {port} (Windows): {e}")
+        else:
+            # Unix: lsof
+            try:
+                result = subprocess.run(
+                    ["lsof", "-t", "-i", f":{port}"], 
+                    capture_output=True, 
+                    text=True
+                )
+                found = result.stdout.strip().split('\n')
+                pids.update([p for p in found if p])
+            except FileNotFoundError:
+                 print("  Warning: 'lsof' command not found. Cannot kill by port automatically.")
+            except Exception as e:
+                print(f"  Error checking port {port} (Unix): {e}")
 
-            if not pids:
-                print(f"  No process found on port {port}.")
-                continue
+        if not pids:
+            print(f"  No process found on port {port}.")
+            continue
 
-            for pid in pids:
-                try:
-                    pid_int = int(pid)
-                    print(f"  Killing PID {pid_int} on port {port}...")
-                    os.kill(pid_int, signal.SIGTERM) # Try gentle kill first
-                    # Optional: wait and force kill if needed
-                except ValueError:
-                    pass
-                except ProcessLookupError:
-                    print(f"  PID {pid} already gone.")
-                except Exception as e:
-                    print(f"  Error killing PID {pid}: {e}")
-                    
-        except FileNotFoundError:
-             print("  Warning: 'lsof' command not found. Cannot kill by port automatically.")
-        except Exception as e:
-            print(f"  Error checking port {port}: {e}")
+        for pid in pids:
+            try:
+                pid_int = int(pid)
+                print(f"  Killing PID {pid_int} on port {port}...")
+                if platform.system() == "Windows":
+                    subprocess.run(["taskkill", "/F", "/PID", str(pid_int)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                else:
+                    os.kill(pid_int, signal.SIGTERM)
+            except ValueError:
+                pass
+            except ProcessLookupError:
+                print(f"  PID {pid} already gone.")
+            except Exception as e:
+                print(f"  Error killing PID {pid}: {e}")
 
     # Clean up PID file just in case
     if os.path.exists(PID_FILE):
@@ -171,11 +193,49 @@ def force_stop(service_name):
         except OSError:
             pass
 
+def run_migrations():
+    """
+    启动服务前，强制同步执行数据库迁移。
+    这是最安全的方式，避免了在应用启动期间进行复杂的并发子进程调用。
+    """
+    print("[Migration] Checking and applying database schema (alembic upgrade head)...")
+    try:
+        # 使用当前解释器运行 alembic 模块
+        cmd = [sys.executable, "-m", "alembic", "upgrade", "head"]
+        result = subprocess.run(
+            cmd,
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            encoding='utf-8' # 防止 Windows 中文乱码
+        )
+        
+        if result.returncode != 0:
+            print("[Migration] FAILED!")
+            print(f"Stdout:\n{result.stdout}")
+            print(f"Stderr:\n{result.stderr}")
+            # 迁移失败则禁止启动，防止数据损坏
+            raise RuntimeError("Database migration failed.")
+        else:
+            print("[Migration] Success.")
+            # 如果有输出，可选打印一些关键信息
+            if "Running upgrade" in result.stdout or "INFO" in result.stdout:
+                 pass # 可以选择性打印日志
+                 
+    except Exception as e:
+        print(f"[Migration] Critical Error: {e}")
+        sys.exit(1)
+
 def start_services(target="all"):
     # 启动前先执行清理！
     print(f"Pre-start cleanup ({target})...")
     force_stop(target)
     time.sleep(1) # 给 OS 一点时间回收资源
+
+    # --- 新增：数据库迁移步骤 ---
+    # 只有当包含 server 启动时才运行迁移
+    if target in ["all", "server"]:
+        run_migrations()
 
     ensure_log_dir()
     pids = read_pids()
@@ -183,6 +243,7 @@ def start_services(target="all"):
     # 准备环境变量，注入启动标记
     run_env = os.environ.copy()
     run_env["EASYQUANT_LAUNCHER"] = "1"
+    run_env["PYTHONIOENCODING"] = "utf-8" # 强制日志输出为 UTF-8，防止 Windows 乱码
     
     # 关键：将项目根目录加入 PYTHONPATH，解决 'ModuleNotFoundError: No module named server'
     # Windows 使用 ; 分隔，Unix 使用 :
@@ -198,11 +259,14 @@ def start_services(target="all"):
     # --- Start Server ---
     if target in ["all", "server"]:
         print("[Server] Starting backend service...")
-        server_log = LOG_DIR / "server.log"
-        server_err_log = LOG_DIR / "server.err.log"
+        # 重命名控制台捕获日志，避免与 Python 内部 logging.FileHandler 产生文件锁冲突
+        # server.log 由 Python 代码直接写入 (Structured Log)
+        # server_console.log 捕获启动时的 print 或 C 级别崩溃 (Raw Stdout)
+        server_console_log = LOG_DIR / "server_console.log"
+        server_console_err_log = LOG_DIR / "server_console.err.log"
         
         # Use shell redirection to avoid file descriptor issues when parent exits
-        cmd_str = f'"{sys.executable}" server/main.py > "{server_log}" 2> "{server_err_log}"'
+        cmd_str = f'"{sys.executable}" -u server/main.py > "{server_console_log}" 2> "{server_console_err_log}"'
         
         try:
             server_proc = subprocess.Popen(
@@ -229,6 +293,10 @@ def start_services(target="all"):
         client_log = LOG_DIR / "client.log"
         client_err_log = LOG_DIR / "client.err.log"
         
+        # 准备 Client 专用环境变量：禁用颜色输出，防止日志乱码
+        client_env = run_env.copy()
+        client_env["NO_COLOR"] = "1"
+        
         # npm run dev
         npm_cmd_str = " ".join(NPM_CMD)
         cmd_str = f'{npm_cmd_str} > "{client_log}" 2> "{client_err_log}"'
@@ -237,7 +305,7 @@ def start_services(target="all"):
             client_proc = subprocess.Popen(
                 cmd_str,
                 cwd=PROJECT_ROOT / "client",
-                env=run_env,
+                env=client_env,
                 shell=True,
                 stdin=subprocess.DEVNULL, # Detach stdin
                 start_new_session=(platform.system() != "Windows"),

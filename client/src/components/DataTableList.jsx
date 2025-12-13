@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Pencil, Trash2, Loader2, Database, Play, AlertTriangle, Copy, X, RefreshCw, Search, RotateCcw } from 'lucide-react'
+import { Plus, Pencil, Trash2, Loader2, Database, Play, AlertTriangle, Copy, X, RefreshCw, Search, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react'
 import api from '../services/api'
 import Modal from './Modal'
 import Select from './ui/Select'
@@ -10,13 +10,11 @@ function DataTableList({ onNavigate }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   
-  // Filter States
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('all')
-  const [selectedStatus, setSelectedStatus] = useState('all')
-  const [activeFilters, setActiveFilters] = useState({
-      query: '',
-      category: 'all',
+  // Pagination & Filtering
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 20, total: 0 })
+  const [filters, setFilters] = useState({
+      search: '',
+      category_id: 'all',
       status: 'all'
   })
   
@@ -28,17 +26,36 @@ function DataTableList({ onNavigate }) {
 
   useEffect(() => {
     fetchData()
-  }, [])
+  }, []) // Initial load
+
+  useEffect(() => {
+    // Reload when pagination or filters trigger
+    fetchData()
+  }, [pagination.page, filters]) // Watch filters and page
 
   const fetchData = async () => {
+    setLoading(true)
+    setError(null)
     try {
-      setError(null)
-      const [tablesData, categoriesData] = await Promise.all([
-        api.getDataTables(),
-        api.getTableCategories()
+      // Prepare params
+      const params = {
+          page: pagination.page,
+          page_size: pagination.pageSize,
+      }
+      if (filters.search) params.search = filters.search
+      if (filters.category_id !== 'all') params.category_id = filters.category_id
+      if (filters.status !== 'all') params.status = filters.status.toUpperCase() // API expects enum (CREATED, DRAFT)
+
+      const [tablesResp, categoriesData] = await Promise.all([
+        api.getDataTables(params),
+        categories.length > 0 ? Promise.resolve(categories) : api.getTableCategories() // Don't reload cats if have them
       ])
-      setTables(tablesData)
-      setCategories(categoriesData)
+      
+      setTables(tablesResp.items)
+      setPagination(prev => ({ ...prev, total: tablesResp.total }))
+      
+      if (categories.length === 0) setCategories(categoriesData)
+
     } catch (err) {
       setError(err.message || '加载失败，请检查后端服务是否启动')
     } finally {
@@ -52,7 +69,7 @@ function DataTableList({ onNavigate }) {
     setDeleteModal(prev => ({ ...prev, error: null }))
     try {
       await api.deleteDataTable(deleteModal.table.id)
-      setTables(tables.filter(t => t.id !== deleteModal.table.id))
+      fetchData() // Reload list
       setDeleteModal({ open: false, table: null, error: null })
     } catch (error) {
       console.error('Failed to delete:', error)
@@ -68,9 +85,7 @@ function DataTableList({ onNavigate }) {
     setPublishModal(prev => ({ ...prev, error: null }))
     try {
       await api.publishDataTable(publishModal.table.id)
-      // Refresh list to update status
-      const updatedTables = await api.getDataTables()
-      setTables(updatedTables)
+      fetchData() // Reload list
       setPublishModal({ open: false, table: null, error: null })
     } catch (err) {
       setPublishModal(prev => ({ ...prev, error: err.response?.data?.detail || '发布失败' }))
@@ -84,7 +99,6 @@ function DataTableList({ onNavigate }) {
     return cat ? cat.name : '-'
   }
 
-  // Pre-defined palette for category badges (Looping assignment)
   const CATEGORY_PALETTE = [
     'bg-blue-50 text-blue-700 border-blue-200',
     'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -100,97 +114,36 @@ function DataTableList({ onNavigate }) {
 
   const getCategoryStyle = (id) => {
     if (!id) return 'bg-slate-50 text-slate-600 border-slate-200'
-    // Use modulo to cycle through colors based on ID. 
-    // This ensures consistency (same ID always gets same color) and supports infinite categories.
     const index = id % CATEGORY_PALETTE.length
     return CATEGORY_PALETTE[index]
   }
 
-  const handleSearch = () => {
-      setActiveFilters({
-          query: searchQuery,
-          category: selectedCategory,
-          status: selectedStatus
-      })
+  // Handle Search Input (Debounced or Enter)
+  const [searchInput, setSearchInput] = useState('')
+  const handleSearchCommit = () => {
+      setPagination(prev => ({ ...prev, page: 1 })) // Reset to page 1
+      setFilters(prev => ({ ...prev, search: searchInput }))
   }
 
   const handleReset = () => {
-    setSearchQuery('')
-    setSelectedCategory('all')
-    setSelectedStatus('all')
-    setActiveFilters({
-        query: '',
-        category: 'all',
-        status: 'all'
-    })
+    setSearchInput('')
+    setFilters({ search: '', category_id: 'all', status: 'all' })
+    setPagination(prev => ({ ...prev, page: 1 }))
   }
-
-  const filteredTables = tables.filter(table => {
-    // 1. Text Search
-    let matchesSearch = true
-    if (activeFilters.query) {
-      const q = activeFilters.query.toLowerCase()
-      matchesSearch = (
-        table.name.toLowerCase().includes(q) ||
-        table.table_name.toLowerCase().includes(q) ||
-        (table.description && table.description.toLowerCase().includes(q))
-      )
-    }
-
-    // 2. Category Filter
-    let matchesCategory = true
-    if (activeFilters.category !== 'all') {
-      matchesCategory = table.category_id === parseInt(activeFilters.category)
-    }
-
-    // 3. Status Filter
-    let matchesStatus = true
-    if (activeFilters.status !== 'all') {
-      const isPublished = table.status === 'created' || table.status === 'CREATED'
-      const isSyncNeeded = !isPublished && table.last_published_at
-      const isDraft = !isPublished && !isSyncNeeded
-
-      if (activeFilters.status === 'published') matchesStatus = isPublished
-      if (activeFilters.status === 'sync_needed') matchesStatus = isSyncNeeded
-      if (activeFilters.status === 'draft') matchesStatus = isDraft
-    }
-
-    return matchesSearch && matchesCategory && matchesStatus
-  })
 
   // Options for custom Select components
   const categoryOptions = [
       { label: '所有分类', value: 'all' },
-      ...categories.map(c => ({ label: c.name, value: String(c.id) })) 
+      ...categories.map(c => ({ label: c.name, value: c.id })) // Value can be number now for our Select
   ]
   
   const statusOptions = [
       { label: '所有状态', value: 'all' },
-      { label: '已发布', value: 'published' },
-      { label: '待同步', value: 'sync_needed' },
-      { label: '草稿', value: 'draft' }
+      { label: '已发布', value: 'created' },
+      { label: '草稿/待同步', value: 'draft' }
   ]
   
-  const hasActiveFilters = activeFilters.query || activeFilters.category !== 'all' || activeFilters.status !== 'all'
-
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4">
-        <Loader2 className="w-12 h-12 text-primary-600 animate-spin" />
-        <p className="text-slate-500">数据表加载中，请稍候...</p>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="card text-center py-12">
-        <div className="text-red-500 text-lg font-medium mb-2">加载失败</div>
-        <p className="text-slate-500 mb-4">{error}</p>
-        <button onClick={fetchData} className="btn-primary">重试</button>
-      </div>
-    )
-  }
+  const totalPages = Math.ceil(pagination.total / pagination.pageSize)
 
   return (
     <div className="space-y-6">
@@ -215,13 +168,13 @@ function DataTableList({ onNavigate }) {
               type="text" 
               placeholder="搜索表名、物理名..." 
               className="input-field !pl-9 !pr-8 w-full"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearchCommit()}
             />
-            {searchQuery && (
+            {searchInput && (
               <button 
-                onClick={() => setSearchQuery('')}
+                onClick={() => { setSearchInput(''); handleSearchCommit() }} // Clear and trigger empty search
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100"
               >
                 <X className="w-3 h-3" />
@@ -232,24 +185,24 @@ function DataTableList({ onNavigate }) {
           {/* Category Filter */}
           <div className="w-full sm:w-40">
             <Select 
-                value={selectedCategory}
-                onChange={setSelectedCategory}
+                value={filters.category_id}
+                onChange={(val) => { setFilters(prev => ({...prev, category_id: val})); setPagination(prev => ({...prev, page: 1})); }}
                 options={categoryOptions}
                 placeholder="选择分类"
                 clearable={true}
-                onClear={() => setSelectedCategory('all')}
+                onClear={() => { setFilters(prev => ({...prev, category_id: 'all'})); setPagination(prev => ({...prev, page: 1})); }}
             />
           </div>
 
           {/* Status Filter */}
           <div className="w-full sm:w-40">
              <Select 
-                value={selectedStatus}
-                onChange={setSelectedStatus}
+                value={filters.status}
+                onChange={(val) => { setFilters(prev => ({...prev, status: val})); setPagination(prev => ({...prev, page: 1})); }}
                 options={statusOptions}
                 placeholder="选择状态"
                 clearable={true}
-                onClear={() => setSelectedStatus('all')}
+                onClear={() => { setFilters(prev => ({...prev, status: 'all'})); setPagination(prev => ({...prev, page: 1})); }}
             />
           </div>
 
@@ -265,7 +218,7 @@ function DataTableList({ onNavigate }) {
             </button>
 
             <button 
-                onClick={handleSearch}
+                onClick={handleSearchCommit}
                 className="w-24 btn-primary px-4 py-2 flex items-center justify-center gap-2 whitespace-nowrap shadow-sm hover:shadow-md transition-all"
             >
                 <Search className="w-4 h-4" />
@@ -275,105 +228,126 @@ function DataTableList({ onNavigate }) {
         </div>
       </div>
 
-      {filteredTables.length === 0 ? (
+      {loading && tables.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+           <Loader2 className="w-12 h-12 text-primary-600 animate-spin" />
+           <p className="text-slate-500">数据加载中...</p>
+        </div>
+      ) : tables.length === 0 ? (
         <div className="card text-center py-12">
-          {hasActiveFilters ? (
-             <>
-               <Search className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-               <h3 className="text-lg font-semibold text-slate-700 mb-2">未找到匹配的结果</h3>
-               <p className="text-slate-500">尝试使用不同的关键词搜索</p>
-               <button onClick={handleReset} className="mt-4 text-primary-600 hover:text-primary-700 font-medium">清除搜索</button>
-             </>
-          ) : (
-             <>
-               <Database className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-               <h3 className="text-lg font-semibold text-slate-700 mb-2">暂无数据表</h3>
-               <p className="text-slate-500 mb-4">点击"新建数据表"注册第一个数据表</p>
-             </>
-          )}
+            <Database className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-slate-700 mb-2">暂无数据表</h3>
+            <p className="text-slate-500 mb-4">没有找到匹配的数据表</p>
         </div>
       ) : (
-        <div className="card overflow-hidden p-0">
-          <table className="w-full">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="text-left px-6 py-4 text-sm font-semibold text-slate-700">显示名称</th>
-                <th className="text-left px-6 py-4 text-sm font-semibold text-slate-700">物理表名</th>
-                <th className="text-left px-6 py-4 text-sm font-semibold text-slate-700">分类</th>
-                <th className="text-left px-6 py-4 text-sm font-semibold text-slate-700">状态</th>
-                <th className="text-right px-6 py-4 text-sm font-semibold text-slate-700">操作</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredTables.map((table) => {
-                const isPublished = table.status === 'created' || table.status === 'CREATED';
-                const isSyncNeeded = !isPublished && table.last_published_at; // DRAFT + has published before = Sync Needed
-                
-                return (
-                  <tr key={table.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <span className="font-medium text-slate-800">{table.name}</span>
-                      {table.description && (
-                        <p className="text-xs text-slate-500 mt-1">{table.description}</p>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <code className="px-2 py-1 bg-slate-100 rounded text-sm text-slate-700">{table.table_name}</code>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`badge border ${getCategoryStyle(table.category_id)}`}>
-                        {getCategoryName(table.category_id)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {isPublished ? (
-                        <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium border border-emerald-200">
-                          已发布
-                        </span>
-                      ) : isSyncNeeded ? (
-                        <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium border border-purple-200 flex items-center gap-1 w-max">
-                           待同步
-                        </span>
-                      ) : (
-                        <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium border border-amber-200">
-                          草稿
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-2">
-                        {/* Publish / Sync Button */}
-                        {!isPublished && (
-                          <button 
-                            onClick={() => setPublishModal({ open: true, table, error: null })} 
-                            className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white rounded-lg transition-all shadow-sm ${
-                                isSyncNeeded 
-                                ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/20' 
-                                : 'bg-primary-600 hover:bg-primary-700 shadow-primary-500/20'
-                            }`}
-                            title={isSyncNeeded ? "同步结构变更到数据库 (新增列)" : "发布并创建物理表"}
-                          >
-                            {isSyncNeeded ? <RefreshCw className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-                            {isSyncNeeded ? '更新结构' : '发布'}
-                          </button>
+        <div className="card overflow-hidden p-0 flex flex-col min-h-[500px]">
+          <div className="overflow-x-auto flex-1">
+            <table className="w-full">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-slate-700">显示名称</th>
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-slate-700">物理表名</th>
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-slate-700">分类</th>
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-slate-700">状态</th>
+                    <th className="text-right px-6 py-4 text-sm font-semibold text-slate-700">操作</th>
+                </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                {tables.map((table) => {
+                    const isPublished = table.status === 'created' || table.status === 'CREATED';
+                    const isSyncNeeded = !isPublished && table.last_published_at; // DRAFT + has published before = Sync Needed
+                    
+                    return (
+                    <tr key={table.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-6 py-4">
+                        <span className="font-medium text-slate-800">{table.name}</span>
+                        {table.description && (
+                            <p className="text-xs text-slate-500 mt-1 line-clamp-1 max-w-xs" title={table.description}>{table.description}</p>
                         )}
-                        
-                        <button onClick={() => onNavigate('table-new', table.id)} className="btn-icon" title="复制表结构">
-                          <Copy className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => onNavigate('table-edit', table.id)} className="btn-icon" title="编辑内容">
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => setDeleteModal({ open: true, table, error: null })} className="btn-icon-danger" title="删除">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                        </td>
+                        <td className="px-6 py-4">
+                        <code className="px-2 py-1 bg-slate-100 rounded text-sm text-slate-700">{table.table_name}</code>
+                        </td>
+                        <td className="px-6 py-4">
+                        <span className={`badge border ${getCategoryStyle(table.category_id)}`}>
+                            {getCategoryName(table.category_id)}
+                        </span>
+                        </td>
+                        <td className="px-6 py-4">
+                        {isPublished ? (
+                            <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium border border-emerald-200">
+                            已发布
+                            </span>
+                        ) : isSyncNeeded ? (
+                            <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium border border-purple-200 flex items-center gap-1 w-max">
+                            待同步
+                            </span>
+                        ) : (
+                            <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium border border-amber-200">
+                            草稿
+                            </span>
+                        )}
+                        </td>
+                        <td className="px-6 py-4">
+                        <div className="flex items-center justify-end gap-2">
+                            {/* Publish / Sync Button */}
+                            {!isPublished && (
+                            <button 
+                                onClick={() => setPublishModal({ open: true, table, error: null })} 
+                                className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white rounded-lg transition-all shadow-sm ${
+                                    isSyncNeeded 
+                                    ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/20' 
+                                    : 'bg-primary-600 hover:bg-primary-700 shadow-primary-500/20'
+                                }`}
+                                title={isSyncNeeded ? "同步结构变更到数据库 (新增列)" : "发布并创建物理表"}
+                            >
+                                {isSyncNeeded ? <RefreshCw className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                                {isSyncNeeded ? '更新结构' : '发布'}
+                            </button>
+                            )}
+                            
+                            <button onClick={() => onNavigate('table-new', table.id)} className="btn-icon" title="复制表结构">
+                            <Copy className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => onNavigate('table-edit', table.id)} className="btn-icon" title="编辑内容">
+                            <Pencil className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => setDeleteModal({ open: true, table, error: null })} className="btn-icon-danger" title="删除">
+                            <Trash2 className="w-4 h-4" />
+                            </button>
+                        </div>
+                        </td>
+                    </tr>
+                    );
+                })}
+                </tbody>
+            </table>
+          </div>
+          
+          {/* Pagination Footer */}
+          <div className="border-t border-slate-200 px-6 py-4 flex items-center justify-between bg-slate-50/50">
+            <div className="text-sm text-slate-500">
+                共 <span className="font-medium text-slate-700">{pagination.total}</span> 条记录 
+                (第 {pagination.page} / {totalPages || 1} 页)
+            </div>
+            <div className="flex items-center gap-2">
+                <button 
+                    onClick={() => setPagination(p => ({ ...p, page: Math.max(1, p.page - 1) }))}
+                    disabled={pagination.page <= 1 || loading}
+                    className="p-1 rounded hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <ChevronLeft className="w-5 h-5 text-slate-600" />
+                </button>
+                <button 
+                    onClick={() => setPagination(p => ({ ...p, page: Math.min(totalPages, p.page + 1) }))}
+                    disabled={pagination.page >= totalPages || loading}
+                    className="p-1 rounded hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <ChevronRight className="w-5 h-5 text-slate-600" />
+                </button>
+            </div>
+          </div>
+
         </div>
       )}
 
