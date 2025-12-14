@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import ReactFlow, {
   ReactFlowProvider,
   addEdge,
@@ -7,110 +7,102 @@ import ReactFlow, {
   Controls,
   Background,
   MiniMap,
-  Handle,
-  Position,
-  Panel
+  MarkerType
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Settings, Trash2 } from 'lucide-react';
+import { Save } from 'lucide-react';
 import { FlowProvider, useFlowContext } from './FlowContext';
 import ConfigPanel from './ConfigPanel';
 
-// --- Custom Node Components (Keep as is) ---
-const BaseNode = ({ data, isConnectable, children, label, icon, inputs = [], outputs = [] }) => {
-  return (
-    <div className="bg-white rounded-lg shadow-lg border border-slate-200 min-w-[180px] group hover:border-primary-400 transition-colors">
-      {/* Inputs (Handles) */}
-      {inputs.map((input, i) => (
-        <div key={input.id} className="relative">
-             <Handle
-                type="target"
-                position={Position.Left}
-                id={input.id}
-                isConnectable={isConnectable}
-                className="!w-3 !h-3 !bg-slate-400 !border-2 !border-white hover:!bg-primary-500"
-                style={{ top: '50%' }}
-            />
-        </div>
-      ))}
+// Import Dify-style components
+import { nodeTypes } from './CustomNode';
+import CustomEdge from './CustomEdge';
 
-      {/* Header */}
-      <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 rounded-t-lg flex items-center justify-between handle-drag">
-        <div className="flex items-center gap-2">
-            <span className="text-lg">{icon}</span>
-            <span className="font-semibold text-sm text-slate-700">{label}</span>
-        </div>
-        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-            {/* Direct delete button on node */}
-            <button className="p-1 hover:bg-red-100 rounded text-red-500" onClick={(e) => { e.stopPropagation(); data.onDelete(); }}>
-                <Trash2 className="w-3 h-3" />
-            </button>
-        </div>
-      </div>
-
-      {/* Body */}
-      <div className="p-3 text-xs text-slate-500">
-        {children || <div className="italic">无配置参数</div>}
-      </div>
-
-      {/* Outputs (Handles) */}
-      {outputs.map((output, i) => (
-        <div key={output.id} className="relative">
-             <Handle
-                type="source"
-                position={Position.Right}
-                id={output.id}
-                isConnectable={isConnectable}
-                className="!w-3 !h-3 !bg-indigo-400 !border-2 !border-white hover:!bg-primary-500"
-                style={{ top: '50%' }}
-            />
-        </div>
-      ))}
-    </div>
-  );
-};
-
-const SourceNode = (props) => (
-  <BaseNode {...props} label="CSV Source" icon="📄" outputs={[{id: 'out'}]}>
-     路径: {props.data.path ? props.data.path.split('/').pop() : '未选择'}
-     {props.data.previewColumns && <div className="mt-1 text-[10px] text-emerald-600">已加载 {props.data.previewColumns.length} 列</div>}
-  </BaseNode>
-);
-
-const ProcessNode = (props) => (
-  <BaseNode {...props} label={props.data.label || 'Processor'} icon="⚡" inputs={[{id: 'in'}]} outputs={[{id: 'out'}]}>
-      类型: {props.data.handler === 'ColumnMappingHandler' ? '字段映射' : props.data.handler === 'DropNaHandler' ? '清洗' : '转换'}
-  </BaseNode>
-);
-
-const SinkNode = (props) => (
-  <BaseNode {...props} label="Database Save" icon="💾" inputs={[{id: 'in'}]}>
-      Table ID: {props.data.target_table_id || 'None'}
-  </BaseNode>
-);
-
-const nodeTypes = {
-  source: SourceNode,
-  processor: ProcessNode,
-  sink: SinkNode,
+const edgeTypes = {
+  custom: CustomEdge,
 };
 
 // --- Inner Editor Component (Where Context is available) ---
 
+const DraggableItem = ({ type, label, icon, color }) => (
+    <div 
+        className={`
+            flex items-center gap-2 px-3 py-2 rounded-lg cursor-grab active:cursor-grabbing 
+            bg-white border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all
+            select-none text-sm font-medium text-slate-700
+        `}
+        onDragStart={(event) => {
+            event.dataTransfer.setData('application/reactflow', type);
+            event.dataTransfer.effectAllowed = 'move';
+        }} 
+        draggable
+    >
+        <span className={`w-6 h-6 rounded flex items-center justify-center text-xs ${color} bg-opacity-20`}>{icon}</span>
+        {label}
+    </div>
+);
+
 const FlowEditorInner = ({ onSave }) => {
   const reactFlowWrapper = useRef(null);
-  const { setNodes, setEdges, setSelectedNodeId, selectedNodeId } = useFlowContext();
-  const [nodes, setNodesLocal, onNodesChange] = useNodesState([]);
-  const [edges, setEdgesLocal, onEdgesChange] = useEdgesState([]);
-  const [reactFlowInstance, setReactFlowInstance] = useState(null);
-
-  // Sync React Flow state to Context
-  // In a real app, we might merge these, but for now we pass setters to context provider wrapper
-  // Wait, useNodesState manages local state. We need to expose it.
   
-  // Let's rely on React Flow's internal state management but hook into events.
+  // Consume state from Context
+  const {
+      nodes, edges, onNodesChange, onEdgesChange, setNodes, setEdges,
+      setSelectedNodeId, selectedNodeId 
+  } = useFlowContext();
+  
+  const [reactFlowInstance, setReactFlowInstance] = useState(null);
+  const [menu, setMenu] = useState(null); // { top, left, visible, sourceNodeId, sourceHandleId }
+  const connectSourceRef = useRef(null);
+  const justConnectedRef = useRef(false); // Flag to prevent onPaneClick conflict
 
-  const onConnect = useCallback((params) => setEdgesLocal((eds) => addEdge(params, eds)), [setEdgesLocal]);
+  // 1. Connection Logic (Standard)
+  const onConnect = useCallback((params) => {
+      setEdges((eds) => addEdge({
+          ...params,
+          type: 'custom', // Use our CustomEdge
+          style: { stroke: '#cbd5e1' }, // Default color, CustomEdge handles overrides
+          markerEnd: { type: MarkerType.ArrowClosed, color: '#cbd5e1' },
+      }, eds));
+      setMenu(null); // Close menu if connected successfully
+      connectSourceRef.current = null; // Reset source
+  }, [setEdges]);
+
+  // 2. Connect Start (Track source)
+  const handleConnectStart = useCallback((_, params) => {
+      connectSourceRef.current = params;
+      justConnectedRef.current = false;
+  }, []);
+
+  // 3. Connect End (Handle drop on pane)
+  const handleConnectEnd = useCallback((event) => {
+      // Set flag to block potential subsequent click/paneClick events momentarily
+      justConnectedRef.current = true;
+      setTimeout(() => { justConnectedRef.current = false; }, 200);
+
+      const target = event.target;
+      const isHandle = target.classList.contains('react-flow__handle') || target.closest('.react-flow__handle');
+      
+      // If we dropped on a handle, do nothing (onConnect will handle it)
+      if (isHandle) return;
+
+      if (connectSourceRef.current) {
+          // Calculate position
+          const { top, left } = reactFlowWrapper.current.getBoundingClientRect();
+          // Handle both Mouse and Touch events
+          const clientX = event.clientX || event.changedTouches?.[0]?.clientX;
+          const clientY = event.clientY || event.changedTouches?.[0]?.clientY;
+
+          if (clientX && clientY) {
+              setMenu({
+                  top: clientY - top,
+                  left: clientX - left,
+                  sourceNodeId: connectSourceRef.current.nodeId,
+                  sourceHandleId: connectSourceRef.current.handleId
+              });
+          }
+      }
+  }, []);
 
   const onDragOver = useCallback((event) => {
     event.preventDefault();
@@ -135,63 +127,154 @@ const FlowEditorInner = ({ onSave }) => {
         data: { 
             label: `${type} node`, 
             onDelete: () => {
-                setNodesLocal((nds) => nds.filter((n) => n.id !== newNode.id));
+                setNodes((nds) => nds.filter((n) => n.id !== newNode.id));
                 setSelectedNodeId(null);
             } 
         },
       };
 
-      setNodesLocal((nds) => nds.concat(newNode));
+      setNodes((nds) => nds.concat(newNode));
     },
-    [reactFlowInstance, setNodesLocal, setSelectedNodeId]
+    [reactFlowInstance, setNodes, setSelectedNodeId]
   );
-
-  // Expose nodes/edges to context whenever they change (for downstream components like ConfigPanel to access latest graph)
-  // We can use a simpler approach: Pass the state setters to the Provider in the Parent component.
   
+  const addNodeFromMenu = (type) => {
+      if (!menu) return;
+      
+      const position = reactFlowInstance.screenToFlowPosition({
+          x: menu.left + reactFlowWrapper.current.getBoundingClientRect().left,
+          y: menu.top + reactFlowWrapper.current.getBoundingClientRect().top
+      });
+
+      const newNodeId = `node_${Date.now()}`;
+      const newNode = {
+          id: newNodeId,
+          type,
+          position,
+          data: { 
+             label: `${type} node`,
+             onDelete: () => setNodes((nds) => nds.filter((n) => n.id !== newNodeId))
+          }
+      };
+
+      setNodes((nds) => nds.concat(newNode));
+      
+      // Auto Connect
+      if (menu.sourceNodeId) {
+          setEdges((eds) => addEdge({
+              source: menu.sourceNodeId,
+              sourceHandle: menu.sourceHandleId,
+              target: newNodeId,
+              targetHandle: 'in', // Assume 'in' is the default input handle
+              type: 'custom',
+              style: { stroke: '#cbd5e1' },
+              markerEnd: { type: MarkerType.ArrowClosed, color: '#cbd5e1' },
+          }, eds));
+      }
+
+      setMenu(null);
+      connectSourceRef.current = null;
+  };
+  
+  // Close menu on click pane
+  const onPaneClick = useCallback(() => {
+      if (justConnectedRef.current) return; // Ignore click if it came from connection end
+      setSelectedNodeId(null);
+      setMenu(null);
+  }, [setSelectedNodeId]);
+
   return (
-    <div className="w-full h-full flex flex-col relative">
+    <div className="w-full h-full flex flex-col relative bg-slate-50/50">
        {/* Toolbar */}
-       <div className="h-12 border-b border-slate-200 bg-white flex items-center px-4 gap-4 shadow-sm z-10 shrink-0">
-           <span className="font-bold text-slate-700">Canvas</span>
-           <div className="h-6 w-px bg-slate-200"></div>
-           <div className="flex gap-2">
-               <div className="draggable-node px-3 py-1 bg-slate-100 border border-slate-300 rounded cursor-grab text-xs font-medium hover:bg-slate-200" onDragStart={(event) => event.dataTransfer.setData('application/reactflow', 'source')} draggable>
-                  📄 Source
-               </div>
-               <div className="draggable-node px-3 py-1 bg-slate-100 border border-slate-300 rounded cursor-grab text-xs font-medium hover:bg-slate-200" onDragStart={(event) => event.dataTransfer.setData('application/reactflow', 'processor')} draggable>
-                  ⚡ Processor
-               </div>
-               <div className="draggable-node px-3 py-1 bg-slate-100 border border-slate-300 rounded cursor-grab text-xs font-medium hover:bg-slate-200" onDragStart={(event) => event.dataTransfer.setData('application/reactflow', 'sink')} draggable>
-                  💾 Sink
-               </div>
+       <div className="h-16 border-b border-slate-200 bg-white/80 backdrop-blur-sm flex items-center px-6 gap-6 shadow-sm z-10 shrink-0">
+           <div className="flex flex-col">
+                <span className="font-bold text-slate-800 text-lg tracking-tight">Pipeline Canvas</span>
+                <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Visual Editor</span>
            </div>
-           <div className="ml-auto">
-               <button onClick={() => onSave(nodes, edges)} className="text-xs bg-primary-600 text-white px-3 py-1.5 rounded hover:bg-primary-700">Save Graph</button>
+           
+           <div className="h-8 w-px bg-slate-200 mx-2"></div>
+           
+           <div className="flex gap-3">
+               <DraggableItem type="source" label="数据源" icon="📄" color="bg-blue-100 text-blue-600" />
+               <DraggableItem type="processor" label="处理器" icon="⚡" color="bg-purple-100 text-purple-600" />
+               <DraggableItem type="sink" label="存储" icon="💾" color="bg-rose-100 text-rose-600" />
+           </div>
+           
+           <div className="ml-auto flex items-center gap-3">
+                <div className="text-xs text-slate-400 mr-2 hidden lg:block">
+                    提示: 拖拽节点到画布, 点击配置参数
+                </div>
+               <button 
+                onClick={() => onSave(nodes, edges)} 
+                className="btn-primary px-4 py-2 flex items-center gap-2 text-sm shadow-lg shadow-primary-500/20"
+               >
+                 <Save className="w-4 h-4" />
+                 保存配置
+               </button>
            </div>
        </div>
 
        {/* Canvas */}
-       <div className="flex-1 bg-slate-50 relative" ref={reactFlowWrapper}>
+       <div className="flex-1 relative" ref={reactFlowWrapper}>
             <ReactFlow
                 nodes={nodes}
                 edges={edges}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
+                onConnectStart={handleConnectStart}
+                onConnectEnd={handleConnectEnd}
                 onInit={setReactFlowInstance}
                 onDrop={onDrop}
                 onDragOver={onDragOver}
-                onNodeClick={(_, node) => setSelectedNodeId(node.id)}
-                onPaneClick={() => setSelectedNodeId(null)}
+                onNodeClick={(_, node) => {
+                    setSelectedNodeId(node.id);
+                    setMenu(null);
+                }}
+                onPaneClick={onPaneClick}
                 nodeTypes={nodeTypes}
+                edgeTypes={edgeTypes}
                 fitView
+                panOnScroll={true}
+                selectionOnDrag={true}
+                zoomOnScroll={false}
+                zoomOnDoubleClick={false}
+                minZoom={0.1}
+                style={{ backgroundColor: 'var(--color-workflow-canvas-workflow-bg)' }}
             >
-                <Controls />
-                <MiniMap />
-                <Background variant="dots" gap={12} size={1} />
+                <Controls className="bg-white border border-slate-200 shadow-md rounded-lg overflow-hidden !m-4" />
+                <MiniMap 
+                    className="!bg-slate-50 border border-slate-200 shadow-lg rounded-lg overflow-hidden !m-4" 
+                    maskColor="rgba(240, 242, 245, 0.7)"
+                    nodeColor={(n) => {
+                        if (n.type === 'source') return '#3b82f6';
+                        if (n.type === 'sink') return '#f43f5e';
+                        return '#a855f7';
+                    }}
+                />
+                <Background variant="dots" gap={20} size={1} color="var(--color-workflow-canvas-workflow-dot-color)" />
             </ReactFlow>
             
+            {/* Quick Add Menu (Drop-to-connect) */}
+            {menu && (
+                <div 
+                    className="absolute bg-white rounded-lg shadow-xl border border-slate-200 p-1 z-50 flex flex-col gap-1 w-40 animate-in fade-in zoom-in-95 duration-150"
+                    style={{ top: menu.top, left: menu.left }}
+                >
+                    <div className="px-2 py-1 text-[10px] text-slate-400 font-semibold uppercase tracking-wider border-b border-slate-100 mb-1">
+                        添加后续节点
+                    </div>
+                    <button onClick={() => addNodeFromMenu('processor')} className="text-left px-3 py-2 hover:bg-slate-50 rounded flex items-center gap-2 text-xs font-medium text-slate-700">
+                        <span className="w-4 h-4 rounded bg-purple-100 text-purple-600 flex items-center justify-center text-[10px]">⚡</span>
+                        处理器 (Processor)
+                    </button>
+                    <button onClick={() => addNodeFromMenu('sink')} className="text-left px-3 py-2 hover:bg-slate-50 rounded flex items-center gap-2 text-xs font-medium text-slate-700">
+                         <span className="w-4 h-4 rounded bg-rose-100 text-rose-600 flex items-center justify-center text-[10px]">💾</span>
+                        数据存储 (Sink)
+                    </button>
+                </div>
+            )}
+
             {/* Config Panel Drawer */}
             {selectedNodeId && <ConfigPanel />}
        </div>
@@ -201,53 +284,32 @@ const FlowEditorInner = ({ onSave }) => {
 
 // --- Wrapper Component ---
 
+const FlowContextWrapper = ({ children, initialNodes, initialEdges }) => {
+    // Manage state here so FlowProvider can access it
+    const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes || []);
+    const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges || []);
+
+    return (
+        <FlowProvider 
+            nodes={nodes} 
+            edges={edges} 
+            setNodes={setNodes} 
+            setEdges={setEdges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+        >
+            {children}
+        </FlowProvider>
+    );
+};
+
 export default function FlowEditor({ initialNodes, initialEdges, onSave }) {
-    // We lift the state up here or let FlowProvider manage it?
-    // Actually, React Flow manages its own state via hooks.
-    // The Context needs access to nodes to calculate schema.
-    
-    // To make things simple: We render FlowProvider, and inside it we render ReactFlowProvider and our Editor.
-    // But `useNodesState` must be inside ReactFlowProvider usually? No, it's a standalone hook.
-    
-    // The issue: ConfigPanel needs access to `nodes`. 
-    // `useNodes()` hook only works inside <ReactFlowProvider>.
-    
     return (
         <ReactFlowProvider>
-            <FlowContextWrapper initialNodes={initialNodes} initialEdges={initialEdges} onSave={onSave}>
+            <FlowContextWrapper initialNodes={initialNodes} initialEdges={initialEdges}>
                 <FlowEditorInner onSave={onSave} />
             </FlowContextWrapper>
         </ReactFlowProvider>
     );
-}
-
-// Helper to bridge Context and React Flow state
-const FlowContextWrapper = ({ children, initialNodes, initialEdges }) => {
-    // We can't access React Flow state here easily without using useNodes() which works inside ReactFlowProvider
-    const nodes = useNodesState(initialNodes || [])[0]; // Just initial? No.
-    
-    // Better approach: FlowEditorInner manages state and renders ContextProvider passing the state down?
-    // No, FlowProvider is the parent.
-    
-    // Correct Architecture:
-    // FlowEditor (Component)
-    //   -> ReactFlowProvider
-    //      -> FlowProvider (Our Custom Context)
-    //         -> FlowEditorInner (Contains ReactFlow + ConfigPanel)
-    
-    // But how does FlowProvider get `nodes`? 
-    // It can use `useNodes()` from ReactFlow!
-    
-    const nodesFromRF = useNodes(); // This works because we are inside ReactFlowProvider
-    const edgesFromRF = useEdges();
-    
-    // However, `useNodes()` only returns nodes if they are managed by React Flow internal store.
-    // When using `useNodesState` (controlled mode), we are responsible for the state.
-    
-    // Let's keep it simple: FlowEditorInner uses `useNodesState`.
-    // We pass `nodes` and `edges` to FlowProvider as props.
-    // But `nodes` change.
-    
-    return <>{children}</>; 
 }
 

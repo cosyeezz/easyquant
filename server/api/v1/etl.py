@@ -36,6 +36,7 @@ class ETLTaskConfigBase(BaseModel):
     source_type: str
     source_config: dict
     pipeline_config: List[dict]
+    graph_config: dict | None = None
     batch_size: int | None = 1000
     schedule: str | None = None
 

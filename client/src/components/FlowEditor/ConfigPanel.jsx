@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useFlowContext } from './FlowContext';
-import { useNodes } from 'reactflow';
 import { X, Save } from 'lucide-react';
 import { MappingEditor, SubsetEditor, TypeConversionEditor, DatabaseSaveEditor } from '../HandlerEditors';
 import FilePathPicker from '../FilePathPicker';
 import api from '../../services/api';
 
 export default function ConfigPanel() {
-  const { selectedNodeId, setSelectedNodeId, getUpstreamInfo, updateNodeSchema } = useFlowContext();
-  const nodes = useNodes();
+  const { selectedNodeId, setSelectedNodeId, getUpstreamInfo, updateNodeSchema, nodes, setNodes } = useFlowContext();
   const selectedNode = nodes.find(n => n.id === selectedNodeId);
   const [dataTables, setDataTables] = useState([]);
 
@@ -25,14 +23,19 @@ export default function ConfigPanel() {
   const inputColumns = upstreamInfo['in']?.columns || []; // 获取上游传过来的列名列表
 
   const handleUpdate = (newParams) => {
-    // 更新 Node Data
-    selectedNode.data = { ...selectedNode.data, ...newParams };
-    // Force update? React Flow nodes state is managed internally, 
-    // we need to use setNodes from context to trigger re-render if we want to reflect changes immediately
-    // But usually data mutation works if we don't need immediate UI repaint of the node itself.
-    // For schema propagation, we need to recalculate schema here.
-    
+    // Immutable Update using setNodes
+    setNodes(nds => nds.map(node => {
+        if (node.id === selectedNodeId) {
+            return {
+                ...node,
+                data: { ...node.data, ...newParams }
+            };
+        }
+        return node;
+    }));
+
     // RE-CALCULATE SCHEMA based on new params
+    // Note: We use newParams directly because state update might be async
     if (selectedNode.type === 'source') {
         if (newParams.previewColumns) {
             updateNodeSchema(selectedNodeId, { out: newParams.previewColumns });

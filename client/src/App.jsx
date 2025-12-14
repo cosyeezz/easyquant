@@ -1,14 +1,15 @@
 import { useState } from 'react'
-import { Activity, Database, Server, Table2, Cpu, Layers } from 'lucide-react'
+import { Activity, Database, Server, Table2, Cpu, Layers, Workflow } from 'lucide-react'
 import ProcessMonitor from './components/ProcessMonitor'
 import ETLTaskList from './components/ETLTaskList'
 import ETLTaskEditor from './components/ETLTaskEditor'
 import DataTableList from './components/DataTableList'
 import DataTableEditor from './components/DataTableEditor'
+import DifyCanvas from './components/DifyCanvas'
 import { useWebSocket } from './hooks/useWebSocket'
 
 function App() {
-  const [activeTab, setActiveTab] = useState('etl')
+  const [activeTab, setActiveTab] = useState('dify-canvas') // Default to new canvas for testing
   const [editId, setEditId] = useState(null)
   
   // Global WebSocket Connection (for System Status)
@@ -23,7 +24,28 @@ function App() {
     { id: 'tables', name: '数据表', icon: Table2 },
     { id: 'etl', name: 'ETL任务', icon: Database },
     { id: 'monitor', name: '进程监控', icon: Activity },
+    { id: 'dify-canvas', name: 'Dify 画布', icon: Workflow },
   ]
+
+  // Special full-screen mode for Dify Canvas
+  if (activeTab === 'dify-canvas') {
+      return (
+          <div className="w-full h-screen flex flex-col">
+              {/* Minimal Header for Navigation Back */}
+              <div className="bg-white border-b border-divider-subtle px-4 py-2 flex items-center justify-between z-50 shadow-sm">
+                  <div className="flex items-center gap-4">
+                     <button onClick={() => setActiveTab('etl')} className="text-text-tertiary hover:text-text-primary text-sm">
+                        ← Back to App
+                     </button>
+                     <h1 className="font-semibold text-text-primary">Dify Workflow Canvas</h1>
+                  </div>
+              </div>
+              <div className="flex-1 relative overflow-hidden">
+                 <DifyCanvas />
+              </div>
+          </div>
+      )
+  }
 
   return (
     <div className="min-h-screen">

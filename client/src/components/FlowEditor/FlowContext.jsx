@@ -4,7 +4,7 @@ import api from '../../services/api';
 
 const FlowContext = createContext(null);
 
-export const FlowProvider = ({ children, nodes, edges, setNodes, setEdges }) => {
+export const FlowProvider = ({ children, nodes, edges, setNodes, setEdges, onNodesChange, onEdgesChange }) => {
   // nodeSchemas: { [nodeId]: { inputs: { portId: ['col1', 'col2'] }, outputs: { portId: ['col1'] } } }
   const [nodeSchemas, setNodeSchemas] = useState({});
   const [selectedNodeId, setSelectedNodeId] = useState(null);
@@ -55,14 +55,17 @@ export const FlowProvider = ({ children, nodes, edges, setNodes, setEdges }) => 
 
   return (
     <FlowContext.Provider value={{ 
+        nodes,
+        edges,
+        onNodesChange,
+        onEdgesChange,
+        setNodes,
+        setEdges,
         nodeSchemas, 
         updateNodeSchema, 
         getUpstreamInfo,
         selectedNodeId,
-        setSelectedNodeId,
-        // 透传 React Flow 的状态修改器以便在 Context 内部操作
-        setNodes,
-        setEdges
+        setSelectedNodeId
     }}>
       {children}
     </FlowContext.Provider>

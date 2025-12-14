@@ -23,6 +23,10 @@ class ETLTaskConfig(Base):
     # pipeline_config 示例: [{"name": "ColumnMapping", "params": {...}}, ...]
     # 这是一个有序列表，定义了处理器链
     pipeline_config = Column(JSON, nullable=False, default=[], comment="处理链路配置")
+
+    # --- Graph / 前端图编辑器配置 ---
+    # 存储 ReactFlow 的 nodes, edges, viewport 等信息，用于前端还原画布
+    graph_config = Column(JSON, nullable=True, default={}, comment="前端图编辑器数据")
     
     # --- 运行参数 ---
     batch_size = Column(Integer, default=1000, comment="批次处理大小")
