@@ -1,0 +1,354 @@
+/**
+ * EasyQuant Design System - CSS Variables
+ * 冷静数据驱动风格 (Data-Driven Precision)
+ */
+
+:root {
+  /* ========================================
+     BACKGROUNDS - 背景层级
+     ======================================== */
+  --eq-bg-base: #0D0F12;
+  --eq-bg-surface: #151921;
+  --eq-bg-elevated: #1C2230;
+  --eq-bg-overlay: #252D3A;
+
+  /* ========================================
+     BORDERS - 边框
+     ======================================== */
+  --eq-border-subtle: #2A3441;
+  --eq-border-default: #3D4A5C;
+  --eq-border-strong: #5A6B7D;
+
+  /* ========================================
+     TEXT - 文字
+     ======================================== */
+  --eq-text-primary: #F0F2F5;
+  --eq-text-secondary: #9BA3B0;
+  --eq-text-muted: #5F6B7A;
+  --eq-text-inverse: #0D0F12;
+
+  /* ========================================
+     PRIMARY - 主色 (蓝色系)
+     ======================================== */
+  --eq-primary-50: #E6F0FF;
+  --eq-primary-100: #B3D1FF;
+  --eq-primary-200: #80B3FF;
+  --eq-primary-300: #4D94FF;
+  --eq-primary-400: #3385FF;
+  --eq-primary-500: #2979FF;
+  --eq-primary-600: #1565E6;
+  --eq-primary-700: #0D47A1;
+  --eq-primary-800: #0A3A82;
+  --eq-primary-900: #072D63;
+
+  /* ========================================
+     SUCCESS - 成功/盈利 (绿色系)
+     ======================================== */
+  --eq-success-bg: #0D2818;
+  --eq-success-border: #1B5E30;
+  --eq-success-50: #0D2818;
+  --eq-success-100: #134D26;
+  --eq-success-200: #1B5E30;
+  --eq-success-300: #22C55E;
+  --eq-success-400: #4ADE80;
+  --eq-success-500: #22C55E;
+  --eq-success-600: #16A34A;
+  --eq-success-text: #4ADE80;
+
+  /* ========================================
+     DANGER - 危险/亏损 (红色系)
+     ======================================== */
+  --eq-danger-bg: #2D1215;
+  --eq-danger-border: #7F1D1D;
+  --eq-danger-50: #2D1215;
+  --eq-danger-100: #450A0A;
+  --eq-danger-200: #7F1D1D;
+  --eq-danger-300: #DC2626;
+  --eq-danger-400: #F87171;
+  --eq-danger-500: #EF4444;
+  --eq-danger-600: #DC2626;
+  --eq-danger-text: #F87171;
+
+  /* ========================================
+     WARNING - 警告 (黄色系)
+     ======================================== */
+  --eq-warning-bg: #2D2305;
+  --eq-warning-border: #854D0E;
+  --eq-warning-50: #2D2305;
+  --eq-warning-100: #422006;
+  --eq-warning-200: #854D0E;
+  --eq-warning-300: #D97706;
+  --eq-warning-400: #FBBF24;
+  --eq-warning-500: #F59E0B;
+  --eq-warning-600: #D97706;
+  --eq-warning-text: #FBBF24;
+
+  /* ========================================
+     INFO - 信息 (浅蓝色系)
+     ======================================== */
+  --eq-info-bg: #0C1929;
+  --eq-info-border: #1E40AF;
+  --eq-info-text: #60A5FA;
+
+  /* ========================================
+     SPACING - 间距系统 (8px grid)
+     ======================================== */
+  --eq-space-1: 4px;
+  --eq-space-2: 8px;
+  --eq-space-3: 12px;
+  --eq-space-4: 16px;
+  --eq-space-5: 20px;
+  --eq-space-6: 24px;
+  --eq-space-8: 32px;
+  --eq-space-10: 40px;
+  --eq-space-12: 48px;
+
+  /* ========================================
+     TYPOGRAPHY - 字体
+     ======================================== */
+  --eq-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --eq-font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace;
+
+  /* Font Sizes */
+  --eq-text-display: 28px;
+  --eq-text-h1: 22px;
+  --eq-text-h2: 18px;
+  --eq-text-h3: 15px;
+  --eq-text-body: 14px;
+  --eq-text-sm: 13px;
+  --eq-text-xs: 12px;
+
+  /* ========================================
+     BORDER RADIUS - 圆角
+     ======================================== */
+  --eq-radius-sm: 4px;
+  --eq-radius-md: 6px;
+  --eq-radius-lg: 8px;
+  --eq-radius-xl: 12px;
+
+  /* ========================================
+     TRANSITIONS - 过渡动画
+     ======================================== */
+  --eq-transition-fast: 150ms ease;
+  --eq-transition-normal: 200ms ease;
+  --eq-transition-slow: 300ms ease;
+}
+
+/* ========================================
+   DARK THEME BASE STYLES
+   ======================================== */
+.eq-dark {
+  background-color: var(--eq-bg-base);
+  color: var(--eq-text-primary);
+}
+
+/* ========================================
+   COMPONENT STYLES
+   ======================================== */
+
+/* Card */
+.eq-card {
+  background-color: var(--eq-bg-surface);
+  border: 1px solid var(--eq-border-subtle);
+  border-radius: var(--eq-radius-lg);
+  padding: var(--eq-space-5);
+  transition: border-color var(--eq-transition-fast);
+}
+
+.eq-card:hover {
+  border-color: var(--eq-border-default);
+}
+
+/* Input */
+.eq-input {
+  background-color: var(--eq-bg-surface);
+  border: 1px solid var(--eq-border-subtle);
+  border-radius: var(--eq-radius-md);
+  color: var(--eq-text-primary);
+  font-size: var(--eq-text-body);
+  height: 40px;
+  padding: 0 var(--eq-space-3);
+  transition: border-color var(--eq-transition-fast), box-shadow var(--eq-transition-fast);
+}
+
+.eq-input::placeholder {
+  color: var(--eq-text-muted);
+}
+
+.eq-input:focus {
+  border-color: var(--eq-primary-500);
+  box-shadow: 0 0 0 3px rgba(41, 121, 255, 0.2);
+  outline: none;
+}
+
+/* Button Primary */
+.eq-btn-primary {
+  background-color: var(--eq-primary-500);
+  border: none;
+  border-radius: var(--eq-radius-md);
+  color: white;
+  cursor: pointer;
+  font-size: var(--eq-text-body);
+  font-weight: 500;
+  height: 40px;
+  padding: 0 var(--eq-space-4);
+  transition: background-color var(--eq-transition-fast);
+}
+
+.eq-btn-primary:hover {
+  background-color: var(--eq-primary-600);
+}
+
+/* Button Secondary */
+.eq-btn-secondary {
+  background-color: transparent;
+  border: 1px solid var(--eq-border-default);
+  border-radius: var(--eq-radius-md);
+  color: var(--eq-text-primary);
+  cursor: pointer;
+  font-size: var(--eq-text-body);
+  font-weight: 500;
+  height: 40px;
+  padding: 0 var(--eq-space-4);
+  transition: all var(--eq-transition-fast);
+}
+
+.eq-btn-secondary:hover {
+  background-color: var(--eq-bg-elevated);
+  border-color: var(--eq-border-strong);
+}
+
+/* Table */
+.eq-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.eq-table th {
+  background-color: var(--eq-bg-surface);
+  border-bottom: 1px solid var(--eq-border-subtle);
+  color: var(--eq-text-secondary);
+  font-size: var(--eq-text-sm);
+  font-weight: 500;
+  padding: var(--eq-space-3) var(--eq-space-4);
+  text-align: left;
+}
+
+.eq-table td {
+  border-bottom: 1px solid var(--eq-border-subtle);
+  color: var(--eq-text-primary);
+  font-size: var(--eq-text-sm);
+  padding: var(--eq-space-3) var(--eq-space-4);
+}
+
+.eq-table tr:nth-child(odd) {
+  background-color: var(--eq-bg-base);
+}
+
+.eq-table tr:nth-child(even) {
+  background-color: var(--eq-bg-surface);
+}
+
+.eq-table tr:hover {
+  background-color: var(--eq-bg-elevated);
+}
+
+/* Status Indicator */
+.eq-status {
+  align-items: center;
+  display: inline-flex;
+  font-size: var(--eq-text-xs);
+  font-weight: 500;
+  gap: var(--eq-space-2);
+}
+
+.eq-status-dot {
+  border-radius: 50%;
+  height: 8px;
+  width: 8px;
+}
+
+.eq-status-online .eq-status-dot {
+  animation: pulse-green 2s infinite;
+  background-color: var(--eq-success-500);
+}
+
+.eq-status-offline .eq-status-dot {
+  background-color: var(--eq-text-muted);
+}
+
+.eq-status-warning .eq-status-dot {
+  animation: pulse-yellow 2s infinite;
+  background-color: var(--eq-warning-500);
+}
+
+@keyframes pulse-green {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+  50% { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0); }
+}
+
+@keyframes pulse-yellow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+  50% { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0); }
+}
+
+/* Badge / Tag */
+.eq-badge {
+  border-radius: var(--eq-radius-sm);
+  font-size: var(--eq-text-xs);
+  font-weight: 500;
+  padding: var(--eq-space-1) var(--eq-space-2);
+}
+
+.eq-badge-primary {
+  background-color: rgba(41, 121, 255, 0.15);
+  color: var(--eq-primary-400);
+}
+
+.eq-badge-success {
+  background-color: var(--eq-success-bg);
+  color: var(--eq-success-text);
+}
+
+.eq-badge-danger {
+  background-color: var(--eq-danger-bg);
+  color: var(--eq-danger-text);
+}
+
+.eq-badge-warning {
+  background-color: var(--eq-warning-bg);
+  color: var(--eq-warning-text);
+}
+
+/* Progress Bar (for CPU/MEM indicators) */
+.eq-progress {
+  background-color: var(--eq-bg-elevated);
+  border-radius: 2px;
+  height: 4px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.eq-progress-bar {
+  border-radius: 2px;
+  height: 100%;
+  transition: width var(--eq-transition-normal);
+}
+
+.eq-progress-success .eq-progress-bar {
+  background-color: var(--eq-success-500);
+}
+
+.eq-progress-warning .eq-progress-bar {
+  background-color: var(--eq-warning-500);
+}
+
+.eq-progress-danger .eq-progress-bar {
+  background-color: var(--eq-danger-500);
+}
+
+/* Monospace Numbers */
+.eq-mono {
+  font-family: var(--eq-font-mono);
+  font-feature-settings: 'tnum' 1;
+}

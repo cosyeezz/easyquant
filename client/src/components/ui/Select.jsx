@@ -48,8 +48,8 @@ export default function Select({
   }
 
   return (
-    <div 
-      className={`relative ${className}`} 
+    <div
+      className={`relative ${className}`}
       ref={containerRef}
     >
       {/* Trigger Button */}
@@ -58,35 +58,35 @@ export default function Select({
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
         className={`
-          w-full flex items-center justify-between px-3 py-2 text-left bg-white border rounded-lg shadow-sm transition-all group
-          ${disabled ? 'bg-slate-50 text-slate-400 cursor-not-allowed border-slate-200' : 'hover:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:border-primary-500 cursor-pointer'}
-          ${isOpen ? 'border-primary-500 ring-2 ring-primary-100' : 'border-slate-300'}
+          w-full flex items-center justify-between px-3 py-2 text-left bg-eq-surface border rounded-md transition-all group
+          ${disabled ? 'bg-eq-elevated text-eq-text-muted cursor-not-allowed border-eq-border-subtle' : 'hover:border-eq-border-default focus:ring-2 focus:ring-eq-primary-500/20 focus:border-eq-primary-500 cursor-pointer'}
+          ${isOpen ? 'border-eq-primary-500 ring-2 ring-eq-primary-500/20' : 'border-eq-border-subtle'}
         `}
       >
-        <span className={`block truncate ${!selectedOption ? 'text-slate-400' : 'text-slate-700'} ${showClear ? 'pr-6' : ''}`}>
+        <span className={`block truncate ${!selectedOption ? 'text-eq-text-muted' : 'text-eq-text-primary'} ${showClear ? 'pr-6' : ''}`}>
           {displayLabel}
         </span>
-        
+
         <div className="flex items-center absolute right-2 top-1/2 -translate-y-1/2">
             {showClear && (
-                <span 
+                <span
                     onClick={handleClear}
-                    className="p-0.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 mr-1 z-10"
+                    className="p-0.5 rounded-full text-eq-text-muted hover:text-eq-text-primary hover:bg-eq-elevated mr-1 z-10"
                     title="清除"
                 >
                     <X className="w-3 h-3" />
                 </span>
             )}
-            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-4 h-4 text-eq-text-muted transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
         </div>
       </button>
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-auto animate-fadeIn">
+        <div className="absolute z-50 w-full mt-1 bg-eq-elevated border border-eq-border-subtle rounded-md max-h-60 overflow-auto animate-fadeIn">
           <ul className="py-1">
             {options.length === 0 ? (
-              <li className="px-3 py-2 text-sm text-slate-400 text-center">无选项</li>
+              <li className="px-3 py-2 text-sm text-eq-text-muted text-center">无选项</li>
             ) : (
               options.map((opt) => (
                 <li key={opt.value}>
@@ -95,11 +95,11 @@ export default function Select({
                     onClick={() => handleSelect(opt.value)}
                     className={`
                       w-full flex items-center justify-between px-3 py-2 text-sm transition-colors
-                      ${opt.value === value ? 'bg-primary-50 text-primary-700 font-medium' : 'text-slate-700 hover:bg-slate-50 hover:text-primary-600'}
+                      ${opt.value === value ? 'bg-eq-primary-500/15 text-eq-primary-400 font-medium' : 'text-eq-text-primary hover:bg-eq-surface hover:text-eq-primary-400'}
                     `}
                   >
                     <span className="truncate">{opt.label}</span>
-                    {opt.value === value && <Check className="w-4 h-4 text-primary-600" />}
+                    {opt.value === value && <Check className="w-4 h-4 text-eq-primary-400" />}
                   </button>
                 </li>
               ))

@@ -80,4 +80,5 @@ npm run dev
 - React 18, Vite, Tailwind CSS
 - **React Flow**: 核心图引擎
 - **WebSocket**: 实时通信
+- **主题系统**: 深色/浅色主题切换，CSS 变量驱动
 - Lucide React: 图标库

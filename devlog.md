@@ -1,3 +1,41 @@
+# 开发日志 (2025-12-21) [NEW]
+
+## 全站视觉系统升级 - 深色主题
+
+本次更新实现了完整的**设计系统 (Design System)** 和**主题切换功能**。
+
+### 1. 设计系统 (Design Tokens)
+- **色彩系统**: 定义了完整的语义化颜色变量
+  - 背景层级: `base`, `surface`, `elevated`, `overlay`
+  - 边框层级: `subtle`, `default`, `strong`
+  - 文字层级: `primary`, `secondary`, `muted`
+  - 语义色: `success`, `danger`, `warning`, `info`
+- **字体系统**:
+  - 界面字体: Inter + PingFang SC
+  - 等宽字体: JetBrains Mono (数字/代码)
+- **组件规范**: 统一了按钮、输入框、卡片、表格、Badge 等组件样式
+
+### 2. 深色/浅色主题切换
+- **ThemeContext**: 实现了 React Context 管理主题状态
+- **CSS 变量**: 通过 `:root.dark` / `:root.light` 切换整套色彩
+- **持久化**: 主题选择保存在 localStorage
+- **切换按钮**: Header 右上角添加太阳/月亮图标切换
+
+### 3. 文件变更
+- `client/src/styles/design-tokens.css` - CSS 变量定义
+- `client/src/contexts/ThemeContext.jsx` - 主题状态管理
+- `client/src/index.css` - 全局样式重构
+- `client/tailwind.config.js` - Tailwind 扩展配置
+- `client/src/App.jsx` - 主题切换按钮
+- `client/src/components/DataTableList.jsx` - 深色主题适配
+- `client/src/components/ui/Select.jsx` - 深色主题适配
+- `client/DESIGN_SYSTEM.md` - 设计系统文档
+
+### 4. 数据库修复
+- 添加 `etl_task_configs.graph_config` 列修复 500 错误
+
+---
+
 # 开发日志 (2025-12-14 Update 2) [NEW]
 
 ## 交互与布局引擎升级

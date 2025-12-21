@@ -2,6 +2,7 @@
 import { difyColors } from './dify-colors.js';
 
 export default {
+  darkMode: 'class',
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -10,6 +11,45 @@ export default {
     extend: {
       colors: {
         ...difyColors,
+        // EasyQuant Theme - CSS Variables for light/dark mode
+        eq: {
+          // Backgrounds
+          base: 'var(--eq-bg-base)',
+          surface: 'var(--eq-bg-surface)',
+          elevated: 'var(--eq-bg-elevated)',
+          overlay: 'var(--eq-bg-overlay)',
+          // Borders
+          'border-subtle': 'var(--eq-border-subtle)',
+          'border-default': 'var(--eq-border-default)',
+          'border-strong': 'var(--eq-border-strong)',
+          // Text
+          'text-primary': 'var(--eq-text-primary)',
+          'text-secondary': 'var(--eq-text-secondary)',
+          'text-muted': 'var(--eq-text-muted)',
+          // Primary (Blue)
+          'primary-400': 'var(--eq-primary-400)',
+          'primary-500': 'var(--eq-primary-500)',
+          'primary-600': 'var(--eq-primary-600)',
+          // Success (Green)
+          'success-bg': 'var(--eq-success-bg)',
+          'success-border': 'var(--eq-success-border)',
+          'success-text': 'var(--eq-success-text)',
+          'success-solid': 'var(--eq-success-solid)',
+          // Danger (Red)
+          'danger-bg': 'var(--eq-danger-bg)',
+          'danger-border': 'var(--eq-danger-border)',
+          'danger-text': 'var(--eq-danger-text)',
+          'danger-solid': 'var(--eq-danger-solid)',
+          // Warning (Yellow)
+          'warning-bg': 'var(--eq-warning-bg)',
+          'warning-border': 'var(--eq-warning-border)',
+          'warning-text': 'var(--eq-warning-text)',
+          'warning-solid': 'var(--eq-warning-solid)',
+          // Info (Light Blue)
+          'info-bg': 'var(--eq-info-bg)',
+          'info-border': 'var(--eq-info-border)',
+          'info-text': 'var(--eq-info-text)',
+        },
         // Dify Standard Palettes
         gray: {
           25: '#fcfcfd',
@@ -126,9 +166,26 @@ export default {
       },
       fontFamily: {
         instrument: ['var(--font-instrument-serif)', 'serif'],
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'PingFang SC', 'Microsoft YaHei', 'sans-serif'],
+        mono: ['JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', 'monospace'],
       },
       fontSize: {
         '2xs': '0.625rem',
+        'display': ['28px', { lineHeight: '1.2', fontWeight: '600' }],
+        'h1': ['22px', { lineHeight: '1.3', fontWeight: '600' }],
+        'h2': ['18px', { lineHeight: '1.4', fontWeight: '600' }],
+        'h3': ['15px', { lineHeight: '1.4', fontWeight: '500' }],
+      },
+      spacing: {
+        '4.5': '18px',
+        '13': '52px',
+        '15': '60px',
+      },
+      borderRadius: {
+        'eq-sm': '4px',
+        'eq-md': '6px',
+        'eq-lg': '8px',
+        'eq-xl': '12px',
       },
       backgroundImage: {
         'chatbot-bg': 'var(--color-chatbot-bg)',
