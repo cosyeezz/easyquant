@@ -1,8 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ArrowLeft, ArrowRight, Save, Loader2, Eye } from 'lucide-react'
 import api from '../services/api'
 import FilePathPicker from './FilePathPicker'
-import FlowEditor from './FlowEditor'
+// --- New Workflow Integration ---
+import { WorkflowWithInnerContext } from './workflow/index'
+import { availableNodesMetaData } from './workflow/node-defaults'
+import { EventEmitterContextProvider } from '../context/event-emitter'
+import { CUSTOM_NODE } from './workflow/constants'
+import { BlockEnum } from './workflow/types'
 
 function ETLTaskEditor({ taskId, onNavigate }) {
   const [step, setStep] = useState(1)
@@ -23,11 +28,11 @@ function ETLTaskEditor({ taskId, onNavigate }) {
     batch_size: 1000,
     workers: 1,
     pipeline_config: [],
+    graph_config: { nodes: [], edges: [] }
   })
 
   useEffect(() => {
     api.getHandlers().then(setHandlers).catch(console.error)
-    // Fetch all tables (large page_size) for dropdown
     api.getDataTables({ page_size: 1000 }).then(res => {
         setDataTables(res.items || [])
     }).catch(console.error)
@@ -95,6 +100,38 @@ function ETLTaskEditor({ taskId, onNavigate }) {
     }
   }
 
+  // --- Workflow Handlers ---
+  const initialWorkflowData = useMemo(() => {
+    if (form.graph_config?.nodes?.length > 0) {
+      return form.graph_config
+    }
+    // Default nodes for new task
+    return {
+      nodes: [
+        {
+          id: 'start',
+          type: CUSTOM_NODE,
+          data: { title: 'Start', type: BlockEnum.Start, desc: 'Start Node', variables: [] },
+          position: { x: 100, y: 100 },
+        },
+        {
+          id: 'end',
+          type: CUSTOM_NODE,
+          data: { title: 'End', type: BlockEnum.End, desc: 'End Node', outputs: [] },
+          position: { x: 600, y: 100 },
+        },
+      ],
+      edges: []
+    }
+  }, [form.graph_config, taskId])
+
+  const handleWorkflowUpdate = useCallback((payload) => {
+    setForm(prev => ({
+      ...prev,
+      graph_config: payload
+    }))
+  }, [])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -116,7 +153,7 @@ function ETLTaskEditor({ taskId, onNavigate }) {
           </div>
         </div>
 
-        {/* Classic Stepper (Compact) */}
+        {/* Stepper */}
         <div className="flex items-center gap-1">
           {[1, 2, 3].map((s) => (
             <div key={s} className="flex items-center">
@@ -138,11 +175,11 @@ function ETLTaskEditor({ taskId, onNavigate }) {
         </div>
       </div>
 
-      {/* Main Content Area - Scrollable */}
-      <div className="flex-1 min-h-0 overflow-y-auto pr-2 -mr-2 pb-2"> 
+      {/* Main Content Area */}
+      <div className="flex-1 min-h-0"> 
         {/* Step 1: 数据源 */}
         {step === 1 && (
-          <div className="card h-full flex flex-col p-6 gap-6 shadow-sm border-slate-200">
+          <div className="card h-full flex flex-col p-6 gap-6 shadow-sm border-slate-200 overflow-y-auto">
             {error && (
               <div className="px-4 py-3 bg-red-50 text-red-700 text-sm rounded-lg border border-red-200 font-medium animate-fadeIn flex items-center gap-2 shrink-0">
                  <span className="text-red-500 text-lg">⚠️</span> {error}
@@ -236,31 +273,26 @@ function ETLTaskEditor({ taskId, onNavigate }) {
           </div>
         )}
 
-        {/* Step 2: Pipeline */}
+        {/* Step 2: Pipeline (The Canvas) */}
         {step === 2 && (
-          <div className="card h-full flex flex-col p-0 gap-0 overflow-hidden shadow-sm border-slate-200">
-            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/30 flex items-center justify-between shrink-0">
-              <div>
-                <h3 className="font-semibold text-lg text-slate-800">处理链路 (Pipeline)</h3>
-                <p className="text-sm text-slate-500">
-                  构建数据清洗与转换流程
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex-1 min-h-0 bg-slate-100">
-                <FlowEditor 
-                    initialNodes={[]} 
-                    initialEdges={[]}
-                    onSave={(nodes, edges) => console.log('Save Graph:', nodes, edges)}
+          <div className="h-full border border-eq-border-subtle rounded-xl overflow-hidden bg-eq-bg-surface shadow-sm">
+             <EventEmitterContextProvider>
+                <WorkflowWithInnerContext
+                  nodes={initialWorkflowData.nodes}
+                  edges={initialWorkflowData.edges}
+                  onWorkflowDataUpdate={handleWorkflowUpdate}
+                  hooksStore={{
+                    availableNodesMetaData,
+                    readOnly: false,
+                  }}
                 />
-            </div>
+             </EventEmitterContextProvider>
           </div>
         )}
 
         {/* Step 3: 运行参数 */}
         {step === 3 && (
-          <div className="card h-full flex flex-col p-6 gap-8 shadow-sm border-slate-200">
+          <div className="card h-full flex flex-col p-6 gap-8 shadow-sm border-slate-200 overflow-y-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div>
                 <label className="form-label text-base">批次大小 (Batch Size)</label>
@@ -275,7 +307,6 @@ function ETLTaskEditor({ taskId, onNavigate }) {
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">rows</span>
                 </div>
-                <p className="form-hint mt-2">每次从磁盘读取并处理的行数。建议 1000-5000，过大可能导致内存溢出。</p>
               </div>
               <div>
                 <label className="form-label text-base">并行进程数 (Workers)</label>
@@ -290,14 +321,13 @@ function ETLTaskEditor({ taskId, onNavigate }) {
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">procs</span>
                 </div>
-                <p className="form-hint mt-2">并发执行的 Worker 数量。建议设置为 CPU 核心数的 50%-80%。</p>
               </div>
             </div>
 
-            <div className="flex-1 bg-slate-50 rounded-xl border border-slate-200 flex flex-col overflow-hidden shadow-inner">
+            <div className="flex-1 bg-slate-50 rounded-xl border border-slate-200 flex flex-col overflow-hidden shadow-inner min-h-[200px]">
               <div className="px-4 py-2 border-b border-slate-200 bg-slate-100/50 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-slate-400"></span>
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">JSON Config Preview</span>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Config Snapshot</span>
               </div>
               <div className="flex-1 overflow-auto bg-white p-4">
                  <pre className="text-xs font-mono text-slate-600 leading-relaxed">{JSON.stringify(form, null, 2)}</pre>
@@ -307,7 +337,7 @@ function ETLTaskEditor({ taskId, onNavigate }) {
         )}
       </div>
 
-      {/* Footer Navigation - Fixed Bottom */}
+      {/* Footer Navigation */}
       <div className="flex items-center justify-between shrink-0 pt-3 border-t border-slate-200/60 mt-1">
         <button
           onClick={() => setStep(step - 1)}

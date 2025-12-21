@@ -1,3 +1,117 @@
+# 开发日志 (2025-12-21 Update 5) [PROD-READY NODE EDITOR]
+
+## 节点能力管理 - 生产级可视化编辑器
+
+本次更新实现了节点定义的完整闭环，将“节点能力”从简单的代码同步升级为可在线编辑、动态配置的生产级管理模块。
+
+### 1. 结构化参数编辑器 (Visual Parameter Editor)
+- **去 JSON 化交互**: 彻底弃用了原始 JSON 编辑，转而使用属性列表。支持可视化配置：字段 ID、显示标题、数据类型（String/Number/Boolean/Object/Array）、UI 格式（Path/Textarea/Column-Map/Password）、默认值及描述。
+- **UI 映射预览**: 根据定义的 `format` 自动渲染模拟组件（如路径选择按钮、下拉菜单预览），实现在定义阶段即“所见即所得”。
+
+### 2. 交互式端口管理 (Interactive Port Editor)
+- **显式 I/O 定义**: 增加了对 `Inputs` (输入端) 和 `Outputs` (输出端) 的可视化编辑。用户可以为节点动态添加/重命名端口，这些定义将直接决定未来在画布上的连接点。
+
+### 3. 全生命周期管理 (CRUD)
+- **新增自定义节点**: 支持通过前端 UI 创建全新的原子节点，并持久化到数据库。
+- **后端同步增强**: `PUT` 和 `POST` API 已打通，支持节点元数据（标题、分类、图标、描述）的实时更新。
+- **状态维护**: 编辑模式支持实时校验与撤销（取消编辑），确保数据一致性。
+
+### 4. 架构意义
+- 本次更新标志着工作流引擎“定义层”的成熟。通过 JSON Schema 驱动 UI 的模式，极大地降低了未来扩展新功能的成本，为下一步实现“动态参数面板”和“画布节点联动”铺平了道路。
+
+---
+
+# 开发日志 (2025-12-21 Update 4) [TECHNICAL REQUIREMENTS]
+
+## 通用工作流引擎：后端 API 与基础设施需求细节
+
+为了实现生产级的通用工作流系统，后端需要提供以下核心 API 和能力支撑。
+
+### 1. 节点元数据管理 (Node Registry API) - [已完成基础]
+*   **GET `/api/v1/workflow/nodes`**: 返回所有已注册节点的完整定义（Schema、UI 配置、分类）。
+*   **PUT `/api/v1/workflow/nodes/{id}`**: 更新节点定义。
+*   **POST `/api/v1/workflow/nodes/sync`**: 触发代码扫描，自动同步所有 `BaseHandler` 子类的元数据到数据库。
+*   **待增强**: 支持节点**版本控制**，防止修改已在线运行任务的节点定义导致崩溃。
+
+### 2. 基础设施支撑服务 (Supportive Services) - [待实现]
+*   **路径选择器 (FileSystem Picker API)**:
+    *   `GET /api/v1/system/fs/ls?path=...`: 浏览服务器本地目录，支持文件/目录过滤。
+    *   用于支持前端的 `PathInput` 组件，实现生产级的“浏览”按钮。
+*   **元数据探测 (Metadata Discovery API)**:
+    *   `POST /api/v1/workflow/inspect-schema`: 接收节点配置（如 CSV 路径），返回其输出 Schema（如列名列表）。
+    *   这是实现“列名映射 (Column Mapping)”可视化编辑的关键。
+
+### 3. 通用工作流配置 (Workflow Config API) - [待实现]
+*   **POST `/api/v1/workflow/configs`**: 创建工作流配置。
+*   **Payload 结构**:
+    ```json
+    {
+      "name": "任务名称",
+      "nodes": [ { "id": "node_1", "type": "csv_loader", "data": { ... } } ],
+      "edges": [ { "source": "node_1", "target": "node_2" } ],
+      "graph_state": { ... } // 存储 ReactFlow 画布坐标
+    }
+    ```
+*   **需求**: 必须支持对 `nodes` 的参数进行基于 `parameters_schema` 的后端强校验。
+
+### 4. 抽象执行引擎 (Universal Workflow Runner) - [待重构]
+*   **核心逻辑**: 弃用硬编码的 ETL 步骤，改为基于 DAG (有向无环图) 的拓扑排序执行。
+*   **Handler 规范**: 所有的 `BaseHandler` 必须支持 `context` 传递。
+*   **生命周期钩子**: `on_node_start`, `on_node_success`, `on_node_error` 必须通过 WebSocket 实时推送事件到前端。
+
+### 5. 动态参数渲染协议
+*   后端必须在 `parameters_schema` 的 `format` 字段中显式指引前端渲染特定的高级组件：
+    *   `path`: 弹出文件浏览器。
+    *   `column-map`: 弹出列对齐编辑器。
+    *   `cron`: 弹出定时任务配置器。
+
+---
+
+# 开发日志 (2025-12-21 Update 3) [STRATEGIC PLAN]
+
+## 架构愿景：从 ETL 到通用量化工作流引擎 (Quant Workflow Engine)
+
+我们决定将现有的 ETL 任务模块抽象并升级为**通用的工作流引擎**。系统将不再区分 ETL、回测或实盘任务，而是统一视为由不同功能节点组成的 **DAG (有向无环图)**。
+
+### 1. 核心变更点
+- **节点定义解耦**: 建立 `workflow_nodes` 元数据表，统一管理节点的能力定义、参数 Schema (JSON Schema) 和后端执行路径。
+- **配置模型升级**: 将 `etl_task_configs` 抽象为 `workflow_configs`，支持更广泛的任务类型。
+- **执行引擎抽象**: 开发通用的 `WorkflowRunner`，根据节点元数据动态调度执行器，支持流式处理 (ETL) 和事件驱动 (回测/实盘)。
+
+### 2. 节点分类规划
+- **Data IO**: `CSV/DB/API` 加载与存储。
+- **Transform**: 基础数据清洗与转换逻辑。
+- **Quant Analysis**: 技术指标 (MA, MACD)、K线合成、特征工程。
+- **Strategy & Logic**: 策略逻辑、信号产生、条件分支。
+- **Execution**: 回测撮合引擎与实盘交易接口。
+
+### 3. 三阶段路线图
+- **阶段 1 (元数据层)**: 建立数据库模型，实现节点能力的自动发现与注册机制，提供能力集 API。
+- **阶段 2 (执行层)**: 重构后端 Runner，实现基于节点定义的动态加载与流水线编排。
+- **阶段 3 (表现层)**: 改造前端 Canvas，实现基于 JSON Schema 的动态节点渲染，彻底消除前后端能力同步的硬编码。
+
+---
+
+# 开发日志 (2025-12-21 Update 2) [NEW]
+
+## Canvas 主题深度集成
+
+本次更新修复了 `easy-canvas` 组件嵌入 `easyquant` 宿主环境时的主题同步问题，确保画布样式与全站深色模式无缝融合。
+
+### 1. 主题机制统一
+- **Class-based Theming**: 将 `easy-canvas` 的主题策略从默认的 `media` 查询改为 `class` 模式，并配置 `next-themes` 监听 `class` 属性。这使其能够直接响应 `easyquant` 在 `html` 标签上切换的 `.dark` 类。
+- **CSS 变量兼容**: 更新了 `easy-canvas` 的所有主题文件 (`themes/*.css`)，使其选择器同时支持 `html[data-theme="dark"]` (独立运行) 和 `:root.dark`/`html.dark` (嵌入运行)。
+
+### 2. 视觉样式同步
+- **变量注入**: 在 `easyquant/client/src/index.css` 中显式注入了画布所需的关键 CSS 变量 (如 `--color-workflow-canvas-workflow-bg`, `--color-workflow-block-bg`)，并针对深色模式定义了专用色值 (`#1D1D20`)。
+- **去硬编码**: 移除了 `ETLTaskEditor` 和 `Workflow` 组件中硬编码的 `bg-white` 类，改为使用语义化的 Tailwind 类 (`bg-workflow-canvas-workflow-bg`)，实现了背景色的动态切换。
+- **Tailwind 扩展**: 同步更新了宿主项目的 `tailwind.config.js`，确保画布组件使用的特定 utility classes 能被正确解析。
+
+### 3. 结果
+- 现在的 ETL 任务编辑器在切换到深色模式时，画布背景、网格点阵、节点卡片及连线颜色均能自动切换至深色风格，消除了之前的视觉割裂感。
+
+---
+
 # 开发日志 (2025-12-21) [NEW]
 
 ## 全站视觉系统升级 - 深色主题

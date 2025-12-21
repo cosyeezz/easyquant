@@ -1,0 +1,8 @@
+/* Mocked CSS to remove broken imports */
+.svgIcon {
+  background-color: transparent;
+}
+
+.svgIconed {
+  background-color: transparent;
+}

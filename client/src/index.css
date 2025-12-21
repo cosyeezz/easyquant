@@ -1,4 +1,6 @@
 @import './dify-theme.css';
+@import './themes/dark.css';
+@import './themes/manual-dark.css';
 @import './styles/design-tokens.css';
 @tailwind base;
 @tailwind components;
@@ -35,6 +37,22 @@
     --eq-info-bg: #DBEAFE;
     --eq-info-border: #93C5FD;
     --eq-info-text: #2563EB;
+
+    /* Missing Background Images for Dify Components */
+    --color-chatbot-bg: linear-gradient(180deg, #F9FAFB 0%, #F2F4F7 100%);
+    --color-chat-bubble-bg: linear-gradient(180deg, #FFFFFF 0%, #FFFFFF 100%);
+    --color-chat-input-mask: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #FFFFFF 100%);
+    --color-workflow-process-bg: #EFF6FF;
+    --color-workflow-run-failed-bg: #FEF2F2;
+    --color-workflow-batch-failed-bg: #FEF2F2;
+    --color-workflow-canvas-workflow-bg: #F8FAFC;
+    --color-workflow-canvas-workflow-dot-color: rgba(0, 0, 0, 0.05);
+    --color-workflow-block-bg: #FFFFFF;
+    --color-workflow-block-border: rgba(0, 0, 0, 0.08);
+    --color-workflow-block-parma-bg: rgba(0, 0, 0, 0.02);
+    --color-workflow-link-line-normal: #D1D5DB;
+    --color-workflow-link-line-active: #3B82F6;
+    --mask-top2bottom-gray-50-to-transparent: linear-gradient(180deg, #F9FAFB 0%, rgba(249, 250, 251, 0) 100%);
   }
 
   /* Dark Theme */
@@ -67,6 +85,22 @@
     --eq-info-bg: #0C1929;
     --eq-info-border: #1E40AF;
     --eq-info-text: #60A5FA;
+
+    /* Missing Background Images for Dify Components (Dark) */
+    --color-chatbot-bg: linear-gradient(180deg, #1C2230 0%, #0D0F12 100%);
+    --color-chat-bubble-bg: linear-gradient(180deg, #252D3A 0%, #252D3A 100%);
+    --color-chat-input-mask: linear-gradient(180deg, rgba(21, 25, 33, 0) 0%, #151921 100%);
+    --color-workflow-process-bg: #172554;
+    --color-workflow-run-failed-bg: #450A0A;
+    --color-workflow-batch-failed-bg: #450A0A;
+    --color-workflow-canvas-workflow-bg: #0D0F12;
+    --color-workflow-canvas-workflow-dot-color: rgba(255, 255, 255, 0.1);
+    --color-workflow-block-bg: #1C2230;
+    --color-workflow-block-border: rgba(255, 255, 255, 0.1);
+    --color-workflow-block-parma-bg: rgba(255, 255, 255, 0.05);
+    --color-workflow-link-line-normal: #3D4A5C;
+    --color-workflow-link-line-active: #2979FF;
+    --mask-top2bottom-gray-50-to-transparent: linear-gradient(180deg, #1C2230 0%, rgba(28, 34, 48, 0) 100%);
   }
 
   body {
@@ -74,6 +108,154 @@
     color: var(--eq-text-primary);
     min-height: 100vh;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  }
+
+  /* Dify System Text Styles */
+  .system-2xs-medium-uppercase {
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    line-height: 12px;
+  }
+
+  .system-xs-regular {
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 18px;
+  }
+
+  .system-xs-medium {
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 18px;
+  }
+
+  .system-xs-medium-uppercase {
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    line-height: 18px;
+  }
+
+  .system-xs-semibold {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 18px;
+  }
+
+  .system-xs-semibold-uppercase {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    line-height: 18px;
+  }
+
+  .system-sm-regular {
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 16px;
+  }
+
+  .system-sm-medium {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 16px;
+  }
+
+  .system-sm-semibold {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 16px;
+  }
+
+  .system-sm-semibold-uppercase {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    line-height: 16px;
+  }
+
+  .system-md-regular {
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 20px;
+  }
+
+  .system-md-medium {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 20px;
+  }
+
+  .system-md-semibold {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 20px;
+  }
+
+  .system-md-semibold-uppercase {
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    line-height: 20px;
+  }
+
+  .system-xl-regular {
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 24px;
+  }
+
+  .system-xl-medium {
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 24px;
+  }
+
+  .system-xl-semibold {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 24px;
+  }
+
+  [class*="code-"] {
+    @apply font-mono;
+  }
+
+  .code-xs-regular {
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  .code-xs-semibold {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  .code-sm-regular {
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  .code-sm-semibold {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  .code-md-regular {
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  .code-md-semibold {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.5;
   }
 }
 

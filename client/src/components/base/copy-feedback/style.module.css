@@ -1,0 +1,12 @@
+/* Mocked CSS to remove broken imports */
+.copyIcon {
+  background-color: transparent;
+}
+
+.copyIcon:hover {
+  background-color: transparent;
+}
+
+.copyIcon.copied {
+  background-color: transparent;
+}

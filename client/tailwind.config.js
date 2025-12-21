@@ -192,6 +192,12 @@ export default {
         'chat-bubble-bg': 'var(--color-chat-bubble-bg)',
         'chat-input-mask': 'var(--color-chat-input-mask)',
         'workflow-process-bg': 'var(--color-workflow-process-bg)',
+        'workflow-canvas-workflow-bg': 'var(--color-workflow-canvas-workflow-bg)',
+        'workflow-block-bg': 'var(--color-workflow-block-bg)',
+        'workflow-block-border': 'var(--color-workflow-block-border)',
+        'workflow-block-parma-bg': 'var(--color-workflow-block-parma-bg)',
+        'workflow-link-line-normal': 'var(--color-workflow-link-line-normal)',
+        'workflow-link-line-active': 'var(--color-workflow-link-line-active)',
         'workflow-run-failed-bg': 'var(--color-workflow-run-failed-bg)',
         'workflow-batch-failed-bg': 'var(--color-workflow-batch-failed-bg)',
         'mask-top2bottom-gray-50-to-transparent': 'var(--mask-top2bottom-gray-50-to-transparent)',
@@ -230,5 +236,7 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/typography'),
+  ],
 }

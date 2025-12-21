@@ -14,9 +14,12 @@ class ColumnMappingHandler(BaseHandler):
     @classmethod
     def metadata(cls) -> Dict[str, Any]:
         return {
-            "name": "ColumnMappingHandler",
-            "label": "列名重命名 (Column Mapping)",
+            "name": "column_mapping",
+            "title": "列名重命名",
+            "category": "transform",
+            "type": "generic",
             "description": "将数据中的列名映射为系统标准列名。",
+            "icon": "table-alias",
             "params_schema": {
                 "type": "object",
                 "properties": {
@@ -31,6 +34,13 @@ class ColumnMappingHandler(BaseHandler):
                     }
                 },
                 "required": ["mapping"]
+            },
+            "ui_config": {
+                "width": 240,
+                "handles": {
+                    "source": ["input"],
+                    "target": ["output"]
+                }
             }
         }
 

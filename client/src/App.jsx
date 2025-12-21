@@ -1,16 +1,16 @@
 import { useState } from 'react'
-import { Activity, Database, Server, Table2, Cpu, Layers, Workflow, Sun, Moon } from 'lucide-react'
+import { Activity, Database, Server, Table2, Cpu, Layers, Sun, Moon, Boxes } from 'lucide-react'
 import ProcessMonitor from './components/ProcessMonitor'
 import ETLTaskList from './components/ETLTaskList'
 import ETLTaskEditor from './components/ETLTaskEditor'
 import DataTableList from './components/DataTableList'
 import DataTableEditor from './components/DataTableEditor'
-import DifyCanvas from './components/DifyCanvas'
+import WorkflowNodeList from './components/WorkflowNodeList'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useTheme } from './contexts/ThemeContext'
 
 function App() {
-  const [activeTab, setActiveTab] = useState('dify-canvas') // Default to new canvas for testing
+  const [activeTab, setActiveTab] = useState('etl')
   const [editId, setEditId] = useState(null)
   const { theme, toggleTheme } = useTheme()
   
@@ -25,29 +25,9 @@ function App() {
   const tabs = [
     { id: 'tables', name: '数据表', icon: Table2 },
     { id: 'etl', name: 'ETL任务', icon: Database },
+    { id: 'nodes', name: '节点能力', icon: Boxes },
     { id: 'monitor', name: '进程监控', icon: Activity },
-    { id: 'dify-canvas', name: 'Dify 画布', icon: Workflow },
   ]
-
-  // Special full-screen mode for Dify Canvas
-  if (activeTab === 'dify-canvas') {
-      return (
-          <div className="w-full h-screen flex flex-col">
-              {/* Minimal Header for Navigation Back */}
-              <div className="bg-white border-b border-divider-subtle px-4 py-2 flex items-center justify-between z-50 shadow-sm">
-                  <div className="flex items-center gap-4">
-                     <button onClick={() => setActiveTab('etl')} className="text-text-tertiary hover:text-text-primary text-sm">
-                        ← Back to App
-                     </button>
-                     <h1 className="font-semibold text-text-primary">Dify Workflow Canvas</h1>
-                  </div>
-              </div>
-              <div className="flex-1 relative overflow-hidden">
-                 <DifyCanvas />
-              </div>
-          </div>
-      )
-  }
 
   return (
     <div className="min-h-screen">
@@ -118,7 +98,8 @@ function App() {
               const Icon = tab.icon
               const isActive = activeTab === tab.id ||
                 (tab.id === 'tables' && activeTab.startsWith('table')) ||
-                (tab.id === 'etl' && activeTab.startsWith('etl'))
+                (tab.id === 'etl' && activeTab.startsWith('etl')) ||
+                (tab.id === 'nodes' && activeTab === 'nodes')
               return (
                 <button
                   key={tab.id}
@@ -142,6 +123,7 @@ function App() {
         {activeTab === 'etl' && <ETLTaskList onNavigate={handleNavigate} />}
         {activeTab === 'etl-new' && <ETLTaskEditor onNavigate={handleNavigate} />}
         {activeTab === 'etl-edit' && <ETLTaskEditor taskId={editId} onNavigate={handleNavigate} />}
+        {activeTab === 'nodes' && <WorkflowNodeList />}
         {activeTab === 'monitor' && <ProcessMonitor />}
       </main>
 
