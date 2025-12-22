@@ -342,12 +342,13 @@ const WorkflowNodeList = () => {
                       Parameters
                     </div>
                     {isEditing && (
-                      <button 
+                      <button
                         onClick={() => {
                           const newKey = `param_${Object.keys(editForm.parameters_schema.properties || {}).length + 1}`;
+                          const stableId = `_id_${Date.now()}`;
                           const updatedProps = {
                             ...(editForm.parameters_schema.properties || {}),
-                            [newKey]: { type: 'string', title: 'New Param', description: '' }
+                            [newKey]: { type: 'string', title: 'New Param', description: '', _stableId: stableId }
                           };
                           setEditForm({
                             ...editForm,
@@ -368,8 +369,8 @@ const WorkflowNodeList = () => {
 
                   {isEditing ? (
                     <div className="space-y-3">
-                      {Object.entries(editForm.parameters_schema.properties || {}).map(([key, prop]) => (
-                        <div key={key} className="p-3 bg-eq-bg-elevated/30 rounded border border-eq-border-subtle relative group">
+                      {Object.entries(editForm.parameters_schema.properties || {}).map(([key, prop], idx) => (
+                        <div key={prop._stableId || `fallback_${idx}`} className="p-3 bg-eq-bg-elevated/30 rounded border border-eq-border-subtle relative group">
                           <button 
                             onClick={() => {
                               const updatedProps = { ...editForm.parameters_schema.properties };
@@ -391,15 +392,21 @@ const WorkflowNodeList = () => {
                           <div className="grid grid-cols-2 gap-3 mb-3">
                             <div className="space-y-1">
                               <label className="text-[10px] font-bold text-eq-text-muted uppercase tracking-widest">Key ID</label>
-                              <input 
+                              <input
                                 type="text"
                                 value={key}
                                 onChange={(e) => {
                                   const newKey = e.target.value;
                                   if (!newKey) return;
-                                  const updatedProps = { ...editForm.parameters_schema.properties };
-                                  updatedProps[newKey] = updatedProps[key];
-                                  delete updatedProps[key];
+                                  const updatedProps = {};
+                                  // Rebuild props with new key while preserving order
+                                  Object.entries(editForm.parameters_schema.properties).forEach(([k, v]) => {
+                                    if (k === key) {
+                                      updatedProps[newKey] = { ...v, _stableId: v._stableId || `_id_${Date.now()}` };
+                                    } else {
+                                      updatedProps[k] = v;
+                                    }
+                                  });
                                   setEditForm({
                                     ...editForm,
                                     parameters_schema: { ...editForm.parameters_schema, properties: updatedProps }

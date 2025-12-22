@@ -93,7 +93,7 @@ export default function Select({
         `}
       >
         <span className={`block truncate ${!selectedOption && variant !== 'ghost' ? 'text-eq-text-muted' : ''} ${showClear ? 'pr-4' : ''}`}>
-          {variant === 'ghost' && <span className="text-eq-text-muted mr-1.5 font-normal opacity-70">{placeholder}:</span>}
+          {/* Removed forced placeholder prefix for ghost variant to save space */}
           {displayLabel}
         </span>
 
@@ -113,7 +113,7 @@ export default function Select({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute top-full left-0 z-50 mt-1 bg-eq-bg-surface border border-eq-border-default rounded-lg shadow-xl max-h-60 overflow-auto animate-fadeIn min-w-[160px] p-1">
+        <div className="absolute top-full left-0 z-50 mt-1 bg-white dark:bg-neutral-800 border border-eq-border-default rounded-lg shadow-xl max-h-60 overflow-auto animate-fadeIn min-w-[160px] p-1 ring-1 ring-black/5">
           <ul className="">
             {options.length === 0 ? (
               <li className={`text-eq-text-muted text-center ${currentSize.option}`}>无选项</li>

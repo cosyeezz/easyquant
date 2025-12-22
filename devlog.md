@@ -1,3 +1,79 @@
+# 开发日志 (2025-12-22 Update 3) [WORKFLOW DESIGN DOC]
+
+## 工作流引擎设计文档 - 完整规范
+
+本次更新产出了完整的工作流引擎设计文档 (`docs/workflow-design.md`)，涵盖节点定义、参数类型系统、列级数据流控制及 CRUD 交互规范。
+
+### 1. 参数类型系统 (Parameter Type System)
+
+**入参类型 (10 种)**:
+| 类型 | 说明 |
+|-----|------|
+| `file_picker` | 文件/文件夹选择器 |
+| `limit` | 数量限制 (前N条/后N条/百分比) |
+| `number` | 数值输入 |
+| `text` | 文本输入 |
+| `select` | 下拉单选 |
+| `multi_select` | 下拉多选 |
+| `upstream_column` | 上游列选择 (单选) |
+| `upstream_columns` | 上游列选择 (多选) |
+| `db_table` | 数据库表选择 |
+| `code` | 代码编辑器 (Python/SQL) |
+
+**出参类型 (8 种)**:
+`df`, `signal`, `file`, `chart`, `metrics`, `message`, `json`, `status`
+
+### 2. 类型专属配置 (Type-Specific Config)
+- 每种入参类型都有专属的配置项（如 `file_picker` 有 `accept`, `multiple`）
+- 选择类型后动态展示对应配置表单
+- 实现"类型 → 配置"的驱动模式
+
+### 3. 列级数据流控制 (Column-Level Flow)
+- **显式选择**: 必须明确勾选要输出的列，不做隐式透传
+- **冲突报错**: 多输入时列名冲突直接报错，需在上游先重命名
+- **多端口分发**: 同一节点的不同列可输出到不同端口
+- **丰富元信息**: 列定义包含类型、格式、描述等完整信息
+
+### 4. 节点 CRUD 交互设计
+- **列表页**: 搜索、分类筛选、操作菜单
+- **新建**: 基本信息 → 入参配置 → 出参配置
+- **编辑**: 内联展开/收缩模式，非弹窗
+- **删除**: 确认弹窗 + 依赖检查 + 输入确认
+- **复制**: 快速基于现有节点创建副本
+- **排序**: 拖拽手柄或上下按钮
+
+### 5. 节点状态流转
+```
+创建中 → 草稿 (Draft) ↔ 已启用 (Active) → 已删除 (Deleted)
+```
+
+### 6. 文档位置
+- `/docs/workflow-design.md` - 完整设计规范 (1000+ 行)
+
+---
+
+# 开发日志 (2025-12-22 Update 2) [I18N SUPPORT]
+
+## 国际化架构 (Internationalization)
+
+为了支持多语言环境并提升系统的通用性，我们完成了前端国际化 (i18n) 基础设施的搭建与集成。
+
+### 1. 架构选型
+- **核心库**: 沿用 `i18next` 生态，结合 `react-i18next` 实现 React 组件层面的响应式翻译。
+- **命名空间**: 引入独立的 `easyquant` namespace，与 Dify 遗留的翻译资源隔离，避免键值冲突。
+- **持久化**: 使用 `js-cookie` 存储用户语言偏好 (`LOCALE_COOKIE_NAME`)，确保刷新后状态保留。
+
+### 2. 功能实现
+- **语言切换器 (Language Switcher)**: 在 Header 区域集成了中英文切换组件，支持即时切换。
+- **自动检测**: 初始化时优先读取 Cookie，缺省回退至 `zh-Hans`。
+- **覆盖范围**: 完成了 `DataTableList`（列名、筛选器、分页）、导航栏 (`Nav`)、状态栏 (`Status`) 的全量翻译。
+
+### 3. 关键修复
+- **Key Resolution**: 修复了 Dify 架构下多模块 namespace 合并导致的 Key 解析失败问题，通过 `keyPrefix: 'easyquant'` 实现了正确的层级映射。
+- **State Persistence**: 修复了页面刷新后语言重置为默认值的问题，加入了显式的 Cookie 读取逻辑。
+
+---
+
 # 开发日志 (2025-12-22) [UI REFACTOR]
 
 ## 全站视觉重构 - Linear/Stripe Fintech Aesthetic

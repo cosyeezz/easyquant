@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import { Activity, Database, Server, Table2, Cpu, Layers, Sun, Moon, Boxes, Command } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import ProcessMonitor from './components/ProcessMonitor'
 import ETLTaskList from './components/ETLTaskList'
 import ETLTaskEditor from './components/ETLTaskEditor'
 import DataTableList from './components/DataTableList'
 import DataTableEditor from './components/DataTableEditor'
 import WorkflowNodeList from './components/WorkflowNodeList'
+import LanguageSwitcher from './components/LanguageSwitcher'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useTheme } from './contexts/ThemeContext'
 
 function App() {
+  const { t } = useTranslation('translation', { keyPrefix: 'easyquant' })
   const [activeTab, setActiveTab] = useState('etl')
   const [editId, setEditId] = useState(null)
   const { theme, toggleTheme } = useTheme()
@@ -23,10 +26,10 @@ function App() {
   }
 
   const tabs = [
-    { id: 'tables', name: 'Schemas', icon: Table2 },
-    { id: 'etl', name: 'Pipelines', icon: Database },
-    { id: 'nodes', name: 'Nodes', icon: Boxes },
-    { id: 'monitor', name: 'Monitor', icon: Activity },
+    { id: 'tables', name: t('nav.schemas'), icon: Table2 },
+    { id: 'nodes', name: t('nav.nodes'), icon: Boxes },
+    { id: 'etl', name: t('nav.pipelines'), icon: Database },
+    { id: 'monitor', name: t('nav.monitor'), icon: Activity },
   ]
 
   return (
@@ -54,20 +57,20 @@ function App() {
                  <div className="flex items-center gap-1.5" title="Server Status">
                     <span className={`w-1.5 h-1.5 rounded-full ${status === 'connected' ? 'bg-eq-success-solid animate-pulse' : 'bg-eq-danger-solid'}`}></span>
                     <span className={status === 'connected' ? 'text-eq-success-text font-medium' : 'text-eq-danger-text'}>
-                        {status === 'connected' ? 'ONLINE' : 'OFFLINE'}
+                        {status === 'connected' ? t('status.online') : 'OFFLINE'}
                     </span>
                  </div>
 
                  {status === 'connected' && systemStatus && (
                     <>
                         <div className="flex items-center gap-1.5">
-                            <span className="text-eq-text-muted">CPU</span>
+                            <span className="text-eq-text-muted">{t('status.cpu')}</span>
                             <span className={`font-medium ${systemStatus.cpu_percent > 80 ? 'text-eq-danger-text' : 'text-eq-text-primary'}`}>
                                 {systemStatus.cpu_percent.toFixed(1)}%
                             </span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                            <span className="text-eq-text-muted">MEM</span>
+                            <span className="text-eq-text-muted">{t('status.mem')}</span>
                             <span className="font-medium text-eq-text-primary">
                                 {Math.round(systemStatus.memory_mb / 1024 * 10) / 10}G
                             </span>
@@ -75,6 +78,9 @@ function App() {
                     </>
                  )}
               </div>
+
+              {/* Language Switcher */}
+              <LanguageSwitcher />
 
               {/* Theme Toggle */}
               <button

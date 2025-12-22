@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Plus, Pencil, Trash2, Loader2, Database, Play, AlertTriangle, Copy, X, RefreshCw, Search, RotateCcw, ChevronLeft, ChevronRight, Filter } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import Modal from './Modal'
 import Select from './ui/Select'
 
 function DataTableList({ onNavigate }) {
+  const { t } = useTranslation('translation', { keyPrefix: 'easyquant' })
   const [tables, setTables] = useState([])
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
@@ -43,7 +45,7 @@ function DataTableList({ onNavigate }) {
       }
       if (filters.search) params.search = filters.search
       if (filters.category_id !== 'all') params.category_id = filters.category_id
-      if (filters.status !== 'all') params.status = filters.status.toUpperCase()
+      if (filters.status !== 'all') params.status = filters.status
 
       const [tablesResp, categoriesData] = await Promise.all([
         api.getDataTables(params),
@@ -97,18 +99,18 @@ function DataTableList({ onNavigate }) {
     return cat ? cat.name : '-'
   }
 
-  // Refined pastel palette for tags
+  // Refined palette with Dark Mode support
   const CATEGORY_PALETTE = [
-    'bg-blue-50 text-blue-700 border-blue-100',
-    'bg-emerald-50 text-emerald-700 border-emerald-100',
-    'bg-purple-50 text-purple-700 border-purple-100',
-    'bg-amber-50 text-amber-700 border-amber-100',
-    'bg-rose-50 text-rose-700 border-rose-100',
-    'bg-cyan-50 text-cyan-700 border-cyan-100',
+    'bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20',
+    'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20',
+    'bg-purple-50 text-purple-700 border-purple-100 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20',
+    'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20',
+    'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20',
+    'bg-cyan-50 text-cyan-700 border-cyan-100 dark:bg-cyan-500/10 dark:text-cyan-400 dark:border-cyan-500/20',
   ]
 
   const getCategoryStyle = (id) => {
-    if (!id) return 'bg-eq-bg-elevated text-eq-text-secondary border-eq-border-default'
+    if (!id) return 'bg-eq-bg-elevated text-eq-text-secondary border-eq-border-default dark:bg-neutral-800 dark:text-neutral-400'
     const index = id % CATEGORY_PALETTE.length
     return CATEGORY_PALETTE[index]
   }
@@ -126,14 +128,14 @@ function DataTableList({ onNavigate }) {
   }
 
   const categoryOptions = [
-      { label: 'All Categories', value: 'all' },
+      { label: t('table.filters.allCategories'), value: 'all' },
       ...categories.map(c => ({ label: c.name, value: c.id }))
   ]
   
   const statusOptions = [
-      { label: 'All Status', value: 'all' },
-      { label: 'Published', value: 'created' },
-      { label: 'Draft', value: 'draft' }
+      { label: t('table.filters.allStatus'), value: 'all' },
+      { label: t('table.filters.published'), value: 'created' },
+      { label: t('table.filters.draft'), value: 'draft' }
   ]
   
   const totalPages = Math.ceil(pagination.total / pagination.pageSize)
@@ -151,7 +153,7 @@ function DataTableList({ onNavigate }) {
                 <Search className="w-3.5 h-3.5 text-eq-text-muted group-hover:text-eq-text-secondary" />
                 <input
                     type="text"
-                    placeholder="Search..."
+                    placeholder={t('table.searchPlaceholder')}
                     className="bg-transparent border-none p-0 text-xs w-24 focus:w-48 transition-all duration-300 text-eq-text-primary placeholder:text-eq-text-muted focus:ring-0"
                     value={searchInput}
                     onChange={(e) => setSearchInput(e.target.value)}
@@ -163,24 +165,28 @@ function DataTableList({ onNavigate }) {
             <div className="w-px h-3.5 bg-eq-border-subtle mx-1"></div>
 
             {/* Filters - Ghost Style */}
-            <div className="flex items-center gap-1">
-                <div className="min-w-[100px]">
+            <div className="flex items-center gap-2">
+                <div className="min-w-[140px]">
                     <Select
                         value={filters.category_id}
                         onChange={(val) => { setFilters(prev => ({...prev, category_id: val})); setPagination(prev => ({...prev, page: 1})); }}
+                        onClear={() => { setFilters(prev => ({...prev, category_id: 'all'})); setPagination(prev => ({...prev, page: 1})); }}
+                        clearable={true}
                         options={categoryOptions}
-                        placeholder="Category"
+                        placeholder={t('table.filters.category')}
                         size="sm"
                         variant="ghost"
                     />
                 </div>
-                <div className="w-px h-3.5 bg-eq-border-subtle mx-1"></div>
-                <div className="min-w-[90px]">
+                <div className="w-px h-3.5 bg-eq-border-subtle"></div>
+                <div className="min-w-[120px]">
                     <Select
                         value={filters.status}
                         onChange={(val) => { setFilters(prev => ({...prev, status: val})); setPagination(prev => ({...prev, page: 1})); }}
+                        onClear={() => { setFilters(prev => ({...prev, status: 'all'})); setPagination(prev => ({...prev, page: 1})); }}
+                        clearable={true}
                         options={statusOptions}
-                        placeholder="Status"
+                        placeholder={t('table.filters.status')}
                         size="sm"
                         variant="ghost"
                     />
@@ -196,7 +202,7 @@ function DataTableList({ onNavigate }) {
                         className="flex items-center gap-1.5 px-2 py-1 text-[11px] text-eq-text-muted hover:text-eq-text-primary hover:bg-eq-bg-elevated rounded transition-colors"
                     >
                         <X className="w-3 h-3" />
-                        <span className="font-medium">Reset</span>
+                        <span className="font-medium">{t('table.filters.reset')}</span>
                     </button>
                 </>
             )}
@@ -205,7 +211,7 @@ function DataTableList({ onNavigate }) {
         {/* Right: Primary Action */}
         <div className="flex items-center gap-4">
              <span className="text-[10px] text-eq-text-muted font-mono tracking-wider">
-                {tables.length} / {pagination.total} ROWS
+                {tables.length} / {pagination.total} {t('table.pagination.rows')}
              </span>
              <div className="w-px h-3.5 bg-eq-border-subtle"></div>
             <button 
@@ -213,7 +219,7 @@ function DataTableList({ onNavigate }) {
                 className="btn-primary !py-1 !px-3 !text-[11px] font-semibold flex items-center gap-1.5 shadow-sm"
             >
                 <Plus className="w-3.5 h-3.5" />
-                New Table
+                {t('table.newTable')}
             </button>
         </div>
       </div>
@@ -247,11 +253,11 @@ function DataTableList({ onNavigate }) {
                 <table className="w-full text-sm text-left border-collapse">
                     <thead className="bg-eq-bg-elevated/50 border-b border-eq-border-subtle text-eq-text-secondary sticky top-0 z-10 backdrop-blur-sm">
                     <tr>
-                        <th className="px-6 py-3 font-medium text-xs uppercase tracking-wider w-[25%]">Display Name</th>
-                        <th className="px-6 py-3 font-medium text-xs uppercase tracking-wider w-[20%]">Physical Table</th>
-                        <th className="px-6 py-3 font-medium text-xs uppercase tracking-wider w-[15%]">Category</th>
-                        <th className="px-6 py-3 font-medium text-xs uppercase tracking-wider w-[15%]">Status</th>
-                        <th className="px-6 py-3 font-medium text-xs uppercase tracking-wider text-right">Actions</th>
+                        <th className="px-6 py-3 font-semibold text-sm tracking-wide w-[25%]">{t('table.columns.displayName')}</th>
+                        <th className="px-6 py-3 font-semibold text-sm tracking-wide w-[20%]">{t('table.columns.physicalTable')}</th>
+                        <th className="px-6 py-3 font-semibold text-sm tracking-wide w-[15%]">{t('table.columns.category')}</th>
+                        <th className="px-6 py-3 font-semibold text-sm tracking-wide w-[15%]">{t('table.columns.status')}</th>
+                        <th className="px-6 py-3 font-semibold text-sm tracking-wide text-right">{t('table.columns.actions')}</th>
                     </tr>
                     </thead>
                     <tbody className="divide-y divide-eq-border-subtle">
@@ -266,41 +272,41 @@ function DataTableList({ onNavigate }) {
                             onMouseEnter={() => setHoveredRow(table.id)}
                             onMouseLeave={() => setHoveredRow(null)}
                         >
-                            <td className="px-6 py-2.5 align-middle">
-                                <div className="font-medium text-eq-text-primary text-sm">{table.name}</div>
+                            <td className="px-6 py-3 align-middle">
+                                <div className="font-medium text-eq-text-primary text-[15px]">{table.name}</div>
                                 {table.description && (
-                                    <div className="text-[10px] text-eq-text-muted mt-0.5 line-clamp-1 max-w-[200px]">{table.description}</div>
+                                    <div className="text-xs text-eq-text-muted mt-1 line-clamp-1 max-w-[240px]">{table.description}</div>
                                 )}
                             </td>
-                            <td className="px-6 py-2.5 align-middle">
-                                <code className="font-mono text-[11px] text-eq-text-secondary bg-eq-bg-elevated px-1.5 py-0.5 rounded border border-eq-border-subtle select-all">
+                            <td className="px-6 py-3 align-middle">
+                                <code className="font-mono text-xs text-eq-text-secondary bg-eq-bg-elevated px-2 py-1 rounded border border-eq-border-subtle select-all">
                                     {table.table_name}
                                 </code>
                             </td>
-                            <td className="px-6 py-2.5 align-middle">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${getCategoryStyle(table.category_id)}`}>
+                            <td className="px-6 py-3 align-middle">
+                                <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border ${getCategoryStyle(table.category_id)}`}>
                                     {getCategoryName(table.category_id)}
                                 </span>
                             </td>
-                            <td className="px-6 py-2.5 align-middle">
+                            <td className="px-6 py-3 align-middle">
                             {isPublished ? (
-                                <div className="flex items-center gap-1.5 text-eq-success-text">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-eq-success-solid"></span>
-                                    <span className="text-[11px] font-medium">Published</span>
+                                <div className="flex items-center gap-2 text-eq-success-text">
+                                    <span className="w-2 h-2 rounded-full bg-eq-success-solid"></span>
+                                    <span className="text-xs font-medium">Published</span>
                                 </div>
                             ) : isSyncNeeded ? (
-                                <div className="flex items-center gap-1.5 text-eq-primary-500">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-eq-primary-500 animate-pulse"></span>
-                                    <span className="text-[11px] font-medium">Update Needed</span>
+                                <div className="flex items-center gap-2 text-eq-primary-500">
+                                    <span className="w-2 h-2 rounded-full bg-eq-primary-500 animate-pulse"></span>
+                                    <span className="text-xs font-medium">Update Needed</span>
                                 </div>
                             ) : (
-                                <div className="flex items-center gap-1.5 text-eq-warning-text">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-eq-warning-solid"></span>
-                                    <span className="text-[11px] font-medium">Draft</span>
+                                <div className="flex items-center gap-2 text-eq-warning-text">
+                                    <span className="w-2 h-2 rounded-full bg-eq-warning-solid"></span>
+                                    <span className="text-xs font-medium">Draft</span>
                                 </div>
                             )}
                             </td>
-                            <td className="px-6 py-2.5 align-middle text-right">
+                            <td className="px-6 py-3 align-middle text-right">
                                 <div className={`flex items-center justify-end gap-1 transition-opacity duration-200 ${hoveredRow === table.id ? 'opacity-100' : 'opacity-60'}`}>
                                     {!isPublished && (
                                     <button
@@ -335,7 +341,7 @@ function DataTableList({ onNavigate }) {
             {/* Pagination Footer */}
             <div className="border-t border-eq-border-subtle px-4 py-2 flex items-center justify-between bg-eq-bg-elevated/30 text-xs">
                 <div className="text-eq-text-secondary">
-                    Showing <span className="font-medium text-eq-text-primary">{tables.length}</span> of <span className="font-medium text-eq-text-primary">{pagination.total}</span>
+                    {t('table.pagination.showing')} <span className="font-medium text-eq-text-primary">{tables.length}</span> {t('table.pagination.of')} <span className="font-medium text-eq-text-primary">{pagination.total}</span>
                 </div>
                 <div className="flex items-center gap-1">
                     <button

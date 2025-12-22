@@ -2,6 +2,8 @@
 import i18n from 'i18next'
 import { camelCase } from 'lodash-es'
 import { initReactI18next } from 'react-i18next'
+import Cookies from 'js-cookie'
+import { LOCALE_COOKIE_NAME } from '@/config'
 
 const NAMESPACES = [
   'app-annotation',
@@ -19,6 +21,7 @@ const NAMESPACES = [
   'dataset-pipeline',
   'dataset-settings',
   'dataset',
+  'easyquant',
   'education',
   'explore',
   'layout',
@@ -86,18 +89,21 @@ export const loadLangResources = async (lang: string) => {
 }
 
 if (!i18n.isInitialized) {
+  const currentLocale = Cookies.get(LOCALE_COOKIE_NAME) || 'zh-Hans'
+
   i18n.use(initReactI18next).init({
-    lng: 'zh-Hans', // Default to Simplified Chinese
+    lng: currentLocale,
     fallbackLng: 'zh-Hans',
     resources: getInitialTranslations(), // Ideally preload zh-Hans too if possible, but async load works
     interpolation: {
       escapeValue: false,
     },
   })
-  // Trigger initial load for zh-Hans if not present in initial resources
-  loadLangResources('zh-Hans').then(resources => {
-      i18n.addResourceBundle('zh-Hans', 'translation', resources, true, true)
-      i18n.changeLanguage('zh-Hans')
+  
+  // Trigger initial load for current locale if not present in initial resources (en-US is preloaded)
+  loadLangResources(currentLocale).then(resources => {
+      i18n.addResourceBundle(currentLocale, 'translation', resources, true, true)
+      i18n.changeLanguage(currentLocale)
   })
 }
 
