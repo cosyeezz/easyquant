@@ -12,7 +12,7 @@ import {
   ChevronRight,
   ShieldCheck,
   Zap,
-  Boxes
+  X
 } from 'lucide-react'
 
 const WorkflowNodeList = () => {
@@ -40,7 +40,7 @@ const WorkflowNodeList = () => {
   const handleAddNew = () => {
     const newNode = {
       name: `custom_node_${Date.now()}`,
-      title: '新自定义节点',
+      title: 'New Custom Node',
       category: 'transform',
       type: 'generic',
       icon: 'box',
@@ -107,7 +107,7 @@ const WorkflowNodeList = () => {
   }
 
   const handleDelete = async (id) => {
-    if (!window.confirm('确定要删除这个节点定义吗？')) return
+    if (!window.confirm('Are you sure you want to delete this node definition?')) return
     try {
       await fetch(`http://localhost:8000/api/v1/workflow/nodes/${id}`, { method: 'DELETE' })
       await fetchNodes()
@@ -128,106 +128,126 @@ const WorkflowNodeList = () => {
 
   const getCategoryIcon = (category) => {
     switch (category) {
-      case 'input': return <Box className="w-5 h-5 text-eq-info-text" />
-      case 'transform': return <Zap className="w-5 h-5 text-eq-warning-text" />
-      case 'output': return <ShieldCheck className="w-5 h-5 text-eq-success-text" />
-      default: return <Code className="w-5 h-5 text-eq-text-muted" />
+      case 'input': return <Box className="w-4 h-4 text-eq-info-text" />
+      case 'transform': return <Zap className="w-4 h-4 text-eq-warning-text" />
+      case 'output': return <ShieldCheck className="w-4 h-4 text-eq-success-text" />
+      default: return <Code className="w-4 h-4 text-eq-text-muted" />
     }
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      {/* Header Area */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-eq-text-primary">节点能力管理</h2>
-          <p className="text-eq-text-muted text-sm mt-1">管理系统中所有可用于工作流的原子节点</p>
-        </div>
+    <div className="h-full flex flex-col animate-fadeIn space-y-3">
+      {/* Linear-Style Toolbar */}
+      <div className="flex items-center justify-between px-1 py-2 mb-2 border-b border-eq-border-subtle/50 flex-shrink-0">
         
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={handleSync}
-            disabled={syncing}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg bg-eq-elevated border border-eq-border-subtle hover:border-eq-primary-500 text-eq-text-primary transition-all ${syncing ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? '同步中...' : '从代码同步'}
-          </button>
-          <button 
-            onClick={handleAddNew}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-eq-primary-500 hover:bg-eq-primary-600 text-white font-medium transition-all shadow-lg shadow-eq-primary-500/20"
-          >
-            <Plus className="w-4 h-4" />
-            新增自定义节点
-          </button>
+        {/* Left: Search & Filters */}
+        <div className="flex items-center gap-2">
+             {/* Search - Ghost Style */}
+             <div className="group flex items-center gap-2 px-2 py-1 rounded-md transition-colors hover:bg-eq-bg-elevated/50">
+                <Search className="w-3.5 h-3.5 text-eq-text-muted group-hover:text-eq-text-secondary" />
+                <input
+                    type="text"
+                    placeholder="Search nodes..."
+                    className="bg-transparent border-none p-0 text-xs w-32 focus:w-48 transition-all duration-300 text-eq-text-primary placeholder:text-eq-text-muted focus:ring-0"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+            </div>
+             {/* Divider */}
+             <div className="w-px h-3.5 bg-eq-border-subtle mx-1"></div>
+             
+             {searchTerm && (
+                <button
+                    onClick={() => setSearchTerm('')}
+                    className="flex items-center gap-1.5 px-2 py-1 text-[11px] text-eq-text-muted hover:text-eq-text-primary hover:bg-eq-bg-elevated rounded transition-colors"
+                >
+                    <X className="w-3 h-3" />
+                    <span className="font-medium">Reset</span>
+                </button>
+             )}
+        </div>
+
+        {/* Right: Actions */}
+        <div className="flex items-center gap-4">
+            <span className="text-[10px] text-eq-text-muted font-mono tracking-wider">
+                {filteredNodes.length} NODES
+             </span>
+             <div className="w-px h-3.5 bg-eq-border-subtle"></div>
+            
+            <button 
+                onClick={handleSync}
+                disabled={syncing}
+                className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium text-eq-text-secondary hover:text-eq-text-primary hover:bg-eq-bg-elevated rounded transition-colors"
+            >
+                 <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+                 {syncing ? 'Syncing...' : 'Sync Code'}
+            </button>
+
+            <button 
+                onClick={handleAddNew}
+                className="btn-primary !py-1 !px-3 !text-[11px] font-semibold flex items-center gap-1.5 shadow-sm"
+            >
+                <Plus className="w-3.5 h-3.5" />
+                New Node
+            </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* Main Content Split View */}
+      <div className="flex-1 grid grid-cols-12 gap-4 min-h-0 overflow-hidden">
+        
         {/* Left: Node List */}
-        <div className="lg:col-span-4 space-y-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-eq-text-muted" />
-            <input 
-              type="text"
-              placeholder="搜索节点..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-eq-surface border border-eq-border-subtle rounded-xl focus:ring-2 focus:ring-eq-primary-500/20 focus:border-eq-primary-500 transition-all outline-none"
-            />
-          </div>
-
-          <div className="bg-eq-surface rounded-2xl border border-eq-border-subtle overflow-hidden">
-            <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
+        <div className="col-span-4 flex flex-col min-h-0 bg-eq-bg-surface border border-eq-border-subtle rounded-lg overflow-hidden">
+            <div className="flex-1 overflow-y-auto custom-scrollbar divide-y divide-eq-border-subtle">
               {loading ? (
-                <div className="p-8 text-center text-eq-text-muted">加载中...</div>
+                <div className="p-8 text-center text-xs text-eq-text-muted">Loading Nodes...</div>
               ) : filteredNodes.length === 0 ? (
-                <div className="p-8 text-center text-eq-text-muted">未找到匹配节点</div>
+                <div className="p-8 text-center text-xs text-eq-text-muted">No nodes found.</div>
               ) : (
-                <div className="divide-y divide-eq-border-subtle">
-                  {filteredNodes.map(node => (
+                  filteredNodes.map(node => (
                     <button
                       key={node.id}
                       onClick={() => {
                         setSelectedNode(node);
                         setIsEditing(false);
                       }}
-                      className={`w-full flex items-center gap-3 p-4 transition-all hover:bg-eq-elevated group ${selectedNode?.id === node.id ? 'bg-eq-elevated border-l-4 border-l-eq-primary-500' : 'border-l-4 border-l-transparent'}`}
+                      className={`w-full flex items-center gap-3 p-3 transition-colors text-left group
+                         ${selectedNode?.id === node.id 
+                            ? 'bg-eq-bg-elevated border-l-2 border-l-eq-primary-500' 
+                            : 'hover:bg-eq-bg-elevated/50 border-l-2 border-l-transparent'}`}
                     >
-                      <div className="p-2 bg-eq-surface rounded-lg border border-eq-border-subtle group-hover:border-eq-primary-500/30">
+                      <div className={`p-1.5 rounded-md border border-eq-border-subtle ${selectedNode?.id === node.id ? 'bg-eq-bg-surface' : 'bg-eq-bg-elevated'}`}>
                         {getCategoryIcon(node.category)}
                       </div>
-                      <div className="flex-1 text-left min-w-0">
-                        <div className="font-semibold text-eq-text-primary truncate">{node.title}</div>
-                        <div className="text-xs text-eq-text-muted truncate font-mono">{node.name}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-xs font-medium truncate ${selectedNode?.id === node.id ? 'text-eq-text-primary' : 'text-eq-text-secondary'}`}>{node.title}</div>
+                        <div className="text-[10px] text-eq-text-muted truncate font-mono mt-0.5">{node.name}</div>
                       </div>
-                      <ChevronRight className={`w-4 h-4 text-eq-text-muted transition-transform ${selectedNode?.id === node.id ? 'translate-x-1 text-eq-primary-500' : ''}`} />
+                      <ChevronRight className={`w-3.5 h-3.5 text-eq-text-muted transition-transform ${selectedNode?.id === node.id ? 'translate-x-0.5 text-eq-primary-500' : 'opacity-0 group-hover:opacity-100'}`} />
                     </button>
-                  ))}
-                </div>
+                  ))
               )}
             </div>
-          </div>
         </div>
 
         {/* Right: Detail View */}
-        <div className="lg:col-span-8">
+        <div className="col-span-8 flex flex-col min-h-0 bg-eq-bg-surface border border-eq-border-subtle rounded-lg overflow-hidden">
           {selectedNode ? (
-            <div className="bg-eq-surface rounded-2xl border border-eq-border-subtle overflow-hidden flex flex-col h-full min-h-[600px]">
+            <div className="flex flex-col h-full">
               {/* Detail Header */}
-              <div className="p-6 border-b border-eq-border-subtle bg-eq-elevated/30">
+              <div className="px-5 py-4 border-b border-eq-border-subtle bg-eq-bg-elevated/20 flex-shrink-0">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="p-3 bg-eq-surface rounded-xl border border-eq-border-subtle shadow-sm">
+                    <div className="p-2.5 bg-eq-bg-surface rounded-lg border border-eq-border-subtle shadow-sm">
                       {getCategoryIcon(selectedNode.category)}
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold text-eq-text-primary">{selectedNode.title}</h3>
+                      <h3 className="text-lg font-semibold text-eq-text-primary tracking-tight">{selectedNode.title}</h3>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-eq-primary-500/10 text-eq-primary-400 border border-eq-primary-500/20">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-eq-bg-elevated border border-eq-border-subtle text-eq-text-secondary">
                           {selectedNode.category}
                         </span>
-                        <span className="text-xs text-eq-text-muted font-mono">{selectedNode.handler_path}</span>
+                        <code className="text-[10px] text-eq-text-muted font-mono bg-eq-bg-elevated px-1 rounded">{selectedNode.handler_path}</code>
                       </div>
                     </div>
                   </div>
@@ -235,32 +255,33 @@ const WorkflowNodeList = () => {
                     {isEditing ? (
                       <>
                         <button 
-                          onClick={handleSave}
-                          className="px-4 py-2 bg-eq-success-solid text-white rounded-lg text-sm font-bold shadow-lg shadow-eq-success-solid/20 hover:scale-[1.02] transition-all"
+                          onClick={() => setIsEditing(false)}
+                          className="px-3 py-1 bg-eq-bg-elevated border border-eq-border-subtle text-eq-text-primary rounded text-xs font-medium hover:bg-eq-bg-overlay transition-colors"
                         >
-                          保存修改
+                          Cancel
                         </button>
                         <button 
-                          onClick={() => setIsEditing(false)}
-                          className="px-4 py-2 bg-eq-elevated border border-eq-border-subtle text-eq-text-primary rounded-lg text-sm font-medium"
+                          onClick={handleSave}
+                          className="btn-primary !py-1 !px-3 !text-xs"
                         >
-                          取消
+                          Save Changes
                         </button>
                       </>
                     ) : (
                       <>
                         <button 
                           onClick={startEditing}
-                          className="p-2 text-eq-text-secondary hover:text-eq-primary-500 hover:bg-eq-primary-500/10 rounded-lg transition-all"
-                          title="编辑节点定义"
+                          className="p-1.5 text-eq-text-secondary hover:text-eq-primary-500 hover:bg-eq-bg-elevated rounded transition-colors"
+                          title="Edit Node Definition"
                         >
-                          <Settings className="w-5 h-5" />
+                          <Settings className="w-4 h-4" />
                         </button>
                         <button 
                           onClick={() => handleDelete(selectedNode.id)}
-                          className="p-2 text-eq-text-secondary hover:text-eq-danger-text hover:bg-eq-danger-bg rounded-lg transition-all"
+                          className="p-1.5 text-eq-text-secondary hover:text-eq-danger-text hover:bg-eq-danger-bg rounded transition-colors"
+                          title="Delete Node"
                         >
-                          <Trash2 className="w-5 h-5" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </>
                     )}
@@ -270,43 +291,43 @@ const WorkflowNodeList = () => {
                   <textarea 
                     value={editForm.description}
                     onChange={(e) => setEditForm({...editForm, description: e.target.value})}
-                    className="mt-4 w-full p-3 bg-eq-surface border border-eq-primary-500/50 rounded-xl text-eq-text-primary text-sm outline-none focus:ring-2 focus:ring-eq-primary-500/20"
+                    className="mt-3 w-full p-2 bg-eq-bg-surface border border-eq-border-subtle rounded text-sm text-eq-text-primary outline-none focus:border-eq-primary-500"
                     rows={2}
-                    placeholder="请输入节点描述..."
+                    placeholder="Enter node description..."
                   />
                 ) : (
-                  <p className="mt-4 text-eq-text-secondary leading-relaxed">
-                    {selectedNode.description || '暂无描述信息'}
+                  <p className="mt-3 text-sm text-eq-text-secondary leading-relaxed">
+                    {selectedNode.description || 'No description available.'}
                   </p>
                 )}
               </div>
 
               {/* Detail Content */}
-              <div className="flex-1 p-6 space-y-8 overflow-y-auto">
+              <div className="flex-1 p-5 space-y-6 overflow-y-auto custom-scrollbar">
                 {isEditing && (
-                  <section className="p-4 bg-eq-primary-500/5 rounded-2xl border border-eq-primary-500/20 space-y-4">
+                  <section className="p-4 bg-eq-bg-elevated/50 rounded-lg border border-eq-border-subtle space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-eq-text-muted uppercase tracking-widest pl-1">显示名称</label>
+                        <label className="text-[10px] font-bold text-eq-text-muted uppercase tracking-widest pl-1">Display Name</label>
                         <input 
                           type="text"
                           value={editForm.title}
                           onChange={(e) => setEditForm({...editForm, title: e.target.value})}
-                          className="w-full px-3 py-2 bg-eq-surface border border-eq-border-subtle rounded-lg text-sm text-eq-text-primary focus:border-eq-primary-500 outline-none"
+                          className="w-full px-2.5 py-1.5 bg-eq-bg-surface border border-eq-border-subtle rounded text-xs text-eq-text-primary focus:border-eq-primary-500 outline-none"
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-eq-text-muted uppercase tracking-widest pl-1">分类</label>
+                        <label className="text-[10px] font-bold text-eq-text-muted uppercase tracking-widest pl-1">Category</label>
                         <select 
                           value={editForm.category}
                           onChange={(e) => setEditForm({...editForm, category: e.target.value})}
-                          className="w-full px-3 py-2 bg-eq-surface border border-eq-border-subtle rounded-lg text-sm text-eq-text-primary focus:border-eq-primary-500 outline-none"
+                          className="w-full px-2.5 py-1.5 bg-eq-bg-surface border border-eq-border-subtle rounded text-xs text-eq-text-primary focus:border-eq-primary-500 outline-none"
                         >
-                          <option value="input">数据加载 (Input)</option>
-                          <option value="transform">数据处理 (Transform)</option>
-                          <option value="quant">量化指标 (Quant)</option>
-                          <option value="output">数据输出 (Output)</option>
-                          <option value="logic">逻辑控制 (Logic)</option>
+                          <option value="input">Data Loading (Input)</option>
+                          <option value="transform">Transformation</option>
+                          <option value="quant">Quantitative (Quant)</option>
+                          <option value="output">Output</option>
+                          <option value="logic">Logic Control</option>
                         </select>
                       </div>
                     </div>
@@ -315,10 +336,10 @@ const WorkflowNodeList = () => {
 
                 {/* Parameters Editor/Preview */}
                 <section>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2 text-eq-text-primary font-bold">
-                      <Settings className="w-4 h-4 text-eq-primary-500" />
-                      配置参数 (Parameters)
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2 text-eq-text-primary font-bold text-xs uppercase tracking-wider">
+                      <Settings className="w-3.5 h-3.5 text-eq-primary-500" />
+                      Parameters
                     </div>
                     {isEditing && (
                       <button 
@@ -326,7 +347,7 @@ const WorkflowNodeList = () => {
                           const newKey = `param_${Object.keys(editForm.parameters_schema.properties || {}).length + 1}`;
                           const updatedProps = {
                             ...(editForm.parameters_schema.properties || {}),
-                            [newKey]: { type: 'string', title: '新参数', description: '' }
+                            [newKey]: { type: 'string', title: 'New Param', description: '' }
                           };
                           setEditForm({
                             ...editForm,
@@ -337,18 +358,18 @@ const WorkflowNodeList = () => {
                             }
                           });
                         }}
-                        className="flex items-center gap-1 px-2 py-1 bg-eq-primary-500/10 text-eq-primary-400 text-[10px] font-bold rounded border border-eq-primary-500/20 hover:bg-eq-primary-500 hover:text-white transition-all"
+                        className="flex items-center gap-1 px-2 py-1 bg-eq-bg-elevated text-eq-primary-500 text-[10px] font-bold rounded border border-eq-border-subtle hover:border-eq-primary-500 transition-colors"
                       >
                         <Plus className="w-3 h-3" />
-                        添加参数
+                        Add Parameter
                       </button>
                     )}
                   </div>
 
                   {isEditing ? (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {Object.entries(editForm.parameters_schema.properties || {}).map(([key, prop]) => (
-                        <div key={key} className="p-4 bg-eq-elevated rounded-xl border border-eq-border-subtle space-y-4 relative group">
+                        <div key={key} className="p-3 bg-eq-bg-elevated/30 rounded border border-eq-border-subtle relative group">
                           <button 
                             onClick={() => {
                               const updatedProps = { ...editForm.parameters_schema.properties };
@@ -364,12 +385,12 @@ const WorkflowNodeList = () => {
                             }}
                             className="absolute top-2 right-2 p-1 text-eq-text-muted hover:text-eq-danger-text opacity-0 group-hover:opacity-100 transition-all"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                           
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-2 gap-3 mb-3">
                             <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-eq-text-muted uppercase tracking-widest">字段 ID (Key)</label>
+                              <label className="text-[10px] font-bold text-eq-text-muted uppercase tracking-widest">Key ID</label>
                               <input 
                                 type="text"
                                 value={key}
@@ -384,11 +405,11 @@ const WorkflowNodeList = () => {
                                     parameters_schema: { ...editForm.parameters_schema, properties: updatedProps }
                                   });
                                 }}
-                                className="w-full px-2 py-1.5 bg-eq-surface border border-eq-border-subtle rounded text-xs text-eq-text-primary outline-none focus:border-eq-primary-500 font-mono"
+                                className="w-full px-2 py-1 bg-eq-bg-surface border border-eq-border-subtle rounded text-[11px] text-eq-text-primary outline-none focus:border-eq-primary-500 font-mono"
                               />
                             </div>
                             <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-eq-text-muted uppercase tracking-widest">显示名称 (Title)</label>
+                              <label className="text-[10px] font-bold text-eq-text-muted uppercase tracking-widest">Title</label>
                               <input 
                                 type="text"
                                 value={prop.title || ''}
@@ -400,14 +421,14 @@ const WorkflowNodeList = () => {
                                     parameters_schema: { ...editForm.parameters_schema, properties: updatedProps }
                                   });
                                 }}
-                                className="w-full px-2 py-1.5 bg-eq-surface border border-eq-border-subtle rounded text-xs text-eq-text-primary outline-none focus:border-eq-primary-500"
+                                className="w-full px-2 py-1 bg-eq-bg-surface border border-eq-border-subtle rounded text-[11px] text-eq-text-primary outline-none focus:border-eq-primary-500"
                               />
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-3 gap-4">
+                          <div className="grid grid-cols-3 gap-3">
                             <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-eq-text-muted uppercase tracking-widest">数据类型 (Type)</label>
+                              <label className="text-[10px] font-bold text-eq-text-muted uppercase tracking-widest">Type</label>
                               <select 
                                 value={prop.type}
                                 onChange={(e) => {
@@ -418,17 +439,17 @@ const WorkflowNodeList = () => {
                                     parameters_schema: { ...editForm.parameters_schema, properties: updatedProps }
                                   });
                                 }}
-                                className="w-full px-2 py-1.5 bg-eq-surface border border-eq-border-subtle rounded text-xs text-eq-text-primary outline-none"
+                                className="w-full px-2 py-1 bg-eq-bg-surface border border-eq-border-subtle rounded text-[11px] text-eq-text-primary outline-none"
                               >
-                                <option value="string">字符串 (String)</option>
-                                <option value="number">数字 (Number)</option>
-                                <option value="boolean">布尔 (Boolean)</option>
-                                <option value="object">对象 (Object)</option>
-                                <option value="array">列表 (Array)</option>
+                                <option value="string">String</option>
+                                <option value="number">Number</option>
+                                <option value="boolean">Boolean</option>
+                                <option value="object">Object</option>
+                                <option value="array">Array</option>
                               </select>
                             </div>
                             <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-eq-text-muted uppercase tracking-widest">UI 格式 (Format)</label>
+                              <label className="text-[10px] font-bold text-eq-text-muted uppercase tracking-widest">Format</label>
                               <select 
                                 value={prop.format || ''}
                                 onChange={(e) => {
@@ -439,17 +460,17 @@ const WorkflowNodeList = () => {
                                     parameters_schema: { ...editForm.parameters_schema, properties: updatedProps }
                                   });
                                 }}
-                                className="w-full px-2 py-1.5 bg-eq-surface border border-eq-border-subtle rounded text-xs text-eq-text-primary outline-none"
+                                className="w-full px-2 py-1 bg-eq-bg-surface border border-eq-border-subtle rounded text-[11px] text-eq-text-primary outline-none"
                               >
-                                <option value="">无 (Default)</option>
-                                <option value="path">路径选择 (Path)</option>
-                                <option value="textarea">长文本 (Textarea)</option>
-                                <option value="column-map">列名映射 (Column Map)</option>
-                                <option value="password">密码 (Password)</option>
+                                <option value="">Default</option>
+                                <option value="path">File Path</option>
+                                <option value="textarea">Long Text</option>
+                                <option value="column-map">Column Map</option>
+                                <option value="password">Password</option>
                               </select>
                             </div>
                             <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-eq-text-muted uppercase tracking-widest">默认值 (Default)</label>
+                              <label className="text-[10px] font-bold text-eq-text-muted uppercase tracking-widest">Default</label>
                               <input 
                                 type="text"
                                 value={prop.default || ''}
@@ -461,7 +482,7 @@ const WorkflowNodeList = () => {
                                     parameters_schema: { ...editForm.parameters_schema, properties: updatedProps }
                                   });
                                 }}
-                                className="w-full px-2 py-1.5 bg-eq-surface border border-eq-border-subtle rounded text-xs text-eq-text-primary outline-none"
+                                className="w-full px-2 py-1 bg-eq-bg-surface border border-eq-border-subtle rounded text-[11px] text-eq-text-primary outline-none"
                               />
                             </div>
                           </div>
@@ -469,47 +490,38 @@ const WorkflowNodeList = () => {
                       ))}
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       {Object.entries(selectedNode.parameters_schema.properties || {}).map(([key, prop]) => (
-                        <div key={key} className="p-4 bg-eq-elevated rounded-xl border border-eq-border-subtle group hover:border-eq-primary-500/30 transition-all">
+                        <div key={key} className="p-3 bg-eq-bg-surface rounded-lg border border-eq-border-subtle/60 group hover:border-eq-border-subtle transition-all">
                           <div className="flex items-center justify-between mb-1">
-                            <span className="font-bold text-eq-text-primary">{prop.title || key}</span>
-                            <span className="px-2 py-0.5 rounded text-[10px] bg-eq-surface border border-eq-border-subtle text-eq-text-muted font-mono uppercase">
+                            <span className="font-medium text-xs text-eq-text-primary">{prop.title || key}</span>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] bg-eq-bg-elevated text-eq-text-muted font-mono uppercase">
                               {prop.type} {prop.format ? `(${prop.format})` : ''}
                             </span>
                           </div>
-                          <p className="text-xs text-eq-text-secondary">{prop.description || '无描述'}</p>
-                          <div className="mt-3">
-                            {prop.type === 'string' && prop.format === 'path' ? (
-                              <div className="flex gap-2">
-                                <div className="flex-1 px-3 py-1.5 bg-eq-surface border border-eq-border-subtle rounded text-xs text-eq-text-muted">/Users/data/...</div>
-                                <button className="px-3 py-1 bg-eq-primary-500 text-white text-[10px] rounded font-bold uppercase">浏览</button>
-                              </div>
-                            ) : (
-                              <div className="px-3 py-1.5 bg-eq-surface border border-eq-border-subtle rounded text-xs text-eq-text-muted">
-                                {prop.default || '请输入...'}
-                              </div>
-                            )}
-                          </div>
+                          <p className="text-[11px] text-eq-text-secondary">{prop.description || 'No description.'}</p>
                         </div>
                       ))}
+                      {Object.keys(selectedNode.parameters_schema.properties || {}).length === 0 && (
+                          <div className="text-xs text-eq-text-muted italic">No parameters defined.</div>
+                      )}
                     </div>
                   )}
                 </section>
 
                 {/* Ports Section */}
                 <section>
-                  <div className="flex items-center gap-2 mb-4 text-eq-text-primary font-bold">
-                    <RefreshCw className="w-4 h-4 text-eq-success-text" />
-                    数据端口与连线 (Ports)
+                  <div className="flex items-center gap-2 mb-3 text-eq-text-primary font-bold text-xs uppercase tracking-wider">
+                    <RefreshCw className="w-3.5 h-3.5 text-eq-success-text" />
+                    Ports & Wiring
                   </div>
                   {isEditing ? (
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-3">
-                        <label className="text-[10px] font-bold text-eq-text-muted uppercase tracking-widest pl-1">输入端口 (Inputs)</label>
-                        <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-eq-text-muted uppercase tracking-widest pl-1">Inputs</label>
+                        <div className="space-y-1.5">
                           {(editForm.ui_config?.handles?.source || []).map((h, idx) => (
-                            <div key={idx} className="flex gap-2">
+                            <div key={idx} className="flex gap-1.5">
                               <input 
                                 type="text"
                                 value={h}
@@ -518,27 +530,27 @@ const WorkflowNodeList = () => {
                                   newHandles[idx] = e.target.value;
                                   setEditForm({...editForm, ui_config: {...editForm.ui_config, handles: {...editForm.ui_config.handles, source: newHandles}}});
                                 }}
-                                className="flex-1 px-3 py-1.5 bg-eq-surface border border-eq-border-subtle rounded text-xs text-eq-text-primary outline-none"
+                                className="flex-1 px-2 py-1 bg-eq-bg-surface border border-eq-border-subtle rounded text-[11px] text-eq-text-primary outline-none"
                               />
                               <button onClick={() => {
                                 const newHandles = editForm.ui_config.handles.source.filter((_, i) => i !== idx);
                                 setEditForm({...editForm, ui_config: {...editForm.ui_config, handles: {...editForm.ui_config.handles, source: newHandles}}});
-                              }} className="p-1.5 text-eq-text-muted hover:text-eq-danger-text">
-                                <Trash2 className="w-4 h-4" />
+                              }} className="p-1 text-eq-text-muted hover:text-eq-danger-text">
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           ))}
                           <button onClick={() => {
                             const source = editForm.ui_config?.handles?.source || [];
                             setEditForm({...editForm, ui_config: {...editForm.ui_config, handles: {...editForm.ui_config.handles, source: [...source, `in_${source.length + 1}`]}}});
-                          }} className="w-full py-1.5 border border-dashed border-eq-border-subtle rounded text-[10px] text-eq-text-muted hover:border-eq-primary-500 hover:text-eq-primary-500">+ 添加输入端口</button>
+                          }} className="w-full py-1 border border-dashed border-eq-border-subtle rounded text-[10px] text-eq-text-muted hover:border-eq-primary-500 hover:text-eq-primary-500">+ Add Input</button>
                         </div>
                       </div>
-                      <div className="space-y-3">
-                        <label className="text-[10px] font-bold text-eq-text-muted uppercase tracking-widest pl-1">输出端口 (Outputs)</label>
-                        <div className="space-y-2">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-eq-text-muted uppercase tracking-widest pl-1">Outputs</label>
+                        <div className="space-y-1.5">
                           {(editForm.ui_config?.handles?.target || []).map((h, idx) => (
-                            <div key={idx} className="flex gap-2">
+                            <div key={idx} className="flex gap-1.5">
                               <input 
                                 type="text"
                                 value={h}
@@ -547,38 +559,38 @@ const WorkflowNodeList = () => {
                                   newHandles[idx] = e.target.value;
                                   setEditForm({...editForm, ui_config: {...editForm.ui_config, handles: {...editForm.ui_config.handles, target: newHandles}}});
                                 }}
-                                className="flex-1 px-3 py-1.5 bg-eq-surface border border-eq-border-subtle rounded text-xs text-eq-text-primary outline-none"
+                                className="flex-1 px-2 py-1 bg-eq-bg-surface border border-eq-border-subtle rounded text-[11px] text-eq-text-primary outline-none"
                               />
                               <button onClick={() => {
                                 const newHandles = editForm.ui_config.handles.target.filter((_, i) => i !== idx);
                                 setEditForm({...editForm, ui_config: {...editForm.ui_config, handles: {...editForm.ui_config.handles, target: newHandles}}});
-                              }} className="p-1.5 text-eq-text-muted hover:text-eq-danger-text">
-                                <Trash2 className="w-4 h-4" />
+                              }} className="p-1 text-eq-text-muted hover:text-eq-danger-text">
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           ))}
                           <button onClick={() => {
                             const target = editForm.ui_config?.handles?.target || [];
                             setEditForm({...editForm, ui_config: {...editForm.ui_config, handles: {...editForm.ui_config.handles, target: [...target, `out_${target.length + 1}`]}}});
-                          }} className="w-full py-1.5 border border-dashed border-eq-border-subtle rounded text-[10px] text-eq-text-muted hover:border-eq-primary-500 hover:text-eq-primary-500">+ 添加输出端口</button>
+                          }} className="w-full py-1 border border-dashed border-eq-border-subtle rounded text-[10px] text-eq-text-muted hover:border-eq-primary-500 hover:text-eq-primary-500">+ Add Output</button>
                         </div>
                       </div>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
                         {selectedNode.ui_config?.handles?.source?.map(h => (
-                          <div key={h} className="flex items-center gap-2 p-2 bg-eq-danger-bg/20 border border-eq-danger-border/30 rounded-lg text-xs text-eq-danger-text">
-                            <div className="w-2 h-2 rounded-full bg-eq-danger-solid"></div>{h}
+                          <div key={h} className="flex items-center gap-2 p-1.5 bg-eq-bg-elevated/50 border border-eq-border-subtle rounded text-[11px] text-eq-text-secondary">
+                            <div className="w-1.5 h-1.5 rounded-full bg-eq-danger-solid"></div>{h}
                           </div>
-                        )) || <div className="text-xs text-eq-text-muted italic">无输入</div>}
+                        )) || <div className="text-[10px] text-eq-text-muted italic">No Inputs</div>}
                       </div>
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         {selectedNode.ui_config?.handles?.target?.map(h => (
-                          <div key={h} className="flex items-center gap-2 p-2 bg-eq-success-bg/20 border border-eq-border-subtle rounded-lg text-xs text-eq-success-text">
-                            <div className="w-2 h-2 rounded-full bg-eq-success-solid"></div>{h}
+                          <div key={h} className="flex items-center gap-2 p-1.5 bg-eq-bg-elevated/50 border border-eq-border-subtle rounded text-[11px] text-eq-text-secondary">
+                            <div className="w-1.5 h-1.5 rounded-full bg-eq-success-solid"></div>{h}
                           </div>
-                        )) || <div className="text-xs text-eq-text-muted italic">无输出</div>}
+                        )) || <div className="text-[10px] text-eq-text-muted italic">No Outputs</div>}
                       </div>
                     </div>
                   )}
@@ -586,26 +598,21 @@ const WorkflowNodeList = () => {
 
                 <section>
                   <details className="group">
-                    <summary className="flex items-center gap-2 cursor-pointer text-eq-text-muted hover:text-eq-text-primary transition-all font-bold text-sm">
-                      <FileJson className="w-4 h-4" />查看原始 JSON 定义
+                    <summary className="flex items-center gap-1.5 cursor-pointer text-eq-text-muted hover:text-eq-text-primary transition-all font-bold text-xs">
+                      <FileJson className="w-3.5 h-3.5" /> View Raw JSON
                     </summary>
-                    <div className="mt-4 bg-eq-elevated rounded-xl border border-eq-border-subtle p-4 font-mono text-[10px] overflow-x-auto text-eq-text-secondary">
+                    <div className="mt-2 bg-eq-bg-base/50 rounded-lg border border-eq-border-subtle p-3 font-mono text-[10px] overflow-x-auto text-eq-text-secondary">
                       <pre>{JSON.stringify(selectedNode, null, 2)}</pre>
                     </div>
                   </details>
                 </section>
               </div>
-
-              <div className="p-4 border-t border-eq-border-subtle bg-eq-elevated/10 flex justify-end gap-3">
-                <button className="px-4 py-2 text-sm font-medium text-eq-text-secondary hover:text-eq-text-primary transition-all">查看运行日志</button>
-                <button className="px-4 py-2 bg-eq-primary-500 text-white rounded-lg text-sm font-bold shadow-lg shadow-eq-primary-500/20 hover:scale-[1.02] transition-all active:scale-[0.98]">运行单元测试</button>
-              </div>
             </div>
           ) : (
-            <div className="bg-eq-surface rounded-2xl border border-eq-border-subtle border-dashed h-full min-h-[600px] flex flex-col items-center justify-center text-eq-text-muted animate-in zoom-in-95 duration-500">
-              <div className="p-4 bg-eq-elevated rounded-full mb-4"><Info className="w-12 h-12 opacity-20" /></div>
-              <p className="text-lg font-medium">请在左侧选择一个节点查看详细能力</p>
-              <p className="text-sm mt-1">同步代码定义的节点或手动创建自定义逻辑</p>
+            <div className="h-full flex flex-col items-center justify-center text-eq-text-muted">
+              <div className="p-3 bg-eq-bg-elevated rounded-full mb-3"><Info className="w-8 h-8 opacity-20" /></div>
+              <p className="text-sm font-medium">Select a node to view details</p>
+              <p className="text-xs mt-1 text-eq-text-secondary">Sync code definitions or create custom nodes.</p>
             </div>
           )}
         </div>

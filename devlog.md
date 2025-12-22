@@ -1,3 +1,27 @@
+# 开发日志 (2025-12-22) [UI REFACTOR]
+
+## 全站视觉重构 - Linear/Stripe Fintech Aesthetic
+
+本次更新将 EasyQuant 的用户界面重构为极简的 **"Linear/Stripe"** 金融科技风格，强调数据的可读性与专业感。
+
+### 1. 视觉语言 (Visual Language)
+- **色彩体系**: 确立了以 **Deep Blue** 为主色调，搭配 **Refined Greys** (冷灰) 的底色系统。
+- **边框风格**: 采用极致轻薄的 **Thin Borders** (`1px` solid / subtle)，去除多余的阴影和圆角，营造精密的工具感。
+- **排版**: 关键数值与状态显示全面启用 **Monospace Data Fonts** (等宽字体)，确保数据对齐整洁。
+
+### 2. 交互与布局 (UX & Layout)
+- **Minimalist Header**: 重设计了顶部导航栏，去除视觉噪点，仅保留核心操作。
+- **Breathing Status**: 引入了“呼吸式”状态指示点 (Breathing Dots)，直观展示系统/任务的实时运行状态。
+- **高密度列表**: 优化了 `DataTableList`，通过紧凑的行高和精细的分割线，提升单屏信息密度。
+
+### 3. 涉及组件
+- `index.css`: 全局样式变量与重置。
+- `App.jsx`: 布局结构调整。
+- `ProcessMonitor.jsx`: 状态监控组件样式升级。
+- `DataTableList.jsx`: 数据表格视觉优化。
+
+---
+
 # 开发日志 (2025-12-21 Update 5) [PROD-READY NODE EDITOR]
 
 ## 节点能力管理 - 生产级可视化编辑器

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Pencil, Trash2, Loader2, Database, Play, AlertTriangle, Copy, X, RefreshCw, Search, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Pencil, Trash2, Loader2, Database, Play, AlertTriangle, Copy, X, RefreshCw, Search, RotateCcw, ChevronLeft, ChevronRight, Filter } from 'lucide-react'
 import api from '../services/api'
 import Modal from './Modal'
 import Select from './ui/Select'
@@ -10,7 +10,6 @@ function DataTableList({ onNavigate }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   
-  // Pagination & Filtering
   const [pagination, setPagination] = useState({ page: 1, pageSize: 20, total: 0 })
   const [filters, setFilters] = useState({
       search: '',
@@ -18,37 +17,37 @@ function DataTableList({ onNavigate }) {
       status: 'all'
   })
   
-  // Modals
   const [deleteModal, setDeleteModal] = useState({ open: false, table: null, error: null })
   const [publishModal, setPublishModal] = useState({ open: false, table: null, error: null })
   const [publishing, setPublishing] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  useEffect(() => {
-    fetchData()
-  }, []) // Initial load
+  // Hover state for table rows to show actions
+  const [hoveredRow, setHoveredRow] = useState(null)
 
   useEffect(() => {
-    // Reload when pagination or filters trigger
     fetchData()
-  }, [pagination.page, filters]) // Watch filters and page
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [pagination.page, filters])
 
   const fetchData = async () => {
     setLoading(true)
     setError(null)
     try {
-      // Prepare params
       const params = {
           page: pagination.page,
           page_size: pagination.pageSize,
       }
       if (filters.search) params.search = filters.search
       if (filters.category_id !== 'all') params.category_id = filters.category_id
-      if (filters.status !== 'all') params.status = filters.status.toUpperCase() // API expects enum (CREATED, DRAFT)
+      if (filters.status !== 'all') params.status = filters.status.toUpperCase()
 
       const [tablesResp, categoriesData] = await Promise.all([
         api.getDataTables(params),
-        categories.length > 0 ? Promise.resolve(categories) : api.getTableCategories() // Don't reload cats if have them
+        categories.length > 0 ? Promise.resolve(categories) : api.getTableCategories()
       ])
       
       setTables(tablesResp.items)
@@ -57,7 +56,7 @@ function DataTableList({ onNavigate }) {
       if (categories.length === 0) setCategories(categoriesData)
 
     } catch (err) {
-      setError(err.message || '加载失败，请检查后端服务是否启动')
+      setError(err.message || 'Failed to load data.')
     } finally {
       setLoading(false)
     }
@@ -69,11 +68,10 @@ function DataTableList({ onNavigate }) {
     setDeleteModal(prev => ({ ...prev, error: null }))
     try {
       await api.deleteDataTable(deleteModal.table.id)
-      fetchData() // Reload list
+      fetchData()
       setDeleteModal({ open: false, table: null, error: null })
     } catch (error) {
-      console.error('Failed to delete:', error)
-      setDeleteModal(prev => ({ ...prev, error: error.response?.data?.detail || '删除失败' }))
+      setDeleteModal(prev => ({ ...prev, error: error.response?.data?.detail || 'Delete failed' }))
     } finally {
       setDeleting(false)
     }
@@ -85,10 +83,10 @@ function DataTableList({ onNavigate }) {
     setPublishModal(prev => ({ ...prev, error: null }))
     try {
       await api.publishDataTable(publishModal.table.id)
-      fetchData() // Reload list
+      fetchData()
       setPublishModal({ open: false, table: null, error: null })
     } catch (err) {
-      setPublishModal(prev => ({ ...prev, error: err.response?.data?.detail || '发布失败' }))
+      setPublishModal(prev => ({ ...prev, error: err.response?.data?.detail || 'Publish failed' }))
     } finally {
       setPublishing(false)
     }
@@ -99,29 +97,25 @@ function DataTableList({ onNavigate }) {
     return cat ? cat.name : '-'
   }
 
+  // Refined pastel palette for tags
   const CATEGORY_PALETTE = [
-    'bg-eq-primary-500/15 text-eq-primary-400 border-eq-primary-500/30',
-    'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-    'bg-violet-500/15 text-violet-400 border-violet-500/30',
-    'bg-amber-500/15 text-amber-400 border-amber-500/30',
-    'bg-rose-500/15 text-rose-400 border-rose-500/30',
-    'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
-    'bg-indigo-500/15 text-indigo-400 border-indigo-500/30',
-    'bg-teal-500/15 text-teal-400 border-teal-500/30',
-    'bg-fuchsia-500/15 text-fuchsia-400 border-fuchsia-500/30',
-    'bg-lime-500/15 text-lime-400 border-lime-500/30',
+    'bg-blue-50 text-blue-700 border-blue-100',
+    'bg-emerald-50 text-emerald-700 border-emerald-100',
+    'bg-purple-50 text-purple-700 border-purple-100',
+    'bg-amber-50 text-amber-700 border-amber-100',
+    'bg-rose-50 text-rose-700 border-rose-100',
+    'bg-cyan-50 text-cyan-700 border-cyan-100',
   ]
 
   const getCategoryStyle = (id) => {
-    if (!id) return 'bg-eq-elevated text-eq-text-secondary border-eq-border-subtle'
+    if (!id) return 'bg-eq-bg-elevated text-eq-text-secondary border-eq-border-default'
     const index = id % CATEGORY_PALETTE.length
     return CATEGORY_PALETTE[index]
   }
 
-  // Handle Search Input (Debounced or Enter)
   const [searchInput, setSearchInput] = useState('')
   const handleSearchCommit = () => {
-      setPagination(prev => ({ ...prev, page: 1 })) // Reset to page 1
+      setPagination(prev => ({ ...prev, page: 1 }))
       setFilters(prev => ({ ...prev, search: searchInput }))
   }
 
@@ -131,254 +125,272 @@ function DataTableList({ onNavigate }) {
     setPagination(prev => ({ ...prev, page: 1 }))
   }
 
-  // Options for custom Select components
   const categoryOptions = [
-      { label: '所有分类', value: 'all' },
-      ...categories.map(c => ({ label: c.name, value: c.id })) // Value can be number now for our Select
+      { label: 'All Categories', value: 'all' },
+      ...categories.map(c => ({ label: c.name, value: c.id }))
   ]
   
   const statusOptions = [
-      { label: '所有状态', value: 'all' },
-      { label: '已发布', value: 'created' },
-      { label: '草稿/待同步', value: 'draft' }
+      { label: 'All Status', value: 'all' },
+      { label: 'Published', value: 'created' },
+      { label: 'Draft', value: 'draft' }
   ]
   
   const totalPages = Math.ceil(pagination.total / pagination.pageSize)
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-3xl font-bold text-eq-text-primary">数据表管理</h2>
-              <p className="mt-1 text-eq-text-secondary">管理系统中的数据库表元数据</p>
+    <div className="space-y-3 animate-fadeIn h-full flex flex-col">
+      {/* Linear-Style Toolbar */}
+      <div className="flex items-center justify-between px-1 py-2 mb-2 border-b border-eq-border-subtle/50">
+        
+        {/* Left: Unified Filter Bar */}
+        <div className="flex items-center gap-2">
+            
+            {/* Search - Ghost Style */}
+            <div className="group flex items-center gap-2 px-2 py-1 rounded-md transition-colors hover:bg-eq-bg-elevated/50">
+                <Search className="w-3.5 h-3.5 text-eq-text-muted group-hover:text-eq-text-secondary" />
+                <input
+                    type="text"
+                    placeholder="Search..."
+                    className="bg-transparent border-none p-0 text-xs w-24 focus:w-48 transition-all duration-300 text-eq-text-primary placeholder:text-eq-text-muted focus:ring-0"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearchCommit()}
+                />
             </div>
-            <button onClick={() => onNavigate('table-new')} className="btn-primary flex items-center gap-2 whitespace-nowrap">
-                <Plus className="w-5 h-5" />
-                新建数据表
-            </button>
+
+            {/* Divider */}
+            <div className="w-px h-3.5 bg-eq-border-subtle mx-1"></div>
+
+            {/* Filters - Ghost Style */}
+            <div className="flex items-center gap-1">
+                <div className="min-w-[100px]">
+                    <Select
+                        value={filters.category_id}
+                        onChange={(val) => { setFilters(prev => ({...prev, category_id: val})); setPagination(prev => ({...prev, page: 1})); }}
+                        options={categoryOptions}
+                        placeholder="Category"
+                        size="sm"
+                        variant="ghost"
+                    />
+                </div>
+                <div className="w-px h-3.5 bg-eq-border-subtle mx-1"></div>
+                <div className="min-w-[90px]">
+                    <Select
+                        value={filters.status}
+                        onChange={(val) => { setFilters(prev => ({...prev, status: val})); setPagination(prev => ({...prev, page: 1})); }}
+                        options={statusOptions}
+                        placeholder="Status"
+                        size="sm"
+                        variant="ghost"
+                    />
+                </div>
+            </div>
+
+            {/* Actions */}
+            {(filters.search || filters.category_id !== 'all' || filters.status !== 'all') && (
+                <>
+                    <div className="w-px h-3.5 bg-eq-border-subtle mx-1"></div>
+                    <button
+                        onClick={handleReset}
+                        className="flex items-center gap-1.5 px-2 py-1 text-[11px] text-eq-text-muted hover:text-eq-text-primary hover:bg-eq-bg-elevated rounded transition-colors"
+                    >
+                        <X className="w-3 h-3" />
+                        <span className="font-medium">Reset</span>
+                    </button>
+                </>
+            )}
         </div>
 
-        {/* Filter Toolbar */}
-        <div className="flex flex-col sm:flex-row gap-3 bg-eq-surface p-4 rounded-lg border border-eq-border-subtle z-10 relative items-center">
-          {/* Search */}
-          <div className="relative flex-1 w-full">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-eq-text-muted" />
-            <input
-              type="text"
-              placeholder="搜索表名、物理名..."
-              className="input-field !pl-9 !pr-8 w-full"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearchCommit()}
-            />
-            {searchInput && (
-              <button
-                onClick={() => { setSearchInput(''); handleSearchCommit() }}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-eq-text-muted hover:text-eq-text-primary p-0.5 rounded-full hover:bg-eq-elevated"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-
-          {/* Category Filter */}
-          <div className="w-full sm:w-40">
-            <Select
-                value={filters.category_id}
-                onChange={(val) => { setFilters(prev => ({...prev, category_id: val})); setPagination(prev => ({...prev, page: 1})); }}
-                options={categoryOptions}
-                placeholder="选择分类"
-                clearable={true}
-                onClear={() => { setFilters(prev => ({...prev, category_id: 'all'})); setPagination(prev => ({...prev, page: 1})); }}
-            />
-          </div>
-
-          {/* Status Filter */}
-          <div className="w-full sm:w-40">
-             <Select
-                value={filters.status}
-                onChange={(val) => { setFilters(prev => ({...prev, status: val})); setPagination(prev => ({...prev, page: 1})); }}
-                options={statusOptions}
-                placeholder="选择状态"
-                clearable={true}
-                onClear={() => { setFilters(prev => ({...prev, status: 'all'})); setPagination(prev => ({...prev, page: 1})); }}
-            />
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-3 pl-2 border-l border-eq-border-subtle ml-1">
-            <button
-              onClick={handleReset}
-              className="w-24 px-4 py-2 bg-eq-elevated border border-eq-border-subtle text-eq-text-secondary hover:text-eq-text-primary hover:border-eq-border-default rounded-md transition-all flex items-center justify-center gap-2"
-              title="重置所有条件"
+        {/* Right: Primary Action */}
+        <div className="flex items-center gap-4">
+             <span className="text-[10px] text-eq-text-muted font-mono tracking-wider">
+                {tables.length} / {pagination.total} ROWS
+             </span>
+             <div className="w-px h-3.5 bg-eq-border-subtle"></div>
+            <button 
+                onClick={() => onNavigate('table-new')} 
+                className="btn-primary !py-1 !px-3 !text-[11px] font-semibold flex items-center gap-1.5 shadow-sm"
             >
-              <RotateCcw className="w-4 h-4" />
-              <span className="text-sm font-medium">重置</span>
+                <Plus className="w-3.5 h-3.5" />
+                New Table
             </button>
-
-            <button
-                onClick={handleSearchCommit}
-                className="w-24 btn-primary px-4 py-2 flex items-center justify-center gap-2 whitespace-nowrap transition-all"
-            >
-                <Search className="w-4 h-4" />
-                查询
-            </button>
-          </div>
         </div>
       </div>
 
-      {loading && tables.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-64 gap-4">
-           <Loader2 className="w-12 h-12 text-eq-primary-500 animate-spin" />
-           <p className="text-eq-text-secondary">数据加载中...</p>
-        </div>
-      ) : tables.length === 0 ? (
-        <div className="card text-center py-12">
-            <Database className="w-16 h-16 text-eq-text-muted mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-eq-text-primary mb-2">暂无数据表</h3>
-            <p className="text-eq-text-secondary mb-4">没有找到匹配的数据表</p>
-        </div>
-      ) : (
-        <div className="card overflow-hidden p-0 flex flex-col min-h-[500px]">
-          <div className="overflow-x-auto flex-1">
-            <table className="w-full">
-                <thead className="bg-eq-elevated border-b border-eq-border-subtle">
-                <tr>
-                    <th className="text-left px-6 py-4 text-sm font-medium text-eq-text-secondary">显示名称</th>
-                    <th className="text-left px-6 py-4 text-sm font-medium text-eq-text-secondary">物理表名</th>
-                    <th className="text-left px-6 py-4 text-sm font-medium text-eq-text-secondary">分类</th>
-                    <th className="text-left px-6 py-4 text-sm font-medium text-eq-text-secondary">状态</th>
-                    <th className="text-right px-6 py-4 text-sm font-medium text-eq-text-secondary">操作</th>
-                </tr>
-                </thead>
-                <tbody className="divide-y divide-eq-border-subtle">
-                {tables.map((table) => {
-                    const isPublished = table.status === 'created' || table.status === 'CREATED';
-                    const isSyncNeeded = !isPublished && table.last_published_at;
-
-                    return (
-                    <tr key={table.id} className="hover:bg-eq-elevated transition-colors">
-                        <td className="px-6 py-4">
-                        <span className="font-medium text-eq-text-primary">{table.name}</span>
-                        {table.description && (
-                            <p className="text-xs text-eq-text-muted mt-1 line-clamp-1 max-w-xs" title={table.description}>{table.description}</p>
-                        )}
-                        </td>
-                        <td className="px-6 py-4">
-                        <code className="px-2 py-1 bg-eq-elevated rounded text-sm text-eq-text-secondary font-mono">{table.table_name}</code>
-                        </td>
-                        <td className="px-6 py-4">
-                        <span className={`badge border ${getCategoryStyle(table.category_id)}`}>
-                            {getCategoryName(table.category_id)}
-                        </span>
-                        </td>
-                        <td className="px-6 py-4">
-                        {isPublished ? (
-                            <span className="px-2 py-1 bg-eq-success-bg text-eq-success-text rounded text-xs font-medium border border-eq-success-border">
-                            已发布
-                            </span>
-                        ) : isSyncNeeded ? (
-                            <span className="px-2 py-1 bg-violet-500/15 text-violet-400 rounded text-xs font-medium border border-violet-500/30 flex items-center gap-1 w-max">
-                            待同步
-                            </span>
-                        ) : (
-                            <span className="px-2 py-1 bg-eq-warning-bg text-eq-warning-text rounded text-xs font-medium border border-eq-warning-border">
-                            草稿
-                            </span>
-                        )}
-                        </td>
-                        <td className="px-6 py-4">
-                        <div className="flex items-center justify-end gap-2">
-                            {!isPublished && (
-                            <button
-                                onClick={() => setPublishModal({ open: true, table, error: null })}
-                                className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white rounded-md transition-all ${
-                                    isSyncNeeded
-                                    ? 'bg-violet-600 hover:bg-violet-700'
-                                    : 'bg-eq-primary-500 hover:bg-eq-primary-600'
-                                }`}
-                                title={isSyncNeeded ? "同步结构变更到数据库 (新增列)" : "发布并创建物理表"}
-                            >
-                                {isSyncNeeded ? <RefreshCw className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-                                {isSyncNeeded ? '更新结构' : '发布'}
-                            </button>
-                            )}
-
-                            <button onClick={() => onNavigate('table-new', table.id)} className="btn-icon" title="复制表结构">
-                            <Copy className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => onNavigate('table-edit', table.id)} className="btn-icon" title="编辑内容">
-                            <Pencil className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => setDeleteModal({ open: true, table, error: null })} className="btn-icon-danger" title="删除">
-                            <Trash2 className="w-4 h-4" />
-                            </button>
-                        </div>
-                        </td>
+      {/* Main Table Content */}
+      <div className="flex-1 flex flex-col min-h-0">
+        {loading && tables.length === 0 ? (
+            <div className="flex flex-col items-center justify-center flex-1 gap-4 py-12">
+            <Loader2 className="w-8 h-8 text-eq-primary-500 animate-spin" />
+            <p className="text-sm text-eq-text-secondary">Loading Data...</p>
+            </div>
+        ) : tables.length === 0 ? (
+            <div className="flex flex-col items-center justify-center flex-1 py-12 bg-eq-bg-elevated/20 rounded-xl m-4">
+                <div className="p-4 rounded-full bg-eq-bg-elevated mb-4">
+                    <Database className="w-8 h-8 text-eq-text-muted/50" />
+                </div>
+                <h3 className="text-sm font-medium text-eq-text-primary">No Data Tables Found</h3>
+                <p className="text-xs text-eq-text-secondary mt-1 max-w-xs text-center leading-relaxed">
+                    Start by creating a new table definition to organize your quantitative data.
+                </p>
+                <button 
+                    onClick={() => onNavigate('table-new')} 
+                    className="mt-6 btn-secondary !py-1.5 !px-4 text-xs font-medium"
+                >
+                    Create Table
+                </button>
+            </div>
+        ) : (
+            <div className="bg-eq-bg-surface border border-eq-border-default rounded-lg overflow-hidden shadow-sm flex flex-col flex-1">
+            <div className="overflow-auto flex-1 custom-scrollbar">
+                <table className="w-full text-sm text-left border-collapse">
+                    <thead className="bg-eq-bg-elevated/50 border-b border-eq-border-subtle text-eq-text-secondary sticky top-0 z-10 backdrop-blur-sm">
+                    <tr>
+                        <th className="px-6 py-3 font-medium text-xs uppercase tracking-wider w-[25%]">Display Name</th>
+                        <th className="px-6 py-3 font-medium text-xs uppercase tracking-wider w-[20%]">Physical Table</th>
+                        <th className="px-6 py-3 font-medium text-xs uppercase tracking-wider w-[15%]">Category</th>
+                        <th className="px-6 py-3 font-medium text-xs uppercase tracking-wider w-[15%]">Status</th>
+                        <th className="px-6 py-3 font-medium text-xs uppercase tracking-wider text-right">Actions</th>
                     </tr>
-                    );
-                })}
-                </tbody>
-            </table>
-          </div>
+                    </thead>
+                    <tbody className="divide-y divide-eq-border-subtle">
+                    {tables.map((table) => {
+                        const isPublished = table.status === 'created' || table.status === 'CREATED';
+                        const isSyncNeeded = !isPublished && table.last_published_at;
 
-          {/* Pagination Footer */}
-          <div className="border-t border-eq-border-subtle px-6 py-4 flex items-center justify-between bg-eq-elevated">
-            <div className="text-sm text-eq-text-secondary">
-                共 <span className="font-medium text-eq-text-primary">{pagination.total}</span> 条记录
-                (第 {pagination.page} / {totalPages || 1} 页)
+                        return (
+                        <tr 
+                            key={table.id} 
+                            className="group hover:bg-eq-bg-elevated/50 transition-colors"
+                            onMouseEnter={() => setHoveredRow(table.id)}
+                            onMouseLeave={() => setHoveredRow(null)}
+                        >
+                            <td className="px-6 py-2.5 align-middle">
+                                <div className="font-medium text-eq-text-primary text-sm">{table.name}</div>
+                                {table.description && (
+                                    <div className="text-[10px] text-eq-text-muted mt-0.5 line-clamp-1 max-w-[200px]">{table.description}</div>
+                                )}
+                            </td>
+                            <td className="px-6 py-2.5 align-middle">
+                                <code className="font-mono text-[11px] text-eq-text-secondary bg-eq-bg-elevated px-1.5 py-0.5 rounded border border-eq-border-subtle select-all">
+                                    {table.table_name}
+                                </code>
+                            </td>
+                            <td className="px-6 py-2.5 align-middle">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${getCategoryStyle(table.category_id)}`}>
+                                    {getCategoryName(table.category_id)}
+                                </span>
+                            </td>
+                            <td className="px-6 py-2.5 align-middle">
+                            {isPublished ? (
+                                <div className="flex items-center gap-1.5 text-eq-success-text">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-eq-success-solid"></span>
+                                    <span className="text-[11px] font-medium">Published</span>
+                                </div>
+                            ) : isSyncNeeded ? (
+                                <div className="flex items-center gap-1.5 text-eq-primary-500">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-eq-primary-500 animate-pulse"></span>
+                                    <span className="text-[11px] font-medium">Update Needed</span>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-1.5 text-eq-warning-text">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-eq-warning-solid"></span>
+                                    <span className="text-[11px] font-medium">Draft</span>
+                                </div>
+                            )}
+                            </td>
+                            <td className="px-6 py-2.5 align-middle text-right">
+                                <div className={`flex items-center justify-end gap-1 transition-opacity duration-200 ${hoveredRow === table.id ? 'opacity-100' : 'opacity-60'}`}>
+                                    {!isPublished && (
+                                    <button
+                                        onClick={() => setPublishModal({ open: true, table, error: null })}
+                                        className={`p-1.5 rounded-md transition-colors ${
+                                            isSyncNeeded ? 'text-eq-primary-500 hover:bg-eq-primary-500/10' : 'text-eq-primary-500 hover:bg-eq-primary-500/10'
+                                        }`}
+                                        title={isSyncNeeded ? "Sync Structure" : "Publish"}
+                                    >
+                                        {isSyncNeeded ? <RefreshCw className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                                    </button>
+                                    )}
+
+                                    <button onClick={() => onNavigate('table-new', table.id)} className="p-1.5 text-eq-text-secondary hover:text-eq-text-primary hover:bg-eq-bg-overlay rounded-md" title="Clone">
+                                        <Copy className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button onClick={() => onNavigate('table-edit', table.id)} className="p-1.5 text-eq-text-secondary hover:text-eq-text-primary hover:bg-eq-bg-overlay rounded-md" title="Edit">
+                                        <Pencil className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button onClick={() => setDeleteModal({ open: true, table, error: null })} className="p-1.5 text-eq-text-muted hover:text-eq-danger-text hover:bg-eq-danger-bg rounded-md" title="Delete">
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        );
+                    })}
+                    </tbody>
+                </table>
             </div>
-            <div className="flex items-center gap-2">
-                <button
-                    onClick={() => setPagination(p => ({ ...p, page: Math.max(1, p.page - 1) }))}
-                    disabled={pagination.page <= 1 || loading}
-                    className="p-1 rounded hover:bg-eq-surface disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <ChevronLeft className="w-5 h-5 text-eq-text-secondary" />
-                </button>
-                <button
-                    onClick={() => setPagination(p => ({ ...p, page: Math.min(totalPages, p.page + 1) }))}
-                    disabled={pagination.page >= totalPages || loading}
-                    className="p-1 rounded hover:bg-eq-surface disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <ChevronRight className="w-5 h-5 text-eq-text-secondary" />
-                </button>
+
+            {/* Pagination Footer */}
+            <div className="border-t border-eq-border-subtle px-4 py-2 flex items-center justify-between bg-eq-bg-elevated/30 text-xs">
+                <div className="text-eq-text-secondary">
+                    Showing <span className="font-medium text-eq-text-primary">{tables.length}</span> of <span className="font-medium text-eq-text-primary">{pagination.total}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                    <button
+                        onClick={() => setPagination(p => ({ ...p, page: Math.max(1, p.page - 1) }))}
+                        disabled={pagination.page <= 1 || loading}
+                        className="p-1 rounded hover:bg-eq-bg-overlay disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                        <ChevronLeft className="w-3.5 h-3.5 text-eq-text-primary" />
+                    </button>
+                    <span className="text-eq-text-primary px-2 font-medium">
+                        {pagination.page} / {totalPages || 1}
+                    </span>
+                    <button
+                        onClick={() => setPagination(p => ({ ...p, page: Math.min(totalPages, p.page + 1) }))}
+                        disabled={pagination.page >= totalPages || loading}
+                        className="p-1 rounded hover:bg-eq-bg-overlay disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                        <ChevronRight className="w-3.5 h-3.5 text-eq-text-primary" />
+                    </button>
+                </div>
             </div>
-          </div>
 
-        </div>
-      )}
+            </div>
+        )}
+      </div>
 
-      {/* Delete Modal */}
+      {/* Delete Modal - Refined */}
       {deleteModal.open && (
-         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 animate-fadeIn p-4">
-          <div className="bg-eq-surface rounded-lg p-6 max-w-md w-full border border-eq-border-subtle animate-slideUp">
-            <div className="flex items-start gap-3">
-              <div className="p-2 bg-eq-danger-bg rounded-full">
-                <AlertTriangle className="w-6 h-6 text-eq-danger-text" />
+         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn p-4">
+          <div className="bg-eq-bg-surface rounded-lg p-6 max-w-md w-full border border-eq-border-subtle shadow-xl animate-slideUp">
+            <div className="flex items-start gap-4">
+              <div className="p-2 bg-eq-danger-bg rounded-full flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-eq-danger-text" />
               </div>
               <div className="flex-1">
-                <h3 className="font-semibold text-lg text-eq-text-primary">
-                  {(deleteModal.table?.status === 'CREATED' || deleteModal.table?.status === 'created') ? "高危操作警告" : "确认删除"}
+                <h3 className="font-semibold text-lg text-eq-text-primary leading-tight">
+                  {(deleteModal.table?.status?.toUpperCase() === 'CREATED') ? "Critical Action Warning" : "Confirm Deletion"}
                 </h3>
 
-                <div className="mt-2 text-eq-text-secondary text-sm">
-                  {(deleteModal.table?.status === 'CREATED' || deleteModal.table?.status === 'created') ? (
-                    <div className="space-y-2">
-                      <p>您正在删除已发布的表 <span className="font-bold text-eq-text-primary">{deleteModal.table?.name}</span>。</p>
-                      <p className="bg-eq-danger-bg border border-eq-danger-border p-2 rounded text-eq-danger-text">
-                        警告：这将永久删除数据库中的物理表 <code className="font-mono bg-eq-elevated px-1 rounded">{deleteModal.table?.table_name}</code> 及其所有数据！
-                      </p>
-                      <p>此操作极度危险且不可恢复！</p>
+                <div className="mt-3 text-eq-text-secondary text-sm leading-relaxed">
+                  {(deleteModal.table?.status?.toUpperCase() === 'CREATED') ? (
+                    <div className="space-y-3">
+                      <p>You are about to delete a <strong>published</strong> table <span className="text-eq-text-primary">{deleteModal.table?.name}</span>.</p>
+                      <div className="bg-eq-danger-bg/50 border border-eq-danger-border p-3 rounded text-eq-danger-text text-xs">
+                        <strong>WARNING:</strong> This will permanently DROP the physical table <code className="font-mono bg-white/50 px-1 rounded">{deleteModal.table?.table_name}</code> and destroy ALL data within it.
+                      </div>
+                      <p>This action is irreversible.</p>
                     </div>
                   ) : (
-                    <p>确定要删除数据表 "{deleteModal.table?.name}" 吗？此操作不可恢复。</p>
+                    <p>Are you sure you want to delete table "{deleteModal.table?.name}"? This cannot be undone.</p>
                   )}
                 </div>
 
                 {deleteModal.error && (
-                   <div className="mt-3 p-3 bg-eq-danger-bg border border-eq-danger-border rounded-lg text-eq-danger-text text-sm">
+                   <div className="mt-3 p-3 bg-eq-danger-bg border border-eq-danger-border rounded text-eq-danger-text text-sm">
                      {deleteModal.error}
                    </div>
                 )}
@@ -391,7 +403,7 @@ function DataTableList({ onNavigate }) {
                 className="btn-secondary"
                 disabled={deleting}
               >
-                取消
+                Cancel
               </button>
               <button
                 onClick={handleDelete}
@@ -399,48 +411,48 @@ function DataTableList({ onNavigate }) {
                 className="btn-danger flex items-center gap-2"
               >
                 {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                {deleting ? '删除中...' : '确认删除'}
+                {deleting ? 'Deleting...' : 'Delete Permanently'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Publish / Sync Modal */}
+      {/* Publish Modal - Refined */}
       {publishModal.open && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 animate-fadeIn p-4">
-          <div className="bg-eq-surface rounded-lg p-6 max-w-md w-full border border-eq-border-subtle animate-slideUp">
-            <div className="flex items-start gap-3">
-              <div className={`p-2 rounded-full ${publishModal.table?.last_published_at ? 'bg-violet-500/15 text-violet-400' : 'bg-eq-warning-bg text-eq-warning-text'}`}>
-                {publishModal.table?.last_published_at ? <RefreshCw className="w-6 h-6" /> : <AlertTriangle className="w-6 h-6" />}
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn p-4">
+          <div className="bg-eq-bg-surface rounded-lg p-6 max-w-md w-full border border-eq-border-subtle shadow-xl animate-slideUp">
+            <div className="flex items-start gap-4">
+              <div className={`p-2 rounded-full flex-shrink-0 ${publishModal.table?.last_published_at ? 'bg-eq-info-bg text-eq-info-text' : 'bg-eq-warning-bg text-eq-warning-text'}`}>
+                {publishModal.table?.last_published_at ? <RefreshCw className="w-5 h-5" /> : <Play className="w-5 h-5" />}
               </div>
               <div className="flex-1">
-                <h3 className="font-semibold text-lg text-eq-text-primary">
-                    {publishModal.table?.last_published_at ? '同步表结构变更' : '确认发布'}
+                <h3 className="font-semibold text-lg text-eq-text-primary leading-tight">
+                    {publishModal.table?.last_published_at ? 'Sync Structure Changes' : 'Publish Table'}
                 </h3>
 
-                <div className="mt-2 text-eq-text-secondary text-sm">
-                  <p className="mb-2">您即将{publishModal.table?.last_published_at ? '同步' : '发布'}表 <span className="font-semibold text-eq-text-primary">{publishModal.table?.name}</span>。</p>
+                <div className="mt-3 text-eq-text-secondary text-sm leading-relaxed">
+                  <p className="mb-3">You are about to {publishModal.table?.last_published_at ? 'sync' : 'publish'} table <span className="font-medium text-eq-text-primary">{publishModal.table?.name}</span>.</p>
 
                   {publishModal.table?.last_published_at ? (
-                      <div className="p-3 bg-violet-500/15 text-violet-300 rounded-lg border border-violet-500/30 space-y-2">
-                          <p className="font-medium">变更模式: 增量同步 (Sync)</p>
-                          <ul className="list-disc list-inside text-xs space-y-1">
-                            <li>检测新增字段并执行 <code className="bg-eq-elevated px-1 rounded">ADD COLUMN</code></li>
-                            <li>注意：删除或重命名字段可能不会自动同步</li>
+                      <div className="p-3 bg-eq-info-bg/50 border border-eq-info-border rounded-lg text-eq-info-text text-xs space-y-1">
+                          <p className="font-semibold">Incremental Sync Mode</p>
+                          <ul className="list-disc list-inside opacity-90">
+                            <li>New columns will be added via <code className="bg-white/50 px-1 rounded">ADD COLUMN</code></li>
+                            <li>Existing data is preserved.</li>
                           </ul>
                       </div>
                   ) : (
-                      <ul className="list-disc list-inside ml-2 mt-1 space-y-1">
-                        <li>在数据库中创建物理表 <code className="bg-eq-elevated px-1 rounded">{publishModal.table?.table_name}</code></li>
-                        <li>锁定表结构（不可再修改字段定义）</li>
+                      <ul className="list-disc list-inside space-y-1 ml-1 text-eq-text-primary">
+                        <li>Create physical table <code className="font-mono bg-eq-bg-elevated px-1 rounded border border-eq-border-subtle">{publishModal.table?.table_name}</code></li>
+                        <li>Lock schema definition</li>
                       </ul>
                   )}
                 </div>
 
                 {publishModal.error && (
-                   <div className="mt-3 p-3 bg-eq-danger-bg border border-eq-danger-border rounded-lg text-eq-danger-text text-sm break-words">
-                     <div className="font-semibold mb-1">操作失败:</div>
+                   <div className="mt-3 p-3 bg-eq-danger-bg border border-eq-danger-border rounded text-eq-danger-text text-sm">
+                     <span className="font-semibold block mb-1">Error:</span>
                      {publishModal.error}
                    </div>
                 )}
@@ -453,19 +465,19 @@ function DataTableList({ onNavigate }) {
                 className="btn-secondary"
                 disabled={publishing}
               >
-                取消
+                Cancel
               </button>
               <button
                 onClick={handlePublish}
                 disabled={publishing}
-                className={`flex items-center gap-2 text-white px-4 py-2 rounded-md font-medium transition-all ${
+                className={`flex items-center gap-2 text-white px-4 py-2 rounded-md font-medium transition-all shadow-sm ${
                      publishModal.table?.last_published_at
-                     ? 'bg-violet-600 hover:bg-violet-700'
-                     : 'bg-eq-primary-500 hover:bg-eq-primary-600'
+                     ? 'bg-eq-primary-500 hover:bg-eq-primary-600'
+                     : 'bg-eq-success-solid hover:bg-eq-success-text' // Green for first publish
                 }`}
               >
                 {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : (publishModal.table?.last_published_at ? <RefreshCw className="w-4 h-4" /> : <Play className="w-4 h-4" />)}
-                {publishing ? '执行中...' : (publishModal.table?.last_published_at ? '确认同步' : '确认发布')}
+                {publishing ? 'Executing...' : (publishModal.table?.last_published_at ? 'Confirm Sync' : 'Confirm Publish')}
               </button>
             </div>
           </div>

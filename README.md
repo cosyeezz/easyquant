@@ -15,6 +15,7 @@ EasyQuant 是一个使用Python和Web技术构建的量化交易系统，支持�
     
 2.  **前端 (Easy-Canvas)**: 独立的 Next.js 应用，提供极致的节点图编排体验。
     -   **Dify/Coze 风格复刻**: 像素级还原 Dify 极简节点设计。
+    -   **Linear/Stripe 视觉风格**: [NEW] 采用 Deep Blue 主色调与精密边框设计，打造专业的 Fintech 工具体验。
     -   **独立运行**: 与后端解耦，通过 API 进行通信（目前处于 Mock/联调过渡阶段）。
     -   **高级交互**: 支持双击配置、智能吸附连线、ELK 自动布局。
 

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Activity, Database, Server, Table2, Cpu, Layers, Sun, Moon, Boxes } from 'lucide-react'
+import { Activity, Database, Server, Table2, Cpu, Layers, Sun, Moon, Boxes, Command } from 'lucide-react'
 import ProcessMonitor from './components/ProcessMonitor'
 import ETLTaskList from './components/ETLTaskList'
 import ETLTaskEditor from './components/ETLTaskEditor'
@@ -23,79 +23,76 @@ function App() {
   }
 
   const tabs = [
-    { id: 'tables', name: '数据表', icon: Table2 },
-    { id: 'etl', name: 'ETL任务', icon: Database },
-    { id: 'nodes', name: '节点能力', icon: Boxes },
-    { id: 'monitor', name: '进程监控', icon: Activity },
+    { id: 'tables', name: 'Schemas', icon: Table2 },
+    { id: 'etl', name: 'Pipelines', icon: Database },
+    { id: 'nodes', name: 'Nodes', icon: Boxes },
+    { id: 'monitor', name: 'Monitor', icon: Activity },
   ]
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-eq-bg-base text-eq-text-primary selection:bg-eq-primary-500/20 selection:text-eq-primary-600">
       {/* Header */}
-      <header className="bg-eq-surface border-b border-eq-border-subtle sticky top-0 z-50">
+      <header className="bg-eq-bg-surface border-b border-eq-border-subtle sticky top-0 z-50 backdrop-blur-sm bg-opacity-80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-14">
+            {/* Logo Area */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-eq-primary-500 rounded-lg flex items-center justify-center">
-                <Server className="w-6 h-6 text-white" />
+              <div className="w-8 h-8 bg-gradient-to-br from-eq-primary-500 to-indigo-600 rounded-md shadow-sm flex items-center justify-center">
+                <Command className="w-4 h-4 text-white" />
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-eq-primary-400">
-                  EasyQuant
+              <div className="flex flex-col justify-center">
+                <h1 className="text-sm font-bold text-eq-text-primary tracking-tight leading-none">
+                  EasyQuant <span className="font-normal text-eq-text-muted">Pro</span>
                 </h1>
-                <p className="text-xs text-eq-text-muted">量化交易监控系统</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              {/* Theme Toggle */}
-              <button
-                onClick={toggleTheme}
-                className="p-2 rounded-md border border-eq-border-subtle text-eq-text-secondary hover:text-eq-text-primary hover:bg-eq-elevated transition-all"
-                title={theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
-              >
-                {theme === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-              </button>
+            {/* Right Side: Stats & Theme */}
+            <div className="flex items-center gap-4">
+              {/* System Metrics (Minimalist) */}
+              <div className="hidden md:flex items-center gap-4 text-xs font-mono text-eq-text-secondary border-r border-eq-border-subtle pr-4">
+                 <div className="flex items-center gap-1.5" title="Server Status">
+                    <span className={`w-1.5 h-1.5 rounded-full ${status === 'connected' ? 'bg-eq-success-solid animate-pulse' : 'bg-eq-danger-solid'}`}></span>
+                    <span className={status === 'connected' ? 'text-eq-success-text font-medium' : 'text-eq-danger-text'}>
+                        {status === 'connected' ? 'ONLINE' : 'OFFLINE'}
+                    </span>
+                 </div>
 
-              {/* Connection Status & System Metrics */}
-              <div className={`flex items-center gap-4 px-4 py-2 rounded-lg border transition-all ${
-                  status === 'connected'
-                  ? 'bg-eq-success-bg border-eq-success-border text-eq-success-text'
-                  : 'bg-eq-danger-bg border-eq-danger-border text-eq-danger-text'
-              }`}>
-                <div className="flex items-center gap-2">
-                    <div className={`w-2.5 h-2.5 rounded-full ${status === 'connected' ? 'bg-eq-success-solid animate-pulse' : 'bg-eq-danger-solid'}`}></div>
-                    <span className="text-sm font-semibold">{status === 'connected' ? '在线' : '离线'}</span>
-                </div>
-
-                {status === 'connected' && systemStatus && (
+                 {status === 'connected' && systemStatus && (
                     <>
-                        <div className="flex items-center gap-2 pl-4 border-l border-eq-border-subtle">
-                            <Cpu className="w-4 h-4 opacity-75" />
-                            <span className="text-sm font-mono text-eq-text-secondary">CPU:</span>
-                            <span className="text-sm font-mono">{systemStatus.cpu_percent.toFixed(1)}%</span>
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-eq-text-muted">CPU</span>
+                            <span className={`font-medium ${systemStatus.cpu_percent > 80 ? 'text-eq-danger-text' : 'text-eq-text-primary'}`}>
+                                {systemStatus.cpu_percent.toFixed(1)}%
+                            </span>
                         </div>
-                        <div className="flex items-center gap-2 pl-4 border-l border-eq-border-subtle">
-                            <Layers className="w-4 h-4 opacity-75" />
-                            <span className="text-sm font-mono text-eq-text-secondary">MEM:</span>
-                            <span className="text-sm font-mono">
-                                {Math.round(systemStatus.memory_mb)} MB / {Math.round(systemStatus.sys_memory_total_mb / 1024)} GB
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-eq-text-muted">MEM</span>
+                            <span className="font-medium text-eq-text-primary">
+                                {Math.round(systemStatus.memory_mb / 1024 * 10) / 10}G
                             </span>
                         </div>
                     </>
-                )}
+                 )}
               </div>
+
+              {/* Theme Toggle */}
+              <button
+                onClick={toggleTheme}
+                className="p-1.5 rounded-md text-eq-text-muted hover:text-eq-text-primary hover:bg-eq-bg-elevated transition-all"
+              >
+                {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+              </button>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Tabs */}
-      <div className="bg-eq-surface border-b border-eq-border-subtle">
+      {/* Tabs - Underline Style */}
+      <div className="bg-eq-bg-surface border-b border-eq-border-subtle">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex gap-8">
+          <nav className="flex gap-6">
             {tabs.map((tab) => {
-              const Icon = tab.icon
               const isActive = activeTab === tab.id ||
                 (tab.id === 'tables' && activeTab.startsWith('table')) ||
                 (tab.id === 'etl' && activeTab.startsWith('etl')) ||
@@ -104,10 +101,17 @@ function App() {
                 <button
                   key={tab.id}
                   onClick={() => handleNavigate(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-4 border-b-2 font-medium transition-all duration-200 ${isActive ? 'border-eq-primary-500 text-eq-primary-400' : 'border-transparent text-eq-text-secondary hover:text-eq-text-primary hover:border-eq-border-default'}`}
+                  className={`relative flex items-center gap-2 py-3 text-sm font-medium transition-colors duration-200 ${
+                      isActive 
+                      ? 'text-eq-text-primary' 
+                      : 'text-eq-text-secondary hover:text-eq-text-primary'
+                  }`}
                 >
-                  <Icon className="w-5 h-5" />
+                  <tab.icon className={`w-4 h-4 ${isActive ? 'text-eq-primary-500' : 'text-eq-text-muted'}`} />
                   {tab.name}
+                  {isActive && (
+                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-eq-primary-500 rounded-t-full"></span>
+                  )}
                 </button>
               )
             })}
@@ -116,7 +120,7 @@ function App() {
       </div>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 animate-fadeIn">
         {activeTab === 'tables' && <DataTableList onNavigate={handleNavigate} />}
         {activeTab === 'table-new' && <DataTableEditor cloneFromId={editId} onNavigate={handleNavigate} />}
         {activeTab === 'table-edit' && <DataTableEditor tableId={editId} onNavigate={handleNavigate} />}
@@ -126,15 +130,6 @@ function App() {
         {activeTab === 'nodes' && <WorkflowNodeList />}
         {activeTab === 'monitor' && <ProcessMonitor />}
       </main>
-
-      {/* Footer */}
-      <footer className="mt-16 py-6 border-t border-eq-border-subtle bg-eq-surface">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <p className="text-center text-sm text-eq-text-muted">
-            EasyQuant v1.0.0 - 量化交易系统监控平台
-          </p>
-        </div>
-      </footer>
     </div>
   )
 }
