@@ -1,3 +1,55 @@
+# 开发日志 (2025-12-24) [WORKFLOW NODE EDITOR UX]
+
+## 节点参数管理器交互升级
+
+本次更新对工作流节点管理界面 (`WorkflowNodeList.jsx`) 进行了多项 UX 改进，重点优化了参数的编辑与排序体验。
+
+### 1. 参数编辑功能修复
+- **问题**: 点击已添加参数的编辑按钮无响应
+- **原因**: `onEdit` 处理函数仅为占位符 (TODO)
+- **解决方案**:
+  - 新增 `editingInputParam` / `editingOutputParam` 状态
+  - 扩展 `AddParamModal` 支持编辑模式 (`editData` prop)
+  - 实现 `handleUpdateInputParam` / `handleUpdateOutputParam` 更新逻辑
+  - 修复编辑模式下 `selectedType` 为 null 导致保存失败的问题
+
+### 2. 参数卡片紧凑化
+- **变更**: 从两行布局改为单行内联布局
+- **优化项**:
+  - 缩小图标、字体、内边距
+  - "Required" 文字简化为 `*` 符号
+  - 所有信息（图标、标题、Key、类型、必填标记）水平排列
+
+### 3. 区块视觉层级优化
+- **Input/Output 标题**: 改为大写、加粗、增加字间距 (`tracking-widest`)
+- **分隔线**: 标题下方添加底边框，与参数列表明确分隔
+- **添加按钮**: 简化为图标 + 文字的轻量样式
+
+### 4. 参数拖拽排序 (Drag & Drop)
+- **弃用**: 上下箭头按钮
+- **新增**: HTML5 原生拖拽 API 实现
+- **交互**:
+  - 通过 `GripVertical` 手柄图标拖拽
+  - 拖拽时源卡片半透明
+  - 目标位置显示虚线边框和浅色背景
+- **实现**:
+  - `draggingInputKey` / `dragOverInputKey` 状态追踪
+  - `handleInputDragEnd` / `handleOutputDragEnd` 处理重排序
+
+### 5. Tooltip 主题适配
+- **问题**: 文本截断提示框 (Tooltip) 固定为深色背景
+- **修复**: 改为主题感知 (`bg-white dark:bg-[#2a2a2e]`)
+- **优化**: 扁平化布局，复制按钮内联显示
+
+### 6. 代码变更
+- `client/src/components/WorkflowNodeList.jsx`
+  - 移除 `ArrowUp`, `ArrowDown` 图标导入
+  - 重构 `ParamCard` / `OutputParamCard` 组件支持拖拽
+  - 新增 4 个拖拽状态变量
+  - 替换移动处理函数为拖拽处理函数
+
+---
+
 # 开发日志 (2025-12-22 Update 3) [WORKFLOW DESIGN DOC]
 
 ## 工作流引擎设计文档 - 完整规范
