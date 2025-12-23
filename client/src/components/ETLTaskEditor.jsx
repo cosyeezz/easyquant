@@ -1,30 +1,27 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { ArrowLeft, ArrowRight, Save, Loader2, Eye } from 'lucide-react'
+import { ArrowLeft, Save, Loader2, Play, Settings, MoreHorizontal } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
-import FilePathPicker from './FilePathPicker'
 // --- New Workflow Integration ---
 import { WorkflowWithInnerContext } from './workflow/index'
 import { availableNodesMetaData } from './workflow/node-defaults'
 import { EventEmitterContextProvider } from '../context/event-emitter'
 import { CUSTOM_NODE } from './workflow/constants'
 import { BlockEnum } from './workflow/types'
+import Modal from './Modal'
 
 function ETLTaskEditor({ taskId, onNavigate }) {
-  const [step, setStep] = useState(1)
+  const { t } = useTranslation('translation', { keyPrefix: 'easyquant' })
   const [loading, setLoading] = useState(!!taskId)
   const [saving, setSaving] = useState(false)
-  const [handlers, setHandlers] = useState([])
-  const [columns, setColumns] = useState([])
-  const [previewLoading, setPreviewLoading] = useState(false)
-  const [dataTables, setDataTables] = useState([])
+  const [running, setRunning] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   
-  const [error, setError] = useState(null)
-
   const [form, setForm] = useState({
     name: '',
     description: '',
-    source_type: 'csv_dir',
-    source_config: { path: '' },
+    source_type: 'workflow',
+    source_config: {},
     batch_size: 1000,
     workers: 1,
     pipeline_config: [],
@@ -32,11 +29,6 @@ function ETLTaskEditor({ taskId, onNavigate }) {
   })
 
   useEffect(() => {
-    api.getHandlers().then(setHandlers).catch(console.error)
-    api.getDataTables({ page_size: 1000 }).then(res => {
-        setDataTables(res.items || [])
-    }).catch(console.error)
-    
     if (taskId) {
       api.getETLConfig(taskId).then(data => {
         setForm(data)
@@ -47,41 +39,6 @@ function ETLTaskEditor({ taskId, onNavigate }) {
 
   const updateForm = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }))
-    if (error) setError(null)
-  }
-
-  const handlePreview = async () => {
-    if (!form.source_config.path) return
-    setPreviewLoading(true)
-    try {
-      const data = await api.previewSource(form.source_type, form.source_config)
-      setColumns(data.columns || [])
-    } catch (error) {
-      console.error('Preview failed:', error)
-    } finally {
-      setPreviewLoading(false)
-    }
-  }
-
-  const handleNext = () => {
-    setError(null)
-    
-    if (step === 1) {
-      if (!form.name.trim()) {
-        setError("请输入任务名称")
-        return
-      }
-      if (!form.description.trim()) {
-        setError("请输入任务描述")
-        return
-      }
-      if (!form.source_config.path) {
-        setError("请配置数据源路径")
-        return
-      }
-    }
-    
-    setStep(step + 1)
   }
 
   const handleSave = async () => {
@@ -90,13 +47,24 @@ function ETLTaskEditor({ taskId, onNavigate }) {
       if (taskId) {
         await api.updateETLConfig(taskId, form)
       } else {
-        await api.createETLConfig(form)
+        const newTask = await api.createETLConfig(form)
+        onNavigate('etl-edit', newTask.id)
       }
-      onNavigate('etl')
     } catch (error) {
       console.error('Save failed:', error)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleRun = async () => {
+    setRunning(true)
+    try {
+      await api.runETLConfig(taskId)
+    } catch (error) {
+      console.error('Run failed:', error)
+    } finally {
+      setRunning(false)
     }
   }
 
@@ -112,13 +80,13 @@ function ETLTaskEditor({ taskId, onNavigate }) {
           id: 'start',
           type: CUSTOM_NODE,
           data: { title: 'Start', type: BlockEnum.Start, desc: 'Start Node', variables: [] },
-          position: { x: 100, y: 100 },
+          position: { x: 100, y: 200 },
         },
         {
           id: 'end',
           type: CUSTOM_NODE,
           data: { title: 'End', type: BlockEnum.End, desc: 'End Node', outputs: [] },
-          position: { x: 600, y: 100 },
+          position: { x: 600, y: 200 },
         },
       ],
       edges: []
@@ -134,231 +102,128 @@ function ETLTaskEditor({ taskId, onNavigate }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-12 h-12 text-primary-600 animate-spin" />
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="w-8 h-8 text-eq-primary-500 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-100px)] gap-4 overflow-hidden">
-      {/* Header & Stepper */}
-      <div className="flex items-center justify-between shrink-0 px-1">
-        <div className="flex items-center gap-3">
-          <button onClick={() => onNavigate('etl')} className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors">
-            <ArrowLeft className="w-5 h-5" />
+    <div className="flex flex-col h-[calc(100vh-140px)] -mx-4 -mb-4 bg-eq-bg-base overflow-hidden">
+      {/* Editor Header */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-eq-border-subtle bg-eq-bg-surface shrink-0">
+        <div className="flex items-center gap-4 min-w-0">
+          <button 
+            onClick={() => onNavigate('etl')} 
+            className="p-1.5 hover:bg-eq-bg-elevated rounded-md text-eq-text-secondary transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
           </button>
-          <div>
-            <h2 className="text-2xl font-bold text-slate-800">{taskId ? '编辑任务' : '新建任务'}</h2>
+          
+          <div className="flex flex-col min-w-0">
+            <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-eq-text-primary truncate">{form.name || 'Untitled Workflow'}</h2>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-eq-bg-elevated text-eq-text-muted border border-eq-border-subtle">
+                    {taskId ? `#${taskId.substring(0, 6)}` : 'DRAFT'}
+                </span>
+            </div>
+            <p className="text-[11px] text-eq-text-muted truncate">{form.description || 'No description'}</p>
           </div>
         </div>
 
-        {/* Stepper */}
-        <div className="flex items-center gap-1">
-          {[1, 2, 3].map((s) => (
-            <div key={s} className="flex items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm transition-all shadow-sm ${
-                 step > s ? 'bg-emerald-500 text-white shadow-emerald-200' : 
-                 step === s ? 'bg-gradient-to-br from-primary-500 to-indigo-600 text-white shadow-primary-200 ring-2 ring-primary-100' : 
-                 'bg-white text-slate-400 border border-slate-200'
-              }`}>
-                {step > s ? '✓' : s}
-              </div>
-              <span className={`ml-2 text-sm font-medium ${step >= s ? 'text-slate-700' : 'text-slate-400'}`}>
-                {s === 1 ? '数据源' : s === 2 ? 'Pipeline' : '运行参数'}
-              </span>
-              {s < 3 && (
-                <div className={`w-8 h-0.5 mx-3 rounded-full transition-colors duration-300 ${step > s ? 'bg-emerald-400' : 'bg-slate-200'}`} />
-              )}
-            </div>
-          ))}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-2 text-eq-text-secondary hover:text-eq-text-primary hover:bg-eq-bg-elevated rounded-md transition-all"
+            title="Settings"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+          
+          <div className="w-px h-4 bg-eq-border-subtle mx-1"></div>
+
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="btn-secondary !py-1.5 !px-3 !text-xs flex items-center gap-2"
+          >
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            {t('common.save')}
+          </button>
+
+          <button
+            onClick={handleRun}
+            disabled={running || !taskId}
+            className="btn-primary !py-1.5 !px-4 !text-xs flex items-center gap-2 shadow-sm"
+          >
+            {running ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+            {t('common.run')}
+          </button>
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 min-h-0"> 
-        {/* Step 1: 数据源 */}
-        {step === 1 && (
-          <div className="card h-full flex flex-col p-6 gap-6 shadow-sm border-slate-200 overflow-y-auto">
-            {error && (
-              <div className="px-4 py-3 bg-red-50 text-red-700 text-sm rounded-lg border border-red-200 font-medium animate-fadeIn flex items-center gap-2 shrink-0">
-                 <span className="text-red-500 text-lg">⚠️</span> {error}
-              </div>
-            )}
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full min-h-0">
-              {/* Left Column */}
-              <div className="space-y-5 flex flex-col">
-                <div>
-                  <label className="form-label text-base">任务名称 <span className="text-red-500">*</span></label>
-                  <input
-                    type="text"
+      {/* Main Canvas Area */}
+      <div className="flex-1 relative min-h-0 bg-[#f8fafc] dark:bg-[#0f172a]"> 
+         <EventEmitterContextProvider>
+            <WorkflowWithInnerContext
+              nodes={initialWorkflowData.nodes}
+              edges={initialWorkflowData.edges}
+              onWorkflowDataUpdate={handleWorkflowUpdate}
+              hooksStore={{
+                availableNodesMetaData,
+                readOnly: false,
+              }}
+            />
+         </EventEmitterContextProvider>
+      </div>
+
+      {/* Settings Modal */}
+      <Modal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        title={t('nav.pipelines') + ' ' + t('nav.nodes')}
+        showConfirm={false}
+      >
+        <div className="space-y-4 py-2">
+            <div>
+                <label className="block text-xs font-medium text-eq-text-secondary mb-1.5">{t('common.name')}</label>
+                <input 
+                    type="text" 
+                    className="input-field w-full"
                     value={form.name}
                     onChange={(e) => updateForm('name', e.target.value)}
-                    className={`input-field !py-3 ${error && !form.name.trim() ? 'border-red-300 focus:ring-red-200' : ''}`}
-                    placeholder="例如：导入 A 股日线数据"
-                  />
-                </div>
-                <div className="flex-1 flex flex-col min-h-0">
-                  <label className="form-label text-base">描述 <span className="text-red-500">*</span></label>
-                  <textarea
+                />
+            </div>
+            <div>
+                <label className="block text-xs font-medium text-eq-text-secondary mb-1.5">{t('common.description')}</label>
+                <textarea 
+                    className="input-field w-full min-h-[80px] py-2"
                     value={form.description}
                     onChange={(e) => updateForm('description', e.target.value)}
-                    className={`input-field resize-none flex-1 min-h-[100px] ${error && !form.description.trim() ? 'border-red-300 focus:ring-red-200' : ''}`}
-                    placeholder="任务描述..."
-                  />
-                </div>
-                <div>
-                  <label className="form-label text-base">数据源类型</label>
-                  <select
-                    value={form.source_type}
-                    onChange={(e) => updateForm('source_type', e.target.value)}
-                    className="input-field !py-3"
-                  >
-                    <option value="csv_dir">CSV 文件夹</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Right Column */}
-              <div className="space-y-5 flex flex-col h-full min-h-0">
-                <div>
-                  <label className="form-label text-base">数据源路径 <span className="text-red-500">*</span></label>
-                  <FilePathPicker
-                    value={form.source_config}
-                    onChange={(config) => updateForm('source_config', config)}
-                    placeholder="选择或输入路径"
-                  />
-                </div>
-                
-                <div className="flex items-center justify-between mt-1">
-                   <span className="text-sm text-slate-500">验证并查看列信息</span>
-                   <button
-                    onClick={handlePreview}
-                    disabled={previewLoading || !form.source_config.path}
-                    className="btn-secondary px-4 py-2 text-sm flex items-center gap-2 h-auto hover:bg-white hover:border-primary-200 hover:text-primary-600"
-                  >
-                    {previewLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
-                    预览数据
-                  </button>
-                </div>
-
-                {/* Preview Box */}
-                <div className="flex-1 bg-slate-50/50 rounded-xl border border-slate-200/60 p-4 overflow-auto min-h-[150px] relative transition-colors hover:bg-slate-50 hover:border-slate-300">
-                   {columns.length > 0 ? (
-                      <>
-                        <div className="sticky top-0 bg-slate-50/95 backdrop-blur-sm pb-2 border-b border-slate-100 w-full mb-3 flex items-center gap-2 z-10">
-                           <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                           <p className="text-sm font-semibold text-slate-700">检测到 {columns.length} 个字段</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2 content-start">
-                          {columns.map((col) => (
-                            <span key={col} className="px-2.5 py-1 bg-white rounded-md text-sm text-slate-600 shadow-sm border border-slate-200/80 font-mono">
-                              {col}
-                            </span>
-                          ))}
-                        </div>
-                      </>
-                   ) : (
-                      <div className="h-full flex flex-col items-center justify-center text-slate-400">
-                        <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3">
-                           <Eye className="w-6 h-6 opacity-40" />
-                        </div>
-                        <p className="text-sm">点击预览查看字段信息</p>
-                      </div>
-                   )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Step 2: Pipeline (The Canvas) */}
-        {step === 2 && (
-          <div className="h-full border border-eq-border-subtle rounded-xl overflow-hidden bg-eq-bg-surface shadow-sm">
-             <EventEmitterContextProvider>
-                <WorkflowWithInnerContext
-                  nodes={initialWorkflowData.nodes}
-                  edges={initialWorkflowData.edges}
-                  onWorkflowDataUpdate={handleWorkflowUpdate}
-                  hooksStore={{
-                    availableNodesMetaData,
-                    readOnly: false,
-                  }}
                 />
-             </EventEmitterContextProvider>
-          </div>
-        )}
-
-        {/* Step 3: 运行参数 */}
-        {step === 3 && (
-          <div className="card h-full flex flex-col p-6 gap-8 shadow-sm border-slate-200 overflow-y-auto">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div>
-                <label className="form-label text-base">批次大小 (Batch Size)</label>
-                <div className="relative mt-2">
-                   <input
-                    type="number"
-                    value={form.batch_size}
-                    onChange={(e) => updateForm('batch_size', parseInt(e.target.value) || 1000)}
-                    className="input-field !pl-4 !py-3 text-lg font-mono"
-                    min={100}
-                    max={10000}
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">rows</span>
-                </div>
-              </div>
-              <div>
-                <label className="form-label text-base">并行进程数 (Workers)</label>
-                <div className="relative mt-2">
-                  <input
-                    type="number"
-                    value={form.workers}
-                    onChange={(e) => updateForm('workers', parseInt(e.target.value) || 1)}
-                    className="input-field !pl-4 !py-3 text-lg font-mono"
-                    min={1}
-                    max={16}
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">procs</span>
-                </div>
-              </div>
             </div>
-
-            <div className="flex-1 bg-slate-50 rounded-xl border border-slate-200 flex flex-col overflow-hidden shadow-inner min-h-[200px]">
-              <div className="px-4 py-2 border-b border-slate-200 bg-slate-100/50 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-slate-400"></span>
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Config Snapshot</span>
-              </div>
-              <div className="flex-1 overflow-auto bg-white p-4">
-                 <pre className="text-xs font-mono text-slate-600 leading-relaxed">{JSON.stringify(form, null, 2)}</pre>
-              </div>
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-xs font-medium text-eq-text-secondary mb-1.5">{t('workflow.config.batchSize') || 'Batch Size'}</label>
+                    <input 
+                        type="number" 
+                        className="input-field w-full font-mono"
+                        value={form.batch_size}
+                        onChange={(e) => updateForm('batch_size', parseInt(e.target.value))}
+                    />
+                </div>
+                <div>
+                    <label className="block text-xs font-medium text-eq-text-secondary mb-1.5">{t('workflow.config.workers') || 'Workers'}</label>
+                    <input 
+                        type="number" 
+                        className="input-field w-full font-mono"
+                        value={form.workers}
+                        onChange={(e) => updateForm('workers', parseInt(e.target.value))}
+                    />
+                </div>
             </div>
-          </div>
-        )}
-      </div>
-
-      {/* Footer Navigation */}
-      <div className="flex items-center justify-between shrink-0 pt-3 border-t border-slate-200/60 mt-1">
-        <button
-          onClick={() => setStep(step - 1)}
-          disabled={step === 1}
-          className="btn-secondary px-5 py-2.5 flex items-center gap-2 transition-transform active:scale-95"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span className="font-medium">上一步</span>
-        </button>
-        {step < 3 ? (
-          <button onClick={handleNext} className="btn-primary px-8 py-2.5 flex items-center gap-2 shadow-lg shadow-primary-500/20 transition-transform active:scale-95">
-            <span className="font-medium">下一步</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        ) : (
-          <button onClick={handleSave} disabled={saving} className="btn-primary px-8 py-2.5 flex items-center gap-2 shadow-lg shadow-primary-500/20 transition-transform active:scale-95">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            <span className="font-medium">保存配置</span>
-          </button>
-        )}
-      </div>
+        </div>
+      </Modal>
     </div>
   )
 }

@@ -370,43 +370,43 @@ function DataTableList({ onNavigate }) {
 
       {/* Delete Modal - Refined */}
       {deleteModal.open && (
-         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn p-4">
-          <div className="bg-eq-bg-surface rounded-lg p-6 max-w-md w-full border border-eq-border-subtle shadow-xl animate-slideUp">
+         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 animate-fadeIn p-4">
+          <div className="bg-white dark:bg-[#1a1a1c] rounded-xl p-6 max-w-md w-full border border-gray-200 dark:border-[#2a2a2e] shadow-2xl animate-slideUp">
             <div className="flex items-start gap-4">
-              <div className="p-2 bg-eq-danger-bg rounded-full flex-shrink-0">
-                <AlertTriangle className="w-5 h-5 text-eq-danger-text" />
+              <div className="p-2.5 bg-red-50 dark:bg-red-500/10 rounded-full flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
               </div>
               <div className="flex-1">
-                <h3 className="font-semibold text-lg text-eq-text-primary leading-tight">
+                <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100 leading-tight">
                   {(deleteModal.table?.status?.toUpperCase() === 'CREATED') ? "Critical Action Warning" : "Confirm Deletion"}
                 </h3>
 
-                <div className="mt-3 text-eq-text-secondary text-sm leading-relaxed">
+                <div className="mt-3 text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
                   {(deleteModal.table?.status?.toUpperCase() === 'CREATED') ? (
                     <div className="space-y-3">
-                      <p>You are about to delete a <strong>published</strong> table <span className="text-eq-text-primary">{deleteModal.table?.name}</span>.</p>
-                      <div className="bg-eq-danger-bg/50 border border-eq-danger-border p-3 rounded text-eq-danger-text text-xs">
-                        <strong>WARNING:</strong> This will permanently DROP the physical table <code className="font-mono bg-white/50 px-1 rounded">{deleteModal.table?.table_name}</code> and destroy ALL data within it.
+                      <p>You are about to delete a <strong className="text-gray-900 dark:text-gray-100">published</strong> table <span className="font-semibold text-gray-900 dark:text-gray-100">{deleteModal.table?.name}</span>.</p>
+                      <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 p-3 rounded-lg text-red-700 dark:text-red-300 text-xs">
+                        <strong>WARNING:</strong> This will permanently DROP the physical table <code className="font-mono bg-red-100 dark:bg-red-500/20 px-1 rounded">{deleteModal.table?.table_name}</code> and destroy ALL data within it.
                       </div>
-                      <p>This action is irreversible.</p>
+                      <p className="text-gray-700 dark:text-gray-300">This action is irreversible.</p>
                     </div>
                   ) : (
-                    <p>Are you sure you want to delete table "{deleteModal.table?.name}"? This cannot be undone.</p>
+                    <p>Are you sure you want to delete table "<span className="font-semibold text-gray-900 dark:text-gray-100">{deleteModal.table?.name}</span>"? This cannot be undone.</p>
                   )}
                 </div>
 
                 {deleteModal.error && (
-                   <div className="mt-3 p-3 bg-eq-danger-bg border border-eq-danger-border rounded text-eq-danger-text text-sm">
+                   <div className="mt-3 p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg text-red-700 dark:text-red-300 text-sm">
                      {deleteModal.error}
                    </div>
                 )}
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 mt-6">
+            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100 dark:border-[#2a2a2e]">
               <button
                 onClick={() => setDeleteModal({ open: false, table: null, error: null })}
-                className="btn-secondary"
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-[#2a2a2e] border border-gray-300 dark:border-[#3a3a3e] rounded-lg hover:bg-gray-50 dark:hover:bg-[#333] transition-colors"
                 disabled={deleting}
               >
                 Cancel
@@ -414,7 +414,7 @@ function DataTableList({ onNavigate }) {
               <button
                 onClick={handleDelete}
                 disabled={deleting}
-                className="btn-danger flex items-center gap-2"
+                className="flex items-center gap-2 text-white bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg font-medium transition-all shadow-sm"
               >
                 {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                 {deleting ? 'Deleting...' : 'Delete Permanently'}
@@ -426,38 +426,43 @@ function DataTableList({ onNavigate }) {
 
       {/* Publish Modal - Refined */}
       {publishModal.open && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn p-4">
-          <div className="bg-eq-bg-surface rounded-lg p-6 max-w-md w-full border border-eq-border-subtle shadow-xl animate-slideUp">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 animate-fadeIn p-4">
+          <div className="bg-white dark:bg-[#1a1a1c] rounded-xl p-6 max-w-md w-full border border-gray-200 dark:border-[#2a2a2e] shadow-2xl animate-slideUp">
             <div className="flex items-start gap-4">
-              <div className={`p-2 rounded-full flex-shrink-0 ${publishModal.table?.last_published_at ? 'bg-eq-info-bg text-eq-info-text' : 'bg-eq-warning-bg text-eq-warning-text'}`}>
-                {publishModal.table?.last_published_at ? <RefreshCw className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+              <div className={`p-2.5 rounded-full flex-shrink-0 ${publishModal.table?.last_published_at ? 'bg-blue-50 dark:bg-blue-500/10' : 'bg-amber-50 dark:bg-amber-500/10'}`}>
+                {publishModal.table?.last_published_at
+                  ? <RefreshCw className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  : <Play className="w-5 h-5 text-amber-600 dark:text-amber-400" />}
               </div>
               <div className="flex-1">
-                <h3 className="font-semibold text-lg text-eq-text-primary leading-tight">
+                <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100 leading-tight">
                     {publishModal.table?.last_published_at ? 'Sync Structure Changes' : 'Publish Table'}
                 </h3>
 
-                <div className="mt-3 text-eq-text-secondary text-sm leading-relaxed">
-                  <p className="mb-3">You are about to {publishModal.table?.last_published_at ? 'sync' : 'publish'} table <span className="font-medium text-eq-text-primary">{publishModal.table?.name}</span>.</p>
+                <div className="mt-3 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+                  <p className="mb-3">
+                    You are about to {publishModal.table?.last_published_at ? 'sync' : 'publish'} table{' '}
+                    <span className="font-semibold text-gray-900 dark:text-gray-100">{publishModal.table?.name}</span>.
+                  </p>
 
                   {publishModal.table?.last_published_at ? (
-                      <div className="p-3 bg-eq-info-bg/50 border border-eq-info-border rounded-lg text-eq-info-text text-xs space-y-1">
+                      <div className="p-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-lg text-blue-700 dark:text-blue-300 text-xs space-y-1">
                           <p className="font-semibold">Incremental Sync Mode</p>
                           <ul className="list-disc list-inside opacity-90">
-                            <li>New columns will be added via <code className="bg-white/50 px-1 rounded">ADD COLUMN</code></li>
+                            <li>New columns will be added via <code className="bg-blue-100 dark:bg-blue-500/20 px-1 rounded font-mono">ADD COLUMN</code></li>
                             <li>Existing data is preserved.</li>
                           </ul>
                       </div>
                   ) : (
-                      <ul className="list-disc list-inside space-y-1 ml-1 text-eq-text-primary">
-                        <li>Create physical table <code className="font-mono bg-eq-bg-elevated px-1 rounded border border-eq-border-subtle">{publishModal.table?.table_name}</code></li>
+                      <ul className="list-disc list-inside space-y-1.5 ml-1 text-gray-700 dark:text-gray-300">
+                        <li>Create physical table <code className="font-mono text-xs bg-gray-100 dark:bg-[#2a2a2e] px-1.5 py-0.5 rounded border border-gray-200 dark:border-[#3a3a3e] text-gray-800 dark:text-gray-200">{publishModal.table?.table_name}</code></li>
                         <li>Lock schema definition</li>
                       </ul>
                   )}
                 </div>
 
                 {publishModal.error && (
-                   <div className="mt-3 p-3 bg-eq-danger-bg border border-eq-danger-border rounded text-eq-danger-text text-sm">
+                   <div className="mt-3 p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg text-red-700 dark:text-red-300 text-sm">
                      <span className="font-semibold block mb-1">Error:</span>
                      {publishModal.error}
                    </div>
@@ -465,10 +470,10 @@ function DataTableList({ onNavigate }) {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 mt-6">
+            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100 dark:border-[#2a2a2e]">
               <button
                 onClick={() => setPublishModal({ open: false, table: null, error: null })}
-                className="btn-secondary"
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-[#2a2a2e] border border-gray-300 dark:border-[#3a3a3e] rounded-lg hover:bg-gray-50 dark:hover:bg-[#333] transition-colors"
                 disabled={publishing}
               >
                 Cancel
@@ -476,10 +481,10 @@ function DataTableList({ onNavigate }) {
               <button
                 onClick={handlePublish}
                 disabled={publishing}
-                className={`flex items-center gap-2 text-white px-4 py-2 rounded-md font-medium transition-all shadow-sm ${
+                className={`flex items-center gap-2 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-sm ${
                      publishModal.table?.last_published_at
-                     ? 'bg-eq-primary-500 hover:bg-eq-primary-600'
-                     : 'bg-eq-success-solid hover:bg-eq-success-text' // Green for first publish
+                     ? 'bg-blue-600 hover:bg-blue-700'
+                     : 'bg-emerald-600 hover:bg-emerald-700'
                 }`}
               >
                 {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : (publishModal.table?.last_published_at ? <RefreshCw className="w-4 h-4" /> : <Play className="w-4 h-4" />)}

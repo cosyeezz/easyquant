@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronDown, Check, X } from 'lucide-react'
 
 export default function Select({ 
@@ -14,6 +15,7 @@ export default function Select({
   variant = 'solid' // 'solid' | 'ghost'
 }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 })
   const containerRef = useRef(null)
 
   // 获取当前显示的 Label
@@ -48,19 +50,50 @@ export default function Select({
   }
   const currentVariant = variantStyles[variant] || variantStyles.solid
 
+  const updateCoords = () => {
+    if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect()
+        setCoords({
+            top: rect.bottom + 4,
+            left: rect.left,
+            width: rect.width
+        })
+    }
+  }
+
   // 点击外部关闭
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
-        setIsOpen(false)
+      // 如果点击的是 Portal 内部的内容
+      if (event.target.closest('.select-dropdown-portal')) {
+          return
       }
+      
+      // 如果点击的是 Trigger 按钮 (containerRef)
+      if (containerRef.current && containerRef.current.contains(event.target)) {
+          return
+      }
+
+      setIsOpen(false)
     }
     
+    const handleScroll = () => {
+        if(isOpen) setIsOpen(false) 
+    }
+    const handleResize = () => {
+         if(isOpen) setIsOpen(false)
+    }
+
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside)
+      window.addEventListener('scroll', handleScroll, true)
+      window.addEventListener('resize', handleResize)
     }
+    
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
+      window.removeEventListener('scroll', handleScroll, true)
+      window.removeEventListener('resize', handleResize)
     }
   }, [isOpen])
 
@@ -74,46 +107,26 @@ export default function Select({
       onClear()
       setIsOpen(false)
   }
+  
+  const toggleOpen = () => {
+      if(!disabled) {
+          if (!isOpen) updateCoords()
+          setIsOpen(!isOpen)
+      }
+  }
 
-  return (
-    <div
-      className={`relative ${className}`}
-      ref={containerRef}
-    >
-      {/* Trigger Button */}
-      <button
-        type="button"
-        onClick={() => !disabled && setIsOpen(!isOpen)}
-        disabled={disabled}
-        className={`
-          w-full flex items-center justify-between text-left transition-all group rounded
-          ${currentSize.btn}
-          ${currentVariant}
-          ${isOpen ? 'bg-eq-bg-elevated text-eq-text-primary z-10' : ''}
-        `}
+  // Portal Content
+  const dropdownContent = (
+      <div 
+        className="select-dropdown-portal fixed z-[9999] bg-white dark:bg-[#18181b] border border-eq-border-default rounded-lg shadow-xl overflow-y-auto overflow-x-hidden p-1 ring-1 ring-black/5 focus:outline-none custom-scrollbar"
+        style={{ 
+            top: coords.top, 
+            left: coords.left, 
+            width: coords.width,
+            minWidth: 'max-content',
+            maxHeight: '15rem' 
+        }}
       >
-        <span className={`block truncate ${!selectedOption && variant !== 'ghost' ? 'text-eq-text-muted' : ''} ${showClear ? 'pr-4' : ''}`}>
-          {/* Removed forced placeholder prefix for ghost variant to save space */}
-          {displayLabel}
-        </span>
-
-        <div className="flex items-center absolute right-2 top-1/2 -translate-y-1/2">
-            {showClear && (
-                <span
-                    onClick={handleClear}
-                    className="p-0.5 rounded-full text-eq-text-muted hover:text-eq-text-primary hover:bg-white/10 mr-1 z-10"
-                    title="清除"
-                >
-                    <X className="w-3 h-3" />
-                </span>
-            )}
-            <ChevronDown className={`${currentSize.icon} text-eq-text-muted/70 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
-        </div>
-      </button>
-
-      {/* Dropdown Menu */}
-      {isOpen && (
-        <div className="absolute top-full left-0 z-50 mt-1 bg-white dark:bg-neutral-800 border border-eq-border-default rounded-lg shadow-xl max-h-60 overflow-auto animate-fadeIn min-w-[160px] p-1 ring-1 ring-black/5">
           <ul className="">
             {options.length === 0 ? (
               <li className={`text-eq-text-muted text-center ${currentSize.option}`}>无选项</li>
@@ -132,15 +145,57 @@ export default function Select({
                       }
                     `}
                   >
-                    <span className="truncate">{opt.label}</span>
-                    {opt.value === value && <Check className={`${currentSize.icon} text-eq-primary-500`} />}
+                    <span className="truncate pr-2">{opt.label}</span>
+                    {opt.value === value && <Check className={`${currentSize.icon} text-eq-primary-500 flex-shrink-0`} />}
                   </button>
                 </li>
               ))
             )}
           </ul>
+      </div>
+  )
+
+  // Use state to ensure document is available (SSR safe)
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
+  return (
+    <>
+        <div
+            className={`relative ${className}`}
+            ref={containerRef}
+        >
+            <button
+                type="button"
+                onClick={toggleOpen}
+                disabled={disabled}
+                className={`
+                w-full flex items-center justify-between text-left transition-all group rounded
+                ${currentSize.btn}
+                ${currentVariant}
+                ${isOpen ? 'bg-eq-bg-elevated text-eq-text-primary' : ''}
+                `}
+            >
+                <span className={`block truncate ${!selectedOption && variant !== 'ghost' ? 'text-eq-text-muted' : ''} ${showClear ? 'pr-4' : ''}`}>
+                {displayLabel}
+                </span>
+
+                <div className="flex items-center absolute right-2 top-1/2 -translate-y-1/2">
+                    {showClear && (
+                        <span
+                            onClick={handleClear}
+                            className="p-0.5 rounded-full text-eq-text-muted hover:text-eq-text-primary hover:bg-white/10 mr-1 z-10"
+                            title="清除"
+                        >
+                            <X className="w-3 h-3" />
+                        </span>
+                    )}
+                    <ChevronDown className={`${currentSize.icon} text-eq-text-muted/70 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                </div>
+            </button>
         </div>
-      )}
-    </div>
+        
+        {isOpen && mounted && createPortal(dropdownContent, document.body)}
+    </>
   )
 }

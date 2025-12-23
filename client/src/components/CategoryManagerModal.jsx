@@ -9,6 +9,7 @@ export default function CategoryManagerModal({ isOpen, onClose, onChange }) {
   const [editingId, setEditingId] = useState(null) // null = create mode
   const [form, setForm] = useState({ code: '', name: '', description: '' })
   const [deleteId, setDeleteId] = useState(null)
+  const [deleteError, setDeleteError] = useState(null)
   const [error, setError] = useState(null)
 
   useEffect(() => {
@@ -58,7 +59,8 @@ export default function CategoryManagerModal({ isOpen, onClose, onChange }) {
       loadData()
       if (onChange) onChange()
     } catch (err) {
-      alert(err.response?.data?.detail || '删除失败')
+      setDeleteId(null)
+      setDeleteError(err.response?.data?.detail || '删除失败')
     }
   }
 
@@ -166,13 +168,21 @@ export default function CategoryManagerModal({ isOpen, onClose, onChange }) {
         </div>
       </div>
 
-      <Modal 
+      <Modal
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}
         onConfirm={handleDelete}
         title="删除分类"
         message="确定要删除这个分类吗？如果该分类下还有数据表，删除将失败。"
         type="warning"
+      />
+
+      <Modal
+        isOpen={!!deleteError}
+        onClose={() => setDeleteError(null)}
+        title="删除失败"
+        message={deleteError}
+        type="error"
       />
     </div>
   )

@@ -131,7 +131,6 @@ function App() {
         {activeTab === 'table-new' && <DataTableEditor cloneFromId={editId} onNavigate={handleNavigate} />}
         {activeTab === 'table-edit' && <DataTableEditor tableId={editId} onNavigate={handleNavigate} />}
         {activeTab === 'etl' && <ETLTaskList onNavigate={handleNavigate} />}
-        {activeTab === 'etl-new' && <ETLTaskEditor onNavigate={handleNavigate} />}
         {activeTab === 'etl-edit' && <ETLTaskEditor taskId={editId} onNavigate={handleNavigate} />}
         {activeTab === 'nodes' && <WorkflowNodeList />}
         {activeTab === 'monitor' && <ProcessMonitor />}

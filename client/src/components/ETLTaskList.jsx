@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react'
 import { Plus, Play, Pencil, Trash2, Loader2, FolderOpen, Search, X, Activity } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import api from '../services/api'
 import Modal from './Modal'
 import Select from './ui/Select'
 
 function ETLTaskList({ onNavigate }) {
+  const { t } = useTranslation('translation', { keyPrefix: 'easyquant' })
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [deleteModal, setDeleteModal] = useState({ open: false, task: null })
+  const [createModal, setCreateModal] = useState({ open: false, name: '', description: '' })
   const [runningId, setRunningId] = useState(null)
+  const [creating, setCreating] = useState(false)
   
   // Toolbar State
   const [search, setSearch] = useState('')
@@ -28,6 +32,28 @@ function ETLTaskList({ onNavigate }) {
       setError(err.message || 'Failed to load configurations.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleCreateTask = async () => {
+    if (!createModal.name.trim()) return
+    setCreating(true)
+    try {
+      const newTask = await api.createETLConfig({
+        name: createModal.name,
+        description: createModal.description,
+        source_type: 'csv_dir', // Temporary fallback to known good type
+        source_config: { path: '' }, // Ensure source_config is not empty if required
+        pipeline_config: [],
+        graph_config: { nodes: [], edges: [] }
+      })
+      onNavigate('etl-edit', newTask.id)
+    } catch (error) {
+      console.error('Failed to create task:', error)
+      alert('Failed to create task: ' + (error.response?.data?.detail || error.message))
+    } finally {
+      setCreating(false)
+      setCreateModal({ open: false, name: '', description: '' })
     }
   }
 
@@ -143,15 +169,15 @@ function ETLTaskList({ onNavigate }) {
         {/* Right: Primary Action */}
         <div className="flex items-center gap-4">
              <span className="text-[10px] text-eq-text-muted font-mono tracking-wider">
-                {filteredTasks.length} PIPELINES
+                {filteredTasks.length} {t('nav.pipelines').toUpperCase()}
              </span>
              <div className="w-px h-3.5 bg-eq-border-subtle"></div>
             <button 
-                onClick={() => onNavigate('etl-new')} 
+                onClick={() => setCreateModal({ ...createModal, open: true })} 
                 className="btn-primary !py-1 !px-3 !text-[11px] font-semibold flex items-center gap-1.5 shadow-sm"
             >
                 <Plus className="w-3.5 h-3.5" />
-                New Pipeline
+                {t('common.create')}
             </button>
         </div>
       </div>
@@ -213,6 +239,38 @@ function ETLTaskList({ onNavigate }) {
           ))}
         </div>
       )}
+
+      <Modal
+        isOpen={createModal.open}
+        onClose={() => setCreateModal({ ...createModal, open: false })}
+        onConfirm={handleCreateTask}
+        title={t('common.create')}
+        confirmText={creating ? t('common.saving') : t('common.confirm')}
+        confirmDisabled={!createModal.name.trim() || creating}
+      >
+        <div className="space-y-4 py-2">
+            <div>
+                <label className="block text-xs font-medium text-eq-text-secondary mb-1.5">{t('common.name')}</label>
+                <input 
+                    type="text" 
+                    className="input-field w-full"
+                    placeholder="e.g. Daily Data Backtest"
+                    value={createModal.name}
+                    onChange={(e) => setCreateModal({ ...createModal, name: e.target.value })}
+                    autoFocus
+                />
+            </div>
+            <div>
+                <label className="block text-xs font-medium text-eq-text-secondary mb-1.5">{t('common.description')}</label>
+                <textarea 
+                    className="input-field w-full min-h-[80px] py-2"
+                    placeholder="Describe the purpose of this workflow..."
+                    value={createModal.description}
+                    onChange={(e) => setCreateModal({ ...createModal, description: e.target.value })}
+                />
+            </div>
+        </div>
+      </Modal>
 
       <Modal
         isOpen={deleteModal.open}
