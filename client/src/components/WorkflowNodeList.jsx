@@ -601,43 +601,55 @@ const OutputParamCard = ({ param, paramKey, isEditing, onEdit, onDelete, typeLab
 }
 
 // Add Parameter Modal
-const AddParamModal = ({ isOpen, onClose, onAdd, onUpdate, paramTypes, title, editData }) => {
+const AddParamModal = ({ isOpen, onClose, onAdd, onUpdate, paramTypes, title, editData, existingKeys = [] }) => {
   const { t } = useTranslation('translation', { keyPrefix: 'easyquant' })
   const isEditMode = !!editData
 
-  // Initialize state based on edit mode
-  const getInitialState = () => {
-    if (editData) {
-      const typeInfo = paramTypes.find(t => t.type === editData.data.type)
-      const { type, title, description, _stableId, ...config } = editData.data
-      return {
-        step: 2,
-        selectedType: typeInfo || null,
-        paramData: {
+  // State for modal
+  const [step, setStep] = useState(1)
+  const [selectedType, setSelectedType] = useState(null)
+  const [paramData, setParamData] = useState({ name: '', title: '', description: '', required: true, config: {} })
+
+  // Reset state when modal opens or editData changes
+  useEffect(() => {
+    if (isOpen) {
+      if (editData) {
+        const typeInfo = paramTypes.find(t => t.type === editData.data.type)
+        const { type, title, description, _stableId, ...config } = editData.data
+        setStep(2)
+        setSelectedType(typeInfo || null)
+        setParamData({
           name: editData.key,
           title: title || editData.key,
           description: description || '',
           required: editData.required || false,
           config
-        }
+        })
+      } else {
+        // Reset to initial state for new parameter
+        setStep(1)
+        setSelectedType(null)
+        setParamData({ name: '', title: '', description: '', required: true, config: {} })
       }
     }
-    return {
-      step: 1,
-      selectedType: null,
-      paramData: { name: '', title: '', description: '', required: true, config: {} }
-    }
-  }
+  }, [isOpen, editData, paramTypes])
 
-  const initialState = getInitialState()
-  const [step, setStep] = useState(initialState.step)
-  const [selectedType, setSelectedType] = useState(initialState.selectedType)
-  const [paramData, setParamData] = useState(initialState.paramData)
+  // Generate unique name based on existing keys
+  const generateUniqueName = (baseName) => {
+    if (!existingKeys.includes(baseName)) {
+      return baseName
+    }
+    let counter = 1
+    while (existingKeys.includes(`${baseName}_${counter}`)) {
+      counter++
+    }
+    return `${baseName}_${counter}`
+  }
 
   const getTypeDefaults = (type) => {
     const title = t(`workflow.paramDefaults.${type}.title`, type)
     const description = t(`workflow.paramDefaults.${type}.desc`, 'No description')
-    
+
     // Default variable names map
     const nameMap = {
       'file_picker': 'file_path',
@@ -660,8 +672,11 @@ const AddParamModal = ({ isOpen, onClose, onAdd, onUpdate, paramTypes, title, ed
       'status': 'status',
     }
 
-    return { 
-        name: nameMap[type] || 'variable',
+    const baseName = nameMap[type] || 'variable'
+    const uniqueName = generateUniqueName(baseName)
+
+    return {
+        name: uniqueName,
         title,
         description
     }
@@ -836,7 +851,6 @@ const WorkflowNodeList = () => {
   const { t } = useTranslation('translation', { keyPrefix: 'easyquant' })
   const [nodes, setNodes] = useState([])
   const [loading, setLoading] = useState(true)
-  const [syncing, setSyncing] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -965,18 +979,6 @@ const WorkflowNodeList = () => {
       }
     } catch (error) {
       console.error('Save failed:', error)
-    }
-  }
-
-  const handleSync = async () => {
-    try {
-      setSyncing(true)
-      await fetch('http://localhost:8000/api/v1/workflow/nodes/sync', { method: 'POST' })
-      await fetchNodes()
-    } catch (error) {
-      console.error('Sync failed:', error)
-    } finally {
-      setSyncing(false)
     }
   }
 
@@ -1195,15 +1197,6 @@ const WorkflowNodeList = () => {
             {filteredNodes.length} / {nodes.length} NODES
           </span>
           <div className="w-px h-4 bg-eq-border-subtle" />
-
-          <button
-            onClick={handleSync}
-            disabled={syncing}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-eq-text-secondary hover:text-eq-text-primary hover:bg-eq-bg-elevated rounded-lg border border-eq-border-subtle transition-colors"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? t('workflow.nodeList.syncing', 'Syncing...') : t('workflow.nodeList.syncCode', 'Sync Code')}
-          </button>
 
           <button
             onClick={handleAddNew}
@@ -1591,6 +1584,7 @@ const WorkflowNodeList = () => {
         onAdd={handleAddInputParam}
         paramTypes={INPUT_PARAM_TYPES}
         title={t('workflow.nodeList.addInputParameter', 'Add Input Parameter')}
+        existingKeys={Object.keys(editForm.parameters_schema?.properties || {})}
       />
       <AddParamModal
         isOpen={showAddOutputModal}
@@ -1598,6 +1592,7 @@ const WorkflowNodeList = () => {
         onAdd={handleAddOutputParam}
         paramTypes={OUTPUT_PARAM_TYPES}
         title={t('workflow.nodeList.addOutputParameter', 'Add Output Parameter')}
+        existingKeys={Object.keys(editForm.outputs_schema || {})}
       />
       {/* Edit Input Param Modal */}
       {editingInputParam && (

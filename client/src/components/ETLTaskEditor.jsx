@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { ArrowLeft, Save, Loader2, Play, Settings, MoreHorizontal } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import api from '../services/api'
@@ -13,10 +13,13 @@ import Modal from './Modal'
 function ETLTaskEditor({ taskId, onNavigate }) {
   const { t } = useTranslation('translation', { keyPrefix: 'easyquant' })
   const [loading, setLoading] = useState(!!taskId)
+  const [loadError, setLoadError] = useState(null)
   const [saving, setSaving] = useState(false)
   const [running, setRunning] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   
+  const workflowRef = useRef(null) // Ref to access workflow state directly
+
   const [form, setForm] = useState({
     name: '',
     description: '',
@@ -30,10 +33,16 @@ function ETLTaskEditor({ taskId, onNavigate }) {
 
   useEffect(() => {
     if (taskId) {
+      setLoading(true)
+      setLoadError(null)
       api.getETLConfig(taskId).then(data => {
         setForm(data)
+      }).catch(err => {
+        console.error('Failed to load task:', err)
+        setLoadError(err.message || 'Failed to load task')
+      }).finally(() => {
         setLoading(false)
-      }).catch(console.error)
+      })
     }
   }, [taskId])
 
@@ -43,13 +52,32 @@ function ETLTaskEditor({ taskId, onNavigate }) {
 
   const handleSave = async () => {
     setSaving(true)
+    
+    // Get latest graph data directly from the workflow component
+    let graphData = form.graph_config
+    if (workflowRef.current) {
+        graphData = workflowRef.current.getGraphData()
+        console.log('Retrieved latest graph data from ref:', graphData)
+    } else {
+        console.warn('Workflow ref is null, using stale form state')
+    }
+
+    const payload = {
+        ...form,
+        graph_config: graphData
+    }
+
+    console.log('Saving task with payload:', payload) 
+
     try {
       if (taskId) {
-        await api.updateETLConfig(taskId, form)
+        await api.updateETLConfig(taskId, payload)
       } else {
-        const newTask = await api.createETLConfig(form)
+        const newTask = await api.createETLConfig(payload)
         onNavigate('etl-edit', newTask.id)
       }
+      // Update local state to reflect what was saved
+      setForm(prev => ({ ...prev, graph_config: graphData }))
     } catch (error) {
       console.error('Save failed:', error)
     } finally {
@@ -100,6 +128,16 @@ function ETLTaskEditor({ taskId, onNavigate }) {
     }))
   }, [])
 
+  if (loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4">
+        <p className="text-eq-danger-text font-medium">Error loading task</p>
+        <p className="text-sm text-eq-text-secondary">{loadError}</p>
+        <button onClick={() => onNavigate('etl')} className="btn-secondary text-xs">Go Back</button>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -124,7 +162,7 @@ function ETLTaskEditor({ taskId, onNavigate }) {
             <div className="flex items-center gap-2">
                 <h2 className="text-sm font-bold text-eq-text-primary truncate">{form.name || 'Untitled Workflow'}</h2>
                 <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-eq-bg-elevated text-eq-text-muted border border-eq-border-subtle">
-                    {taskId ? `#${taskId.substring(0, 6)}` : 'DRAFT'}
+                    {taskId ? `#${String(taskId).substring(0, 6)}` : 'DRAFT'}
                 </span>
             </div>
             <p className="text-[11px] text-eq-text-muted truncate">{form.description || 'No description'}</p>
@@ -166,6 +204,7 @@ function ETLTaskEditor({ taskId, onNavigate }) {
       <div className="flex-1 relative min-h-0 bg-[#f8fafc] dark:bg-[#0f172a]"> 
          <EventEmitterContextProvider>
             <WorkflowWithInnerContext
+              ref={workflowRef}
               nodes={initialWorkflowData.nodes}
               edges={initialWorkflowData.edges}
               onWorkflowDataUpdate={handleWorkflowUpdate}

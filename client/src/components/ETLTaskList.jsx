@@ -38,16 +38,24 @@ function ETLTaskList({ onNavigate }) {
   const handleCreateTask = async () => {
     if (!createModal.name.trim()) return
     setCreating(true)
+    console.log('Creating task with name:', createModal.name)
     try {
       const newTask = await api.createETLConfig({
         name: createModal.name,
         description: createModal.description,
-        source_type: 'csv_dir', // Temporary fallback to known good type
-        source_config: { path: '' }, // Ensure source_config is not empty if required
+        source_type: 'workflow', // Changed to workflow as generic type
+        source_config: { path: '/' }, // Default path
         pipeline_config: [],
         graph_config: { nodes: [], edges: [] }
       })
-      onNavigate('etl-edit', newTask.id)
+      console.log('Task created:', newTask)
+      if (newTask && newTask.id) {
+          console.log('Navigating to editor for ID:', newTask.id)
+          onNavigate('etl-edit', newTask.id)
+      } else {
+          console.error('Task created but ID is missing:', newTask)
+          alert('Task created but returned invalid data (missing ID). Check console.')
+      }
     } catch (error) {
       console.error('Failed to create task:', error)
       alert('Failed to create task: ' + (error.response?.data?.detail || error.message))

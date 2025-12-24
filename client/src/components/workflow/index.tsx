@@ -10,6 +10,8 @@ import {
   useState,
   lazy,
   Suspense,
+  forwardRef,
+  useImperativeHandle,
 } from 'react'
 import { setAutoFreeze } from 'immer'
 import {
@@ -28,6 +30,7 @@ import ReactFlow, {
 } from 'reactflow'
 import type {
   Viewport,
+  ReactFlowInstance,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 import './style.css'
@@ -127,13 +130,18 @@ export type WorkflowProps = {
   children?: React.ReactNode
   onWorkflowDataUpdate?: (v: any) => void
 }
-export const Workflow: FC<WorkflowProps> = memo(({
+
+export type WorkflowHandle = {
+  getGraphData: () => { nodes: Node[]; edges: Edge[]; viewport: Viewport }
+}
+
+export const Workflow = memo(forwardRef<WorkflowHandle, WorkflowProps>(({
   nodes: originalNodes,
   edges: originalEdges,
   viewport,
   children,
   onWorkflowDataUpdate,
-}) => {
+}, ref) => {
   const workflowContainerRef = useRef<HTMLDivElement>(null)
   const workflowStore = useWorkflowStore()
   const reactflow = useReactFlow()
@@ -152,6 +160,17 @@ export const Workflow: FC<WorkflowProps> = memo(({
       return '100%'
     return workflowCanvasHeight - bottomPanelHeight
   }, [workflowCanvasHeight, bottomPanelHeight])
+
+  // Expose methods to parent via ref
+  useImperativeHandle(ref, () => ({
+    getGraphData: () => {
+      return {
+        nodes: reactflow.getNodes(),
+        edges: reactflow.getEdges(),
+        viewport: reactflow.getViewport()
+      }
+    }
+  }));
 
   // update workflow Canvas width and height
   useEffect(() => {
@@ -323,6 +342,26 @@ export const Workflow: FC<WorkflowProps> = memo(({
     return setupScrollToNodeListener(nodes, reactflow)
   }, [nodes, reactflow])
 
+  // Sync changes to parent component
+  useEffect(() => {
+    if (!onWorkflowDataUpdate) return
+
+    const timer = setTimeout(() => {
+      // Use reactflow instance getters to ensure we get the absolute latest state
+      // including internal position updates that might not fully reflect in state yet
+      const currentNodes = reactflow.getNodes()
+      const currentEdges = reactflow.getEdges()
+      
+      onWorkflowDataUpdate({
+        nodes: currentNodes,
+        edges: currentEdges,
+        viewport: reactflow.getViewport()
+      })
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [nodes, edges, onWorkflowDataUpdate, reactflow])
+
   const { schemaTypeDefinitions } = useMatchSchemaType()
   const { fetchInspectVars } = useSetWorkflowVarsWithValue()
   const dataSourceList = useStore(s => s.dataSourceList)
@@ -450,29 +489,29 @@ export const Workflow: FC<WorkflowProps> = memo(({
       </ReactFlow>
     </div>
   )
-})
+}))
 
 type WorkflowWithInnerContextProps = WorkflowProps & {
   hooksStore?: Partial<HooksStoreShape>
 }
-export const WorkflowWithInnerContext = memo(({
+export const WorkflowWithInnerContext = memo(forwardRef<WorkflowHandle, WorkflowWithInnerContextProps>(({
   hooksStore,
   ...restProps
-}: WorkflowWithInnerContextProps) => {
+}, ref) => {
   return (
     <ReactFlowProvider>
       <WorkflowContextProvider>
         <WorkflowHistoryProvider nodes={restProps.nodes} edges={restProps.edges}>
           <DatasetsDetailProvider nodes={restProps.nodes}>
             <HooksStoreContextProvider {...hooksStore}>
-              <Workflow {...restProps} />
+              <Workflow ref={ref} {...restProps} />
             </HooksStoreContextProvider>
           </DatasetsDetailProvider>
         </WorkflowHistoryProvider>
       </WorkflowContextProvider>
     </ReactFlowProvider>
   )
-})
+}))
 
 type WorkflowWithDefaultContextProps
   = Pick<WorkflowProps, 'edges' | 'nodes'>

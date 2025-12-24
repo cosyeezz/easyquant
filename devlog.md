@@ -50,6 +50,35 @@
 
 ---
 
+# 开发日志 (2025-12-24) [WORKFLOW SAVE & SYNC]
+
+## 工作流保存与代码同步机制修复
+
+本次更新修复了两个影响核心可用性的关键问题：任务保存时状态滞后导致的数据丢失，以及节点代码同步功能的缺失。
+
+### 1. 任务保存机制重构 (Task Saving)
+- **问题**: 点击保存按钮时，后端存储的 DSL (`graph_config`) 往往落后于当前画布状态，导致最新的拖拽或连线操作丢失。
+- **原因**: 原有的“父子组件状态同步”机制存在延迟。`onWorkflowDataUpdate` 回调过于被动，无法捕获保存前一瞬间的操作。
+- **解决方案**: 
+    - 引入 **Imperative Handle (Ref)** 模式。
+    - `Workflow` 组件通过 `forwardRef` 暴露 `getGraphData()` 方法，直接调用 React Flow 实例获取实时数据。
+    - `ETLTaskEditor` 在点击保存时，主动调用该 Ref 方法获取最新快照，彻底弃用被动同步 State。
+
+### 2. 代码同步功能 (Code Sync)
+- **问题**: `WorkflowNodeList` 页面报错 `handleSync is not defined`，且缺少手动触发代码扫描的入口。
+- **解决方案**:
+    - 实现了 `POST /api/v1/workflow/nodes/sync` 的前端调用逻辑。
+    - 在工具栏新增 "Sync Code" 按钮，允许开发者手动触发后端扫描 `server/etl/process/handlers` 目录下的新节点类。
+
+### 3. 任务创建体验优化
+- **问题**: 点击“新建任务”后无反应或弹窗无内容。
+- **修复**:
+    - 重构 `Modal` 组件，支持 `children` 渲染，从而正确显示“任务名称”输入表单。
+    - 增加错误处理，若创建返回的 ID 为空则显式报错。
+    - 修复 Task ID 截取字符串时的类型错误 (`taskId.substring` -> `String(taskId).substring`)。
+
+---
+
 # 开发日志 (2025-12-22 Update 3) [WORKFLOW DESIGN DOC]
 
 ## 工作流引擎设计文档 - 完整规范
