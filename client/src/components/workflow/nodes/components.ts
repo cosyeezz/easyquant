@@ -49,8 +49,6 @@ import TriggerWebhookPanel from './trigger-webhook/panel'
 import TriggerPluginNode from './trigger-plugin/node'
 import TriggerPluginPanel from './trigger-plugin/panel'
 
-console.log('BlockEnum in components.ts:', BlockEnum);
-
 export const NodeComponentMap: Record<string, ComponentType<any>> = {
   [BlockEnum.Start]: StartNode,
   [BlockEnum.End]: EndNode,

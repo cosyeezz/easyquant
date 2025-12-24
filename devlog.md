@@ -1,3 +1,84 @@
+# 开发日志 (2025-12-24 Update 4) [CRITICAL FIXES]
+
+## 节点添加流程稳定性修复
+
+本次更新彻底解决了自定义节点（Dynamic Nodes）在添加时导致的崩溃和 "Initializing Node..." 错误。
+
+### 1. 元数据防御性访问 (Defensive Metadata Access)
+- **问题**: 在通过“连线添加” (`use-nodes-interactions.ts`) 或“侧边栏添加” (`add-block.tsx`) 新节点时，代码直接访问 `nodesMetaDataMap![type]`。对于刚注册的自定义节点，其元数据可能尚未同步到 Store 中，导致 `undefined` 访问崩溃或数据缺失。
+- **修复**: 在两处代码中均增加了空值检查与回退机制：
+    ```typescript
+    const meta = nodesMetaDataMap?.[type]
+    const defaultValue = meta ? meta.defaultValue : { title: type }
+    ```
+- **效果**: 即使元数据暂时缺失，也能使用默认标题（节点类型名）成功创建节点，避免了 UI 崩溃和 "undefined" 标题。
+
+### 2. 确保类型字段透传
+- **问题**: `node-adapter` 生成的 `defaultValue` 不包含 `type` 字段，导致 `CustomNode` 渲染时因缺失类型而显示 "Initializing Node..."。
+- **修复**: 在节点创建逻辑中显式注入 `type` 字段到 `data` 对象中，确保 `CustomNode` 能正确识别并加载对应的组件（或 fallback 到 `ToolNode`）。
+
+---
+
+# 开发日志 (2025-12-24 Update 3) [DYNAMIC NODE FIX]
+
+## 自定义节点动态加载与渲染修复
+
+本次更新解决了自定义节点在画布中无法正确渲染（显示 "Initializing Node..." 和 "undefined"）的关键问题。
+
+### 1. 节点组件映射回退 (Node Component Fallback)
+- **问题**: 自定义节点（如 `csv_loader`）的 `type` 不在 React Flow 的硬编码映射表 (`NodeComponentMap`) 中，导致组件加载失败。
+- **修复**: 在 `easyquant/client/src/components/workflow/nodes/index.tsx` 中实现了显式的回退逻辑。
+- **逻辑**: 当 `NodeComponentMap[nodeData.type]` 为空时，强制使用通用的 `ToolNode` 和 `ToolPanel` 组件进行渲染。这确保了所有动态定义的节点都能以“工具节点”的形态正常展示。
+
+### 2. 节点元数据适配与合并 (Metadata Adapter & Merge)
+- **适配器**: 创建了 `node-adapter.ts`，负责将后端数据库返回的节点 JSON 结构转换为前端工作流引擎所需的 `NodeDefault` 格式。
+- **动态注入**: 在 `ETLTaskEditor` 中实现了动态获取节点列表的逻辑，并将自定义节点与系统内置节点（Start, End, Loop 等）合并后注入到 `Workflow` 组件的 Context 中。
+
+### 3. 类型展示优化 (Type Badges)
+- **UI 改进**: 在任务列表页和编辑器头部，为不同类型的任务（ETL, Backtest, Live）添加了颜色区分的 Badge，提升了视觉识别度。
+
+---
+
+# 开发日志 (2025-12-24 Update 2) [OUTPUTS_SCHEMA & AUTO-NAMING]
+
+## 节点出参持久化与参数命名优化
+
+本次更新修复了节点出参无法保存的严重 Bug，并优化了参数添加的用户体验。
+
+### 1. 出参丢失问题修复 (Critical Bug)
+- **问题**: 添加出参后保存节点，重新打开时出参数据丢失
+- **根因**: 后端数据库模型和 API Schema 均缺少 `outputs_schema` 字段
+- **修复**:
+  - `server/storage/models/workflow_node.py`: 新增 `outputs_schema = Column(JSON, nullable=False, default={})`
+  - `server/api/v1/workflow.py`: 三个 Schema 类均新增 `outputs_schema` 字段
+  - 创建数据库迁移，处理现有数据（先添加可空列，设置默认值 `{}`，再改为非空）
+
+### 2. 参数名自动递增命名
+- **问题**: 添加同类型参数时，默认名称重复导致覆盖
+- **修复**: 新增 `generateUniqueName(baseName)` 函数
+- **逻辑**: 检查 `existingKeys`，若 `file_path` 已存在，自动生成 `file_path_1`、`file_path_2` 等
+- **实现**: Modal 组件新增 `existingKeys` prop，传入当前已有的参数名列表
+
+### 3. Modal 状态重置问题
+- **问题**: 关闭再打开添加参数弹窗时，显示上次选择的类型而非类型选择界面
+- **原因**: `useState(initialState)` 仅在组件首次渲染时计算
+- **修复**: 改用 `useEffect` 监听 `isOpen` 变化，每次打开时重置状态
+
+### 4. 移除后台同步功能
+- **变更**: 删除 "Sync Code" 按钮及 `handleSync` 函数
+- **原因**: 节点定义改为完全由页面驱动，不再依赖后台代码扫描
+- **影响**: 简化了节点管理流程，所有节点通过 UI 创建和编辑
+
+### 5. 数据库迁移
+```sql
+-- alembic/versions/f000991a1dff_add_outputs_schema_to_workflow_nodes.py
+ALTER TABLE workflow_nodes ADD COLUMN outputs_schema JSON;
+UPDATE workflow_nodes SET outputs_schema = '{}' WHERE outputs_schema IS NULL;
+ALTER TABLE workflow_nodes ALTER COLUMN outputs_schema SET NOT NULL;
+```
+
+---
+
 # 开发日志 (2025-12-24) [WORKFLOW NODE EDITOR UX]
 
 ## 节点参数管理器交互升级

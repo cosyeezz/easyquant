@@ -63,14 +63,14 @@ const AddBlock = ({
     } = store.getState()
     const nodes = getNodes()
     const nodesWithSameType = nodes.filter(node => node.data.type === type)
-    const {
-      defaultValue,
-    } = nodesMetaDataMap![type]
+    const meta = nodesMetaDataMap?.[type]
+    const defaultValue = meta ? meta.defaultValue : { title: type }
     const { newNode } = generateNewNode({
       type: getNodeCustomTypeByNodeDataType(type),
       data: {
         ...(defaultValue as any),
-        title: nodesWithSameType.length > 0 ? `${defaultValue.title} ${nodesWithSameType.length + 1}` : defaultValue.title,
+        type,
+        title: nodesWithSameType.length > 0 ? `${defaultValue.title || type} ${nodesWithSameType.length + 1}` : (defaultValue.title || type),
         ...pluginDefaultValue,
         _isCandidate: true,
       },

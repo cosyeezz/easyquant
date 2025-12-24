@@ -842,7 +842,10 @@ export const useNodesInteractions = () => {
       const nodesWithSameType = nodes.filter(
         node => node.data.type === nodeType,
       )
-      const { defaultValue } = nodesMetaDataMap![nodeType] || { defaultValue: { title: nodeType } }
+      // FIX: Handle dynamic nodes where metaData might be missing in initial map if not synced perfectly
+      const meta = nodesMetaDataMap?.[nodeType]
+      const defaultValue = meta ? meta.defaultValue : { title: nodeType }
+      
       const { newNode, newIterationStartNode, newLoopStartNode }
         = generateNewNode({
           type: getNodeCustomTypeByNodeDataType(nodeType),
