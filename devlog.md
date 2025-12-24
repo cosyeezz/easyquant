@@ -1,3 +1,54 @@
+# EasyQuant 项目概览
+
+## 1. 项目简介
+EasyQuant 是一个基于事件驱动架构的现代化量化交易系统，致力于提供生产级的 ETL 数据处理、因子挖掘、策略回测及实盘交易能力。系统采用前后端分离架构，核心特色是集成了 **Easy-Canvas** —— 一个复刻 Dify/Coze 风格、基于节点图（Node-based Graph）的可视化编排引擎。
+
+## 2. 系统架构
+- **Backend (easyquant)**: Python FastAPI。负责核心业务逻辑、异步任务调度（ETL/回测）、WebSocket 实时消息推送及数据库交互。
+    - **数据库**: PostgreSQL 14 (Local/Remote)。
+    - **核心机制**: 事件驱动 (Event-Driven)、可观测性 (Observability)。
+- **Frontend (easy-canvas)**: Next.js + React Flow。独立的单页应用 (SPA)，提供极致的节点图编辑体验（微型卡片设计、智能连线、ELK 布局）。
+    - **通信**: 通过 RESTful API 与后端交互，WebSocket 接收实时状态。
+
+## 3. 核心功能
+- **ETL 编排**: 从线性 Pipeline 升级为通用节点图引擎，支持多源数据清洗、合并及入库。
+- **Schema Propagation**: 列级元数据在节点间的自动流动与推导。
+- **Version Control**: 节点版本管理 (Maven Style: SNAPSHOT/RELEASE)，支持草稿与发布流程。
+- **可观测性**: 全链路日志与事件追踪。
+
+## 4. 目录结构
+```
+/Users/dane/Easy/
+├── easyquant/             # Backend Root (Python FastAPI)
+│   ├── server/            # Core Service Logic
+│   │   ├── api/           # API Endpoints
+│   │   ├── storage/       # Database Models
+│   │   └── runner/        # Task Execution Engine
+│   ├── alembic/           # Database Migrations
+│   ├── manage.py          # Service Entry Point
+│   └── start.sh           # Startup Script
+│
+└── easy-canvas/           # Frontend Root (Next.js)
+    ├── app/               # App Router & UI Logic
+    │   └── components/    # Reusable UI Components
+    │       └── workflow/  # Workflow Editor (Canvas)
+    ├── service/           # API Adapters
+    └── public/            # Static Assets
+```
+
+## 5. 技术栈 (Tech Stack)
+- **Frontend**: Next.js 15 (App Router), React 19, React Flow 11, TailwindCSS, Zustand, i18next.
+- **Backend**: FastAPI, SQLAlchemy (Async), Alembic, Pandas.
+- **Infrastructure**: PostgreSQL 14, SSH Tunneling (`sshtunnel` for remote DB).
+- **Testing**: Jest (Frontend).
+
+## 6. 关键规范
+- **开发**: 严禁 `print()`，必须使用 `logging`。
+- **端口**: Backend :8000, Frontend :3000。
+- **设计**: 生产级标准，拒绝临时代码。
+
+---
+
 # EasyQuant 开发日志
 
 > **格式说明**: 每条日志按时间倒序排列，最新的在最上面。AI 可通过阅读本文件快速恢复上下文。
@@ -249,9 +300,9 @@ onDragEnd={() => handleReorder()}
 | `path/to/file` | 新增/修改/删除 | 简要说明 |
 
 ### 🔧 关键代码 (可选)
-\`\`\`language
+```language
 // 核心代码片段
-\`\`\`
+```
 
 ### ⏭️ 下一步 (可选)
 - [ ] 待办项 1
@@ -268,3 +319,4 @@ onDragEnd={() => handleReorder()}
 3. 变更文件表格帮助快速定位代码
 4. "下一步"帮助 AI 恢复上下文后知道接下来做什么
 5. "上下文"记录关键状态和依赖关系
+```
