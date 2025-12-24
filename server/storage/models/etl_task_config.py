@@ -19,6 +19,10 @@ class ETLTaskConfig(Base):
     # source_config 示例: {"path": "F:/data/stocks"}
     source_config = Column(JSON, nullable=False, default={}, comment="数据源详细配置参数")
     
+    # --- 任务类型 ---
+    # 示例: 'etl', 'backtest', 'live'
+    type = Column(String, nullable=False, default='etl', server_default='etl', comment="任务类型")
+
     # --- Pipeline / 处理链路配置 ---
     # pipeline_config 示例: [{"name": "ColumnMapping", "params": {...}}, ...]
     # 这是一个有序列表，定义了处理器链

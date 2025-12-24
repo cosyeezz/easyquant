@@ -846,6 +846,104 @@ const AddParamModal = ({ isOpen, onClose, onAdd, onUpdate, paramTypes, title, ed
   )
 }
 
+// Publish Modal Component
+const PublishModal = ({ node, onClose, onPublish, publishing }) => {
+  const { t } = useTranslation('translation', { keyPrefix: 'easyquant' })
+  const [versionType, setVersionType] = useState('SNAPSHOT')
+  const [changelog, setChangelog] = useState('')
+
+  const nextSnapshot = node.latest_release
+    ? `${node.latest_release.split('.').slice(0, 2).join('.')}.${parseInt(node.latest_release.split('.')[1] || 0) + 1}.0-SNAPSHOT`
+    : node.latest_snapshot || '1.0.0-SNAPSHOT'
+
+  const nextRelease = node.latest_snapshot
+    ? node.latest_snapshot.replace('-SNAPSHOT', '')
+    : node.latest_release
+      ? `${node.latest_release.split('.').slice(0, 2).join('.')}.${parseInt(node.latest_release.split('.')[2] || 0) + 1}`
+      : '1.0.0'
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 animate-fadeIn p-4">
+      <div className="bg-white dark:bg-[#1a1a1c] rounded-xl p-6 max-w-md w-full border border-gray-200 dark:border-[#2a2a2e] shadow-2xl">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="p-2.5 bg-eq-success-bg rounded-full">
+            <Send className="w-5 h-5 text-eq-success-text" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-lg text-eq-text-primary">{t('workflow.nodeList.publishNode', 'Publish Node')}</h3>
+            <p className="text-xs text-eq-text-muted">{node.title}</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-[10px] font-semibold text-eq-text-muted uppercase tracking-wider">{t('workflow.nodeList.versionType', 'Version Type')}</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setVersionType('SNAPSHOT')}
+                className={`p-3 rounded-lg border text-left transition-all ${
+                  versionType === 'SNAPSHOT'
+                    ? 'border-eq-warning-border bg-eq-warning-bg/50'
+                    : 'border-eq-border-subtle hover:border-eq-border-default'
+                }`}
+              >
+                <div className="text-xs font-medium text-eq-text-primary">SNAPSHOT</div>
+                <div className="text-[10px] text-eq-text-muted mt-0.5">{t('workflow.nodeList.snapshotDesc', 'Development version, can be updated')}</div>
+                <div className="text-[10px] font-mono text-eq-warning-text mt-1">{nextSnapshot}</div>
+              </button>
+              <button
+                onClick={() => setVersionType('RELEASE')}
+                className={`p-3 rounded-lg border text-left transition-all ${
+                  versionType === 'RELEASE'
+                    ? 'border-eq-success-border bg-eq-success-bg/50'
+                    : 'border-eq-border-subtle hover:border-eq-border-default'
+                }`}
+              >
+                <div className="text-xs font-medium text-eq-text-primary">RELEASE</div>
+                <div className="text-[10px] text-eq-text-muted mt-0.5">{t('workflow.nodeList.releaseDesc', 'Stable version, immutable')}</div>
+                <div className="text-[10px] font-mono text-eq-success-text mt-1">{nextRelease}</div>
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-semibold text-eq-text-muted uppercase tracking-wider">{t('workflow.nodeList.changelog', 'Changelog')}</label>
+            <textarea
+              value={changelog}
+              onChange={(e) => setChangelog(e.target.value)}
+              placeholder={t('workflow.nodeList.changelogPlaceholder', 'Describe what changed in this version...')}
+              className="w-full p-3 bg-eq-bg-elevated border border-eq-border-subtle rounded-lg text-xs text-eq-text-primary outline-none focus:border-eq-primary-500 resize-none"
+              rows={3}
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-eq-border-subtle">
+          <button
+            onClick={onClose}
+            disabled={publishing}
+            className="px-4 py-2 text-sm font-medium text-eq-text-secondary hover:text-eq-text-primary rounded-lg transition-colors"
+          >
+            {t('workflow.nodeList.cancel', 'Cancel')}
+          </button>
+          <button
+            onClick={() => onPublish(versionType, changelog)}
+            disabled={publishing}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-eq-success-text hover:bg-green-600 rounded-lg transition-colors disabled:opacity-50"
+          >
+            {publishing ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+            {t('workflow.nodeList.publish', 'Publish')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // === Main Component ===
 const WorkflowNodeList = () => {
   const { t } = useTranslation('translation', { keyPrefix: 'easyquant' })
@@ -862,6 +960,8 @@ const WorkflowNodeList = () => {
   const [editingInputParam, setEditingInputParam] = useState(null) // { key, data }
   const [editingOutputParam, setEditingOutputParam] = useState(null) // { key, data }
   const [deleteModal, setDeleteModal] = useState({ open: false, nodeId: null })
+  const [publishModal, setPublishModal] = useState({ open: false, node: null })
+  const [publishing, setPublishing] = useState(false)
 
   // Drag-and-drop state
   const [draggingInputKey, setDraggingInputKey] = useState(null)
@@ -882,7 +982,7 @@ const WorkflowNodeList = () => {
 
   const STATUSES = useMemo(() => [
     { value: 'all', label: t('workflow.nodeList.allStatus'), color: null },
-    { value: 'active', label: t('workflow.nodeList.statusActive'), color: 'text-eq-success-text' },
+    { value: 'published', label: t('workflow.nodeList.statusPublished', 'Published'), color: 'text-eq-success-text' },
     { value: 'draft', label: t('workflow.nodeList.statusDraft'), color: 'text-eq-warning-text' },
   ], [t])
 
@@ -915,7 +1015,15 @@ const WorkflowNodeList = () => {
       setLoading(true)
       const response = await fetch('http://localhost:8000/api/v1/workflow/nodes')
       const data = await response.json()
-      setNodes(data)
+      // Map draft fields to working fields for UI
+      const normalizedData = data.map(node => ({
+        ...node,
+        parameters_schema: node.draft_parameters_schema || { type: 'object', properties: {}, required: [] },
+        outputs_schema: node.draft_outputs_schema || {},
+        ui_config: node.draft_ui_config || {},
+        handler_path: node.draft_handler_path || ''
+      }))
+      setNodes(normalizedData)
     } catch (error) {
       console.error('Failed to fetch nodes:', error)
     } finally {
@@ -954,7 +1062,11 @@ const WorkflowNodeList = () => {
   }
 
   const startEditing = () => {
-    setEditForm({ ...selectedNode })
+    setEditForm({
+      ...selectedNode,
+      parameters_schema: selectedNode.parameters_schema || { type: 'object', properties: {}, required: [] },
+      outputs_schema: selectedNode.outputs_schema || {}
+    })
     setIsEditing(true)
   }
 
@@ -965,17 +1077,38 @@ const WorkflowNodeList = () => {
         ? 'http://localhost:8000/api/v1/workflow/nodes'
         : `http://localhost:8000/api/v1/workflow/nodes/${selectedNode.id}`
 
+      // Map UI fields to API draft fields
+      const payload = {
+        name: editForm.name,
+        title: editForm.title,
+        category: editForm.category,
+        icon: editForm.icon,
+        description: editForm.description,
+        draft_parameters_schema: editForm.parameters_schema,
+        draft_outputs_schema: editForm.outputs_schema,
+        draft_ui_config: editForm.ui_config || {},
+        draft_handler_path: editForm.handler_path
+      }
+
       const response = await fetch(url, {
         method: isNew ? 'POST' : 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm)
+        body: JSON.stringify(payload)
       })
 
       if (response.ok) {
         setIsEditing(false)
         await fetchNodes()
         const data = await response.json()
-        setSelectedNode(isNew ? data : { ...editForm })
+        // Map response back to UI format
+        const normalizedNode = {
+          ...data,
+          parameters_schema: data.draft_parameters_schema || { type: 'object', properties: {}, required: [] },
+          outputs_schema: data.draft_outputs_schema || {},
+          ui_config: data.draft_ui_config || {},
+          handler_path: data.draft_handler_path || ''
+        }
+        setSelectedNode(normalizedNode)
       }
     } catch (error) {
       console.error('Save failed:', error)
@@ -990,6 +1123,26 @@ const WorkflowNodeList = () => {
       setDeleteModal({ open: false, nodeId: null })
     } catch (error) {
       console.error('Delete failed:', error)
+    }
+  }
+
+  const handlePublish = async (versionType, changelog) => {
+    if (!publishModal.node?.id) return
+    try {
+      setPublishing(true)
+      const response = await fetch(`http://localhost:8000/api/v1/workflow/nodes/${publishModal.node.id}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version_type: versionType, changelog })
+      })
+      if (response.ok) {
+        await fetchNodes()
+        setPublishModal({ open: false, node: null })
+      }
+    } catch (error) {
+      console.error('Publish failed:', error)
+    } finally {
+      setPublishing(false)
     }
   }
 
@@ -1138,9 +1291,10 @@ const WorkflowNodeList = () => {
       const matchesSearch = node.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         node.name.toLowerCase().includes(searchTerm.toLowerCase())
       const matchesCategory = categoryFilter === 'all' || node.category === categoryFilter
+      const hasPublished = node.latest_release || node.latest_snapshot
       const matchesStatus = statusFilter === 'all' ||
-        (statusFilter === 'active' && node.is_active) ||
-        (statusFilter === 'draft' && !node.is_active)
+        (statusFilter === 'published' && hasPublished) ||
+        (statusFilter === 'draft' && !hasPublished)
       return matchesSearch && matchesCategory && matchesStatus
     })
   }, [nodes, searchTerm, categoryFilter, statusFilter])
@@ -1258,12 +1412,16 @@ const WorkflowNodeList = () => {
                             selectedNode?.id === node.id ? 'text-eq-text-primary' : 'text-eq-text-secondary'
                           }`}
                         />
-                        {node.is_active ? (
+                        {node.latest_release ? (
                           <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-eq-success-bg text-eq-success-text border border-eq-success-border flex-shrink-0">
-                            Active
+                            v{node.latest_release}
+                          </span>
+                        ) : node.latest_snapshot ? (
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-eq-warning-bg text-eq-warning-text border border-eq-warning-border flex-shrink-0">
+                            {node.latest_snapshot}
                           </span>
                         ) : (
-                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-eq-warning-bg text-eq-warning-text border border-eq-warning-border flex-shrink-0">
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-eq-bg-elevated text-eq-text-muted border border-eq-border-subtle flex-shrink-0">
                             Draft
                           </span>
                         )}
@@ -1324,13 +1482,22 @@ const WorkflowNodeList = () => {
                           <Edit3 className="w-4 h-4" />
                         </button>
                         {selectedNode.id && (
-                          <button
-                            onClick={() => setDeleteModal({ open: true, nodeId: selectedNode.id })}
-                            className="p-2 text-eq-text-secondary hover:text-eq-danger-text hover:bg-eq-danger-bg rounded-lg transition-colors border border-transparent hover:border-eq-danger-border"
-                            title={t('workflow.nodeList.deleteNode', 'Delete Node')}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <>
+                            <button
+                              onClick={() => setPublishModal({ open: true, node: selectedNode })}
+                              className="p-2 text-eq-text-secondary hover:text-eq-success-text hover:bg-eq-success-bg rounded-lg transition-colors border border-transparent hover:border-eq-success-border"
+                              title={t('workflow.nodeList.publishNode', 'Publish Node')}
+                            >
+                              <Send className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteModal({ open: true, nodeId: selectedNode.id })}
+                              className="p-2 text-eq-text-secondary hover:text-eq-danger-text hover:bg-eq-danger-bg rounded-lg transition-colors border border-transparent hover:border-eq-danger-border"
+                              title={t('workflow.nodeList.deleteNode', 'Delete Node')}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
                         )}
                       </>
                     )}
@@ -1656,6 +1823,16 @@ const WorkflowNodeList = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Publish Modal */}
+      {publishModal.open && (
+        <PublishModal
+          node={publishModal.node}
+          onClose={() => setPublishModal({ open: false, node: null })}
+          onPublish={handlePublish}
+          publishing={publishing}
+        />
       )}
     </div>
   )

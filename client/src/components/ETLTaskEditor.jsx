@@ -5,6 +5,7 @@ import api from '../services/api'
 // --- New Workflow Integration ---
 import { WorkflowWithInnerContext } from './workflow/index'
 import { availableNodesMetaData } from './workflow/node-defaults'
+import { convertDbNodeToNodeDefault } from './workflow/utils/node-adapter' // IMPORT
 import { EventEmitterContextProvider } from '../context/event-emitter'
 import { CUSTOM_NODE } from './workflow/constants'
 import { BlockEnum } from './workflow/types'
@@ -18,11 +19,15 @@ function ETLTaskEditor({ taskId, onNavigate }) {
   const [running, setRunning] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   
+  // Custom nodes state
+  const [mergedNodesMetaData, setMergedNodesMetaData] = useState(availableNodesMetaData)
+
   const workflowRef = useRef(null) // Ref to access workflow state directly
 
   const [form, setForm] = useState({
     name: '',
     description: '',
+    type: 'etl',
     source_type: 'workflow',
     source_config: {},
     batch_size: 1000,
@@ -30,6 +35,45 @@ function ETLTaskEditor({ taskId, onNavigate }) {
     pipeline_config: [],
     graph_config: { nodes: [], edges: [] }
   })
+
+  const TASK_TYPES = [
+    { value: 'etl', label: 'ETL Pipeline', color: 'bg-eq-primary-500', text: 'text-white' },
+    { value: 'backtest', label: 'Backtest', color: 'bg-purple-500', text: 'text-white' },
+    { value: 'live', label: 'Live Trading', color: 'bg-green-500', text: 'text-white' },
+  ]
+  const getTypeStyle = (type) => {
+      const t = TASK_TYPES.find(t => t.value === type)
+      return t ? `${t.color} ${t.text}` : 'bg-gray-500 text-white'
+  }
+
+  // Fetch custom nodes on mount
+  useEffect(() => {
+    const fetchCustomNodes = async () => {
+        try {
+            const response = await fetch('http://localhost:8000/api/v1/workflow/nodes')
+            if (response.ok) {
+                const dbNodes = await response.json()
+                const customDefaults = dbNodes.map(convertDbNodeToNodeDefault)
+                
+                // Merge with built-in defaults
+                // Create a new map to avoid mutating the original import
+                const newNodes = [...availableNodesMetaData.nodes, ...customDefaults]
+                const newNodesMap = { ...availableNodesMetaData.nodesMap }
+                customDefaults.forEach(node => {
+                    newNodesMap[node.metaData.type] = node
+                })
+                
+                setMergedNodesMetaData({
+                    nodes: newNodes,
+                    nodesMap: newNodesMap
+                })
+            }
+        } catch (error) {
+            console.error('Failed to fetch custom nodes:', error)
+        }
+    }
+    fetchCustomNodes()
+  }, [])
 
   useEffect(() => {
     if (taskId) {
@@ -57,7 +101,6 @@ function ETLTaskEditor({ taskId, onNavigate }) {
     let graphData = form.graph_config
     if (workflowRef.current) {
         graphData = workflowRef.current.getGraphData()
-        console.log('Retrieved latest graph data from ref:', graphData)
     } else {
         console.warn('Workflow ref is null, using stale form state')
     }
@@ -78,6 +121,7 @@ function ETLTaskEditor({ taskId, onNavigate }) {
       }
       // Update local state to reflect what was saved
       setForm(prev => ({ ...prev, graph_config: graphData }))
+      setIsSettingsOpen(false) // Close settings if open
     } catch (error) {
       console.error('Save failed:', error)
     } finally {
@@ -160,6 +204,9 @@ function ETLTaskEditor({ taskId, onNavigate }) {
           
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-2">
+                <span className={`px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold uppercase tracking-wider ${getTypeStyle(form.type || 'etl')}`}>
+                    {(form.type || 'etl')}
+                </span>
                 <h2 className="text-sm font-bold text-eq-text-primary truncate">{form.name || 'Untitled Workflow'}</h2>
                 <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-eq-bg-elevated text-eq-text-muted border border-eq-border-subtle">
                     {taskId ? `#${String(taskId).substring(0, 6)}` : 'DRAFT'}
@@ -209,7 +256,7 @@ function ETLTaskEditor({ taskId, onNavigate }) {
               edges={initialWorkflowData.edges}
               onWorkflowDataUpdate={handleWorkflowUpdate}
               hooksStore={{
-                availableNodesMetaData,
+                availableNodesMetaData: mergedNodesMetaData, // UPDATED
                 readOnly: false,
               }}
             />
@@ -221,9 +268,29 @@ function ETLTaskEditor({ taskId, onNavigate }) {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         title={t('nav.pipelines') + ' ' + t('nav.nodes')}
-        showConfirm={false}
+        showConfirm={true} // Enabled confirm button to act as a "Save" for modal
+        onConfirm={handleSave} // Clicking confirm triggers the main save
+        confirmText={saving ? "Saving..." : "Save Settings"}
       >
         <div className="space-y-4 py-2">
+            <div>
+                <label className="block text-xs font-medium text-eq-text-secondary mb-1.5">Task Type</label>
+                <div className="grid grid-cols-3 gap-2">
+                    {TASK_TYPES.map(type => (
+                        <button
+                            key={type.value}
+                            onClick={() => updateForm('type', type.value)}
+                            className={`px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
+                                form.type === type.value
+                                    ? 'bg-eq-primary-500/10 border-eq-primary-500 text-eq-primary-500'
+                                    : 'bg-eq-bg-elevated border-eq-border-subtle text-eq-text-secondary hover:border-eq-border-default'
+                            }`}
+                        >
+                            {type.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
             <div>
                 <label className="block text-xs font-medium text-eq-text-secondary mb-1.5">{t('common.name')}</label>
                 <input 

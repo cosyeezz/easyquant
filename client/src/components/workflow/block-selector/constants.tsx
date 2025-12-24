@@ -4,9 +4,11 @@ import { BlockClassificationEnum } from './types'
 
 export const BLOCK_CLASSIFICATIONS: string[] = [
   BlockClassificationEnum.Default,
+  BlockClassificationEnum.Data,
   BlockClassificationEnum.QuestionUnderstand,
   BlockClassificationEnum.Logic,
   BlockClassificationEnum.Transform,
+  BlockClassificationEnum.Quant,
   BlockClassificationEnum.Utilities,
 ]
 

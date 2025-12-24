@@ -59,7 +59,7 @@ const Tabs: FC<TabsProps> = ({
   return (
     <div onClick={e => e.stopPropagation()}>
       {
-        !noBlocks && (
+        !noBlocks && false && ( // Hiding tabs header for now to enforce split-view
           <div className='relative flex bg-background-section-burn pl-1 pt-1'>
             {
               tabs.map((tab) => {
@@ -122,7 +122,7 @@ const Tabs: FC<TabsProps> = ({
       }
       {
         activeTab === TabsEnum.Blocks && !noBlocks && (
-          <div className='border-t border-divider-subtle'>
+          <div className=''>
             <Blocks
               searchText={searchText}
               onSelect={onSelect}

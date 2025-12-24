@@ -10,6 +10,7 @@ const translation = {
     name: '名称',
     description: '描述',
     actions: '操作',
+    editWorkflow: '编辑工作流',
   },
   nav: {
     schemas: '数据模型',

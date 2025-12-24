@@ -10,6 +10,7 @@ const translation = {
     name: 'Name',
     description: 'Description',
     actions: 'Actions',
+    editWorkflow: 'Edit Workflow',
   },
   nav: {
     schemas: 'Data Models',

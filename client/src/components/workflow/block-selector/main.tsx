@@ -65,8 +65,8 @@ const NodeSelector: FC<NodeSelectorProps> = ({
   onOpenChange,
   onSelect,
   trigger,
-  placement = 'right',
-  offset = 6,
+  placement = 'right-start',
+  offset = 0,
   triggerClassName,
   triggerInnerClassName,
   triggerStyle,
@@ -203,8 +203,8 @@ const NodeSelector: FC<NodeSelectorProps> = ({
             )
         }
       </PortalToFollowElemTrigger>
-      <PortalToFollowElemContent className='z-[1000]'>
-        <div className={`rounded-lg border-[0.5px] border-components-panel-border bg-components-panel-bg shadow-lg ${popupClassName}`}>
+      <PortalToFollowElemContent className='z-[1000] !fixed !inset-0 !transform-none !left-0 !top-0 flex items-center justify-center bg-black/20 backdrop-blur-sm'>
+        <div className={`overflow-hidden rounded-lg border-[0.5px] border-components-panel-border bg-components-panel-bg shadow-2xl ${popupClassName}`}>
           <Tabs
             tabs={tabs}
             activeTab={activeTab}
@@ -212,27 +212,7 @@ const NodeSelector: FC<NodeSelectorProps> = ({
             allowStartNodeSelection={canSelectUserInput}
             onActiveTabChange={handleActiveTabChange}
             filterElem={
-              <div className='relative m-2' onClick={e => e.stopPropagation()}>
-                {activeTab === TabsEnum.Start && (
-                  <Input
-                    showLeftIcon
-                    showClearIcon
-                    autoFocus
-                    value={searchText}
-                    onChange={e => setSearchText(e.target.value)}
-                    onClear={() => setSearchText('')}
-                    placeholder={searchPlaceholder}
-                  />
-                  // <SearchBox
-                  //   autoFocus
-                  //   search={searchText}
-                  //   onSearchChange={setSearchText}
-                  //   tags={tags}
-                  //   onTagsChange={setTags}
-                  //   placeholder={searchPlaceholder}
-                  //   inputClassName='grow'
-                  // />
-                )}
+              <div className='relative px-3 pt-3 pb-1' onClick={e => e.stopPropagation()}>
                 {activeTab === TabsEnum.Blocks && (
                   <Input
                     showLeftIcon
@@ -242,6 +222,20 @@ const NodeSelector: FC<NodeSelectorProps> = ({
                     placeholder={searchPlaceholder}
                     onChange={e => setSearchText(e.target.value)}
                     onClear={() => setSearchText('')}
+                    wrapperClassName='bg-transparent border-none shadow-none'
+                    className='!bg-background-section-burn border-none'
+                  />
+                )}
+                {/* ... other tabs inputs ... */}
+                {activeTab === TabsEnum.Start && (
+                  <Input
+                    showLeftIcon
+                    showClearIcon
+                    autoFocus
+                    value={searchText}
+                    onChange={e => setSearchText(e.target.value)}
+                    onClear={() => setSearchText('')}
+                    placeholder={searchPlaceholder}
                   />
                 )}
                 {activeTab === TabsEnum.Sources && (
@@ -265,15 +259,6 @@ const NodeSelector: FC<NodeSelectorProps> = ({
                     onClear={() => setSearchText('')}
                     placeholder={t('plugin.searchTools')!}
                   />
-                  // <SearchBox
-                  //   autoFocus
-                  //   search={searchText}
-                  //   onSearchChange={setSearchText}
-                  //   tags={tags}
-                  //   onTagsChange={setTags}
-                  //   placeholder={t('plugin.searchTools')!}
-                  //   inputClassName='grow'
-                  // />
                 )}
               </div>
             }

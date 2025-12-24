@@ -23,6 +23,8 @@ export enum BlockClassificationEnum {
   Logic = 'logic',
   Transform = 'transform',
   Utilities = 'utilities',
+  Quant = 'quant',
+  Data = 'data',
 }
 
 type PluginCommonDefaultValue = {

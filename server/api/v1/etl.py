@@ -33,6 +33,7 @@ async def _run_task_background(task_id: int):
 class ETLTaskConfigBase(BaseModel):
     name: str
     description: str | None = None
+    type: str = 'etl' # Default type
     source_type: str
     source_config: dict
     pipeline_config: List[dict]
