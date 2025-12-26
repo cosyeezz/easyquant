@@ -1,0 +1,16 @@
+# Product Guide
+
+## Project Vision
+EasyQuant 是一个综合性的量化交易系统，旨在通过可视化的工作流编排降低算法交易的门槛。它结合了 Python 的强大数据处理能力和现代 Web 前端的交互体验，支持从数据清洗 (ETL)、策略回测到实盘交易的全生命周期管理。
+
+## Core Features
+- **可视化策略编排 (Visual Orchestration):** 基于 Easy-Canvas 的节点编辑器，采用 "Dify/Coze" 风格的极简设计，支持拖拽式构建 ETL 流程和交易策略。
+- **事件驱动架构 (Event-Driven):** 后端基于 Python FastAPI，采用全链路事件追踪设计，确保系统的高可观测性。
+- **实时监控 (Real-Time Observability):** 通过 WebSocket 实现日志流、进程状态和交易事件的毫秒级前端推送。
+- **量化引擎 (Quant Engine):** 内置回测与实盘交易引擎，支持复杂的金融数据处理和策略执行。
+- **前后端分离:** 独立的 Next.js 前端与 Python 后端通过 API 和 WebSocket 通信，结构清晰。
+
+## Target Audience
+- **量化研究员:** 需要高效工具进行策略开发和历史回测。
+- **算法交易员:** 需要稳定、可视化的环境监控实盘交易状态。
+- **数据工程师:** 负责维护金融数据清洗和 ETL 流程。
