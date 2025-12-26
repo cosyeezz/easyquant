@@ -1,9 +1,9 @@
 # Plan: 版本管理界面与画布集成
 
 ## Phase 1: Version History UI
-- [ ] Task: Create a VersionHistory component to display list of node versions.
-- [ ] Task: Integrate VersionHistory into the existing WorkflowNodeList page.
-- [ ] Task: Conductor - User Manual Verification 'Version History UI' (Protocol in workflow.md)
+- [x] Task: Create a VersionHistory component to display list of node versions. [cdac714]
+- [x] Task: Integrate VersionHistory into the existing WorkflowNodeList page. [cdac714]
+- [~] Task: Conductor - User Manual Verification 'Version History UI' (Protocol in workflow.md)
 
 ## Phase 2: Node Selector Versioning
 - [ ] Task: Modify NodeSelector to support hierarchical display (Node -> Versions).
