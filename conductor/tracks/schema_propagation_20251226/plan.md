@@ -6,8 +6,8 @@
 - [x] Task: Conductor - User Manual Verification 'Backend Inference Engine' (Protocol in workflow.md)
 
 ## Phase 2: Frontend Propagation Logic
-- [ ] Task: Implement `useSchemaPropagation` hook in React Flow context.
-- [ ] Task: Update node configurations reactively when connections change.
+- [x] Task: Implement `useSchemaPropagation` hook in React Flow context. [e51592f]
+- [x] Task: Update node configurations reactively when connections change. [e51592f]
 - [ ] Task: Conductor - User Manual Verification 'Frontend Propagation Logic' (Protocol in workflow.md)
 
 ## Phase 3: Dynamic Parameter Picker
