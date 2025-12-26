@@ -44,6 +44,30 @@ class ColumnMappingHandler(BaseHandler):
             }
         }
 
+    @classmethod
+    def get_output_schema(cls, config: Dict[str, Any], input_schema: Dict[str, Any] | None = None) -> Dict[str, Any]:
+        """
+        推导重命名后的 Schema。
+        """
+        if not input_schema or "columns" not in input_schema:
+            return {"columns": []}
+            
+        mapping = config.get("mapping", {})
+        output_columns = []
+        
+        for col in input_schema["columns"]:
+            col_name = col["name"]
+            # 如果该列在映射中，则重命名
+            if col_name in mapping:
+                new_col = col.copy()
+                new_col["name"] = mapping[col_name]
+                output_columns.append(new_col)
+            else:
+                # 否则保持原样
+                output_columns.append(col)
+                
+        return {"columns": output_columns}
+
     async def handle(self, data: Any, context: Dict[str, Any] | None = None) -> Any:
         """
         执行重命名操作。

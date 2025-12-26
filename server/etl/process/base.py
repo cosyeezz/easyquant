@@ -25,6 +25,18 @@ class BaseHandler(ABC):
         """
         raise NotImplementedError
 
+    @classmethod
+    def get_output_schema(cls, config: Dict[str, Any], input_schema: Dict[str, Any] | None = None) -> Dict[str, Any]:
+        """
+        根据当前节点配置和输入 Schema，推导输出 Schema。
+        默认行为是直接传递输入 Schema (Pass-through)。
+        
+        :param config: 节点的参数配置 (draft_parameters)
+        :param input_schema: 上游节点的输出 Schema
+        :return: 当前节点的输出 Schema
+        """
+        return input_schema or {"columns": []}
+
     @abstractmethod
     async def handle(self, data: Any, context: Dict[str, Any] | None = None) -> Any:
         """
