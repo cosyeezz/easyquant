@@ -14,12 +14,8 @@ import VariableAssignerNodeDefault from '@/app/components/workflow/nodes/variabl
 import ParameterExtractorNodeDefault from '@/app/components/workflow/nodes/parameter-extractor/default'
 import IterationNodeDefault from '@/app/components/workflow/nodes/iteration/default'
 import DocExtractorNodeDefault from '@/app/components/workflow/nodes/document-extractor/default'
-import ListOperatorNodeDefault from '@/app/components/workflow/nodes/list-operator/default'
-// import IterationStartNodeDefault from '@/app/components/workflow/nodes/iteration-start/default'
-// import AssignerNodeDefault from '@/app/components/workflow/nodes/assigner/default'
 import LoopNodeDefault from '@/app/components/workflow/nodes/loop/default'
-// import LoopStartNodeDefault from '@/app/components/workflow/nodes/loop-start/default'
-// import LoopEndNodeDefault from '@/app/components/workflow/nodes/loop-end/default'
+import ColumnMappingNodeDefault from '@/app/components/workflow/nodes/column-mapping/default'
 
 export const nodes = [
   StartNodeDefault,
@@ -39,6 +35,7 @@ export const nodes = [
   DocExtractorNodeDefault,
   ListOperatorNodeDefault,
   LoopNodeDefault,
+  ColumnMappingNodeDefault,
 ]
 
 export const nodesMap = nodes.reduce((acc, node) => {

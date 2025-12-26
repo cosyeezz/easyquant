@@ -50,6 +50,7 @@ export enum BlockEnum {
   TriggerSchedule = 'trigger-schedule',
   TriggerWebhook = 'trigger-webhook',
   TriggerPlugin = 'trigger-plugin',
+  ColumnMapping = 'column_mapping',
 }
 
 export enum ControlMode {
