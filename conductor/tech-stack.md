@@ -13,6 +13,7 @@
 - **Node Editor:** React Flow
 - **Styling:** Tailwind CSS (遵循 Linear/Stripe 风格)
 - **State Management:** React Context / Hooks
+- **Testing:** Vitest (Unit/Integration), React Testing Library
 
 ## Infrastructure & Tools
 - **Process Management:** 自定义一键启动脚本 (start.sh/stop.sh)

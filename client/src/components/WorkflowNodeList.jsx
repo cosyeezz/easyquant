@@ -41,6 +41,7 @@ import {
   Clock
 } from 'lucide-react'
 import Select from '@/components/ui/Select'
+import VersionHistoryPanel from '@/components/workflow/panel/version-history/container'
 
 // === Constants ===
 const AVAILABLE_ICONS = [
@@ -1715,6 +1716,29 @@ const WorkflowNodeList = () => {
                       )}
                     </div>
                   </section>
+
+                                    {/* Version History Section */}
+                  {selectedNode.id && !isEditing && (
+                    <VersionHistoryPanel
+                      nodeId={selectedNode.id}
+                      onRollback={async () => {
+                        await fetchNodes()
+                        // Refresh selected node
+                        const res = await fetch(`http://localhost:8000/api/v1/workflow/nodes/${selectedNode.id}`)
+                        if (res.ok) {
+                          const data = await res.json()
+                          const normalizedNode = {
+                            ...data,
+                            parameters_schema: data.draft_parameters_schema || { type: 'object', properties: {}, required: [] },
+                            outputs_schema: data.draft_outputs_schema || {},
+                            ui_config: data.draft_ui_config || {},
+                            handler_path: data.draft_handler_path || ''
+                          }
+                          setSelectedNode(normalizedNode)
+                        }
+                      }}
+                    />
+                  )}
 
                   {/* Raw JSON (collapsed) */}
                   <section>
