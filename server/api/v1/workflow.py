@@ -51,7 +51,7 @@ class WorkflowNodeSchema(BaseModel):
 
 
 class WorkflowNodeListSchema(BaseModel):
-    """节点列表 Schema (简化版)"""
+    """节点列表 Schema (含草稿配置)"""
     id: int
     name: str
     title: str
@@ -60,6 +60,11 @@ class WorkflowNodeListSchema(BaseModel):
     description: str | None
     latest_snapshot: str | None
     latest_release: str | None
+    # 草稿配置
+    draft_parameters_schema: Dict[str, Any]
+    draft_outputs_schema: Dict[str, Any]
+    draft_ui_config: Dict[str, Any]
+    draft_handler_path: str | None
 
     class Config:
         from_attributes = True
@@ -196,8 +201,13 @@ async def create_node(
     new_node = WorkflowNode(**data.model_dump())
     session.add(new_node)
     await session.commit()
-    await session.refresh(new_node)
-    return new_node
+
+    # 重新查询以加载 versions 关系
+    stmt = select(WorkflowNode).where(WorkflowNode.id == new_node.id).options(
+        selectinload(WorkflowNode.versions)
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one()
 
 
 @router.put("/nodes/{node_id}", response_model=WorkflowNodeSchema)
@@ -220,8 +230,13 @@ async def update_node(
         setattr(node, key, value)
 
     await session.commit()
-    await session.refresh(node)
-    return node
+
+    # 重新查询以加载 versions 关系
+    stmt = select(WorkflowNode).where(WorkflowNode.id == node_id).options(
+        selectinload(WorkflowNode.versions)
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one()
 
 
 @router.delete("/nodes/{node_id}")
@@ -361,6 +376,78 @@ async def get_node_version(
         raise HTTPException(status_code=404, detail="Version not found")
 
     return version_obj
+
+
+class RollbackSchema(BaseModel):
+    """回滚版本 Schema"""
+    version: str
+
+
+class InferSchemaRequest(BaseModel):
+    """Schema 推导请求"""
+    node_name: str
+    config: Dict[str, Any]
+    input_schema: Dict[str, Any] | None = None
+
+
+@router.post("/nodes/infer-schema")
+async def infer_node_schema(
+    data: InferSchemaRequest
+):
+    """根据节点配置和输入 Schema 推导输出 Schema"""
+    from server.etl.process.registry import registry
+    
+    # 确保已加载 Handlers
+    registry.auto_discover("server.etl.process.handlers")
+    
+    try:
+        handler_class = registry.get_handler(data.node_name)
+        output_schema = handler_class.get_output_schema(data.config, data.input_schema)
+        return output_schema
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Inference error: {str(e)}")
+
+
+@router.post("/nodes/{node_id}/rollback", response_model=WorkflowNodeSchema)
+async def rollback_node(
+    node_id: int,
+    data: RollbackSchema,
+    session: AsyncSession = Depends(get_session)
+):
+    """将指定版本的配置回滚到草稿"""
+    # 获取节点
+    stmt = select(WorkflowNode).where(WorkflowNode.id == node_id)
+    result = await session.execute(stmt)
+    node = result.scalar_one_or_none()
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    # 获取目标版本
+    stmt = select(WorkflowNodeVersion).where(
+        WorkflowNodeVersion.node_id == node_id,
+        WorkflowNodeVersion.version == data.version
+    )
+    result = await session.execute(stmt)
+    version_obj = result.scalar_one_or_none()
+    if not version_obj:
+        raise HTTPException(status_code=404, detail="Version not found")
+
+    # 将版本配置复制到草稿
+    node.draft_parameters_schema = version_obj.parameters_schema
+    node.draft_outputs_schema = version_obj.outputs_schema
+    node.draft_ui_config = version_obj.ui_config
+    node.draft_handler_path = version_obj.handler_path
+
+    await session.commit()
+
+    # 重新查询以加载 versions 关系
+    stmt = select(WorkflowNode).where(WorkflowNode.id == node_id).options(
+        selectinload(WorkflowNode.versions)
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one()
 
 
 @router.get("/published-nodes")

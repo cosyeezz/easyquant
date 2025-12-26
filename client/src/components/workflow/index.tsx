@@ -53,6 +53,7 @@ import {
   useWorkflow,
   useWorkflowReadOnly,
   useWorkflowRefreshDraft,
+  useSchemaPropagation,
 } from './hooks'
 import CustomNode from './nodes'
 import CustomNoteNode from './note-node'
@@ -336,6 +337,9 @@ export const Workflow = memo(forwardRef<WorkflowHandle, WorkflowProps>(({
   useShortcuts()
   // Initialize workflow node search functionality
   useWorkflowSearch()
+
+  // Propagate schema between nodes
+  useSchemaPropagation(nodes, edges, setNodes)
 
   // Set up scroll to node event listener using the utility function
   useEffect(() => {

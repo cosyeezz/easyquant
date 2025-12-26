@@ -48,6 +48,20 @@ class CSVLoaderHandler(BaseHandler):
             }
         }
 
+    @classmethod
+    def get_output_schema(cls, config: Dict[str, Any], input_schema: Dict[str, Any] | None = None) -> Dict[str, Any]:
+        """
+        对于 CSV 加载器，暂时返回预定义的示例列。
+        """
+        return {
+            "columns": [
+                {"name": "date", "type": "string"},
+                {"name": "open", "type": "number"},
+                {"name": "close", "type": "number"},
+                {"name": "volume", "type": "number"}
+            ]
+        }
+
     async def handle(self, data: Any, context: Dict[str, Any] | None = None) -> Any:
         """
         作为 Source 节点，它忽略输入的 `data`，并产生数据流。
