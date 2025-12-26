@@ -1,0 +1,8 @@
+{
+  "track_id": "project_cleanup_20251226",
+  "type": "chore",
+  "status": "new",
+  "created_at": "2025-12-26T14:32:45Z",
+  "updated_at": "2025-12-26T14:32:45Z",
+  "description": "清理项目中的无效文件、冗余代码、缓存以及不再使用的调试脚本，并完善 .gitignore。"
+}

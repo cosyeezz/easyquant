@@ -15,3 +15,6 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ## [ ] Track 4: 实现后端 Runner 映射与执行流
 *Link: [./conductor/tracks/runner_integration_20251226/](./conductor/tracks/runner_integration_20251226/)*
+
+## [ ] Track 5: 项目清理与维护
+*Link: [./conductor/tracks/project_cleanup_20251226/](./conductor/tracks/project_cleanup_20251226/)*
