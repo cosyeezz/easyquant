@@ -1,0 +1,8 @@
+{
+  "track_id": "schema_propagation_20251226",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2025-12-26T14:28:57Z",
+  "updated_at": "2025-12-26T14:28:57Z",
+  "description": "实现元数据（Schema）在节点间的自动流动，下游节点能自动感知上游节点的输出列信息。"
+}
