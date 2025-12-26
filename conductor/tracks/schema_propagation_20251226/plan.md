@@ -11,5 +11,5 @@
 - [ ] Task: Conductor - User Manual Verification 'Frontend Propagation Logic' (Protocol in workflow.md)
 
 ## Phase 3: Dynamic Parameter Picker
-- [ ] Task: Create a ColumnPicker UI component that uses propagated schema.
-- [ ] Task: Conductor - User Manual Verification 'Dynamic Parameter Picker' (Protocol in workflow.md)
+- [x] Task: Create a ColumnPicker UI component that uses propagated schema. [ea94bb8]
+- [x] Task: Conductor - User Manual Verification 'Dynamic Parameter Picker' (Protocol in workflow.md)
