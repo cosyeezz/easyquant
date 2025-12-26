@@ -1,8 +1,8 @@
 # Plan: 元数据传播引擎实现 (Schema Propagation)
 
 ## Phase 1: Backend Inference Engine
-- [x] Task: Write failing tests for Schema inference logic.
-- [x] Task: Implement base Node class with `get_output_schema()` method.
+- [x] Task: Write failing tests for Schema inference logic. [2aab2fc]
+- [x] Task: Implement base Node class with `get_output_schema()` method. [2aab2fc]
 - [ ] Task: Conductor - User Manual Verification 'Backend Inference Engine' (Protocol in workflow.md)
 
 ## Phase 2: Frontend Propagation Logic
