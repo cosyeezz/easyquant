@@ -162,13 +162,6 @@ class ApiService {
     const response = await this.client.delete(`/categories/${id}`);
     return response.data;
   }
-
-  // ========== Workflow API ==========
-
-  async getNodeDefinitions() {
-    const response = await this.client.get('/workflow/definitions');
-    return response.data;
-  }
 }
 
 export default new ApiService();

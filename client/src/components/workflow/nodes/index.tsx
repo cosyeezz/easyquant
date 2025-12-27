@@ -2,7 +2,6 @@ import {
   memo,
   useMemo,
 } from 'react'
-import { useHooksStore } from '../hooks-store'
 import type { NodeProps } from 'reactflow'
 import type { Node } from '../types'
 import { CUSTOM_NODE } from '../constants'
@@ -12,8 +11,8 @@ import {
 } from './components'
 import BaseNode from './_base/node'
 import BasePanel from './_base/components/workflow-panel'
+import ToolNode from './tool/node'
 import ToolPanel from './tool/panel'
-import DynamicNodePanel from './dynamic/panel'
 
 const CustomNode = (props: NodeProps) => {
   const nodeData = props.data
@@ -54,21 +53,12 @@ export type PanelProps = {
 export const Panel = memo((props: PanelProps) => {
   const nodeClass = props.type
   const nodeData = props.data
-  const { nodesMap } = useHooksStore.getState().availableNodesMetaData || { nodesMap: {} }
-
   const PanelComponent = useMemo(() => {
-    if (nodeClass !== CUSTOM_NODE) return () => null
-    
-    // 1. Check if we have a specific panel for this type
-    if (PanelComponentMap[nodeData.type]) return PanelComponentMap[nodeData.type]
-    
-    // 2. Check if it's a backend node (V2 Protocol)
-    const meta = (nodesMap as any)?.[nodeData.type]
-    if (meta?.metaData?.isBackend) return DynamicNodePanel
-    
-    // 3. Fallback to ToolPanel
-    return ToolPanel
-  }, [nodeClass, nodeData.type, nodesMap])
+    if (nodeClass === CUSTOM_NODE)
+      return PanelComponentMap[nodeData.type] || ToolPanel // Fallback to ToolPanel
+
+    return () => null
+  }, [nodeClass, nodeData.type])
 
   if (nodeClass === CUSTOM_NODE) {
     return (

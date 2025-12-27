@@ -3,15 +3,13 @@ import { BlockEnum } from '../types'
 import { BlockClassificationEnum } from './types'
 
 export const BLOCK_CLASSIFICATIONS: string[] = [
-  BlockClassificationEnum.System,
-  BlockClassificationEnum.Logic,
-  BlockClassificationEnum.ETL,
-  BlockClassificationEnum.Quant,
+  BlockClassificationEnum.Default,
   BlockClassificationEnum.Data,
   BlockClassificationEnum.QuestionUnderstand,
+  BlockClassificationEnum.Logic,
   BlockClassificationEnum.Transform,
+  BlockClassificationEnum.Quant,
   BlockClassificationEnum.Utilities,
-  BlockClassificationEnum.Default,
 ]
 
 export const DEFAULT_FILE_EXTENSIONS_IN_LOCAL_FILE_DATA_SOURCE = [

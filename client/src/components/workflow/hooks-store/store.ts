@@ -68,7 +68,6 @@ export type CommonHooksFnMap = {
   invalidateSysVarValues: () => void
   resetConversationVar: (varId: string) => Promise<void>
   invalidateConversationVarValues: () => void
-  onManageNodes?: () => void
   configsMap?: {
     flowId: string
     flowType: FlowType
@@ -120,7 +119,6 @@ export const createHooksStore = ({
   invalidateSysVarValues = noop,
   resetConversationVar = async () => noop(),
   invalidateConversationVarValues = noop,
-  onManageNodes = noop,
 }: Partial<Shape>) => {
   return createStore<Shape>(set => ({
     refreshAll: props => set(state => ({ ...state, ...props })),
@@ -158,7 +156,6 @@ export const createHooksStore = ({
     invalidateSysVarValues,
     resetConversationVar,
     invalidateConversationVarValues,
-    onManageNodes,
   }))
 }
 
