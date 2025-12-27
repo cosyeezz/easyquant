@@ -28,7 +28,6 @@ from server.storage.models.base import Base
 import server.storage.models.event
 import server.storage.models.etl_task_config
 import server.storage.models.data_table_config
-import server.storage.models.workflow_node
 target_metadata = Base.metadata
 
 # 3. Read the database URL from the server configuration (reusing SSH Tunnel logic)

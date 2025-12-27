@@ -19,12 +19,13 @@ export enum ToolTypeEnum {
 
 export enum BlockClassificationEnum {
   Default = '-',
+  System = 'system',
+  Data = 'data',
   QuestionUnderstand = 'question-understand',
   Logic = 'logic',
   Transform = 'transform',
-  Utilities = 'utilities',
   Quant = 'quant',
-  Data = 'data',
+  Utilities = 'utilities',
 }
 
 type PluginCommonDefaultValue = {

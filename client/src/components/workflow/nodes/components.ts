@@ -50,6 +50,8 @@ import TriggerPluginNode from './trigger-plugin/node'
 import TriggerPluginPanel from './trigger-plugin/panel'
 import ColumnMappingNode from './column-mapping/node'
 import ColumnMappingPanel from './column-mapping/panel'
+import ProcessSchedulerNode from './process-scheduler/node'
+import ProcessSchedulerPanel from './process-scheduler/panel'
 
 export const NodeComponentMap: Record<string, ComponentType<any>> = {
   [BlockEnum.Start]: StartNode,
@@ -78,6 +80,7 @@ export const NodeComponentMap: Record<string, ComponentType<any>> = {
   [BlockEnum.TriggerWebhook]: TriggerWebhookNode,
   [BlockEnum.TriggerPlugin]: TriggerPluginNode,
   [BlockEnum.ColumnMapping]: ColumnMappingNode,
+  [BlockEnum.ProcessScheduler]: ProcessSchedulerNode,
 }
 
 export const PanelComponentMap: Record<string, ComponentType<any>> = {
@@ -107,4 +110,5 @@ export const PanelComponentMap: Record<string, ComponentType<any>> = {
   [BlockEnum.TriggerWebhook]: TriggerWebhookPanel,
   [BlockEnum.TriggerPlugin]: TriggerPluginPanel,
   [BlockEnum.ColumnMapping]: ColumnMappingPanel,
+  [BlockEnum.ProcessScheduler]: ProcessSchedulerPanel,
 }

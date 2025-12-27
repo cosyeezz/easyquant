@@ -4,6 +4,7 @@ import { BlockClassificationEnum } from './types'
 
 export const BLOCK_CLASSIFICATIONS: string[] = [
   BlockClassificationEnum.Default,
+  BlockClassificationEnum.System,
   BlockClassificationEnum.Data,
   BlockClassificationEnum.QuestionUnderstand,
   BlockClassificationEnum.Logic,
@@ -63,6 +64,12 @@ export const ENTRY_NODE_TYPES = [
 ] as const
 
 export const BLOCKS: Block[] = [
+  {
+    classification: BlockClassificationEnum.System,
+    type: BlockEnum.ProcessScheduler,
+    title: 'Process Scheduler',
+    description: 'Multi-process orchestration with MQ-based communication',
+  },
   {
     classification: BlockClassificationEnum.Default,
     type: BlockEnum.LLM,

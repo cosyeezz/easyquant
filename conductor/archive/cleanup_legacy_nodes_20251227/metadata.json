@@ -1,0 +1,8 @@
+{
+  "track_id": "cleanup_legacy_nodes_20251227",
+  "type": "chore",
+  "status": "new",
+  "created_at": "2025-12-27T10:00:00Z",
+  "updated_at": "2025-12-27T10:00:00Z",
+  "description": "删除旧版算子节点管理的相关前后端及数据库逻辑"
+}

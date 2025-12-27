@@ -18,6 +18,8 @@ export const VIDEO_SIZE_LIMIT = 100 * 1024 * 1024 // 100MB
 export const MAX_FILE_UPLOAD_LIMIT = 10
 
 export const getInputVars = (text: string) => {
+  if (!text)
+    return []
   const reg = /\{\{#(.+?)#\}\}/g
   const matches = text.matchAll(reg)
   const results = []

@@ -16,6 +16,7 @@ import IterationNodeDefault from '@/app/components/workflow/nodes/iteration/defa
 import DocExtractorNodeDefault from '@/app/components/workflow/nodes/document-extractor/default'
 import LoopNodeDefault from '@/app/components/workflow/nodes/loop/default'
 import ColumnMappingNodeDefault from '@/app/components/workflow/nodes/column-mapping/default'
+import ProcessSchedulerNodeDefault from '@/app/components/workflow/nodes/process-scheduler/default'
 
 export const nodes = [
   StartNodeDefault,
@@ -35,6 +36,7 @@ export const nodes = [
   DocExtractorNodeDefault,
   LoopNodeDefault,
   ColumnMappingNodeDefault,
+  ProcessSchedulerNodeDefault,
 ]
 
 export const nodesMap = nodes.reduce((acc, node) => {

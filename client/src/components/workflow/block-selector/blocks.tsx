@@ -20,6 +20,7 @@ import {
   RiArrowRightSLine,
   RiArrowDownSLine,
   RiHistoryLine,
+  RiServerLine,
 } from '@remixicon/react'
 import BlockIcon from '../block-icon'
 import { BlockEnum } from '../types'
@@ -40,6 +41,7 @@ type BlocksProps = {
 
 const ClassificationIcons: Record<string, React.ComponentType<any>> = {
   [BlockClassificationEnum.Default]: RiAppsLine,
+  [BlockClassificationEnum.System]: RiServerLine,
   [BlockClassificationEnum.Data]: RiDatabase2Line,
   [BlockClassificationEnum.Quant]: RiStockLine,
   [BlockClassificationEnum.QuestionUnderstand]: RiBrainLine,
