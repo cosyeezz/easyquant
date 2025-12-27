@@ -16,7 +16,7 @@
 - [x] Task: Conductor - User Manual Verification 'Frontend Node Selector & Manager' (Protocol in workflow.md) [checkpoint: 8ec5cc0]
 
 ## Phase 3: Interaction & Data Flow
-- [~] Task: Ensure that when a user configures `ProcessSchedulerNode` (e.g., set concurrency=5), the JSON saved to the backend correctly reflects this structure.
-- [ ] Task: Implement a "Debug Workflow" generator in backend that creates a sample graph.
-- [ ] Task: Frontend must be able to load and display this "Debug Workflow" correctly without crashing.
-- [ ] Task: Conductor - User Manual Verification 'Interaction & Data Flow' (Protocol in workflow.md)
+- [x] Task: Ensure that when a user configures `ProcessSchedulerNode` (e.g., set concurrency=5), the JSON saved to the backend correctly reflects this structure. [8ec5cc0]
+- [x] Task: Implement a "Debug Workflow" generator in backend that creates a sample graph. [8ec5cc0]
+- [x] Task: Frontend must be able to load and display this "Debug Workflow" correctly without crashing. [8ec5cc0]
+- [x] Task: Conductor - User Manual Verification 'Interaction & Data Flow' (Protocol in workflow.md) [checkpoint: 8ec5cc0]
