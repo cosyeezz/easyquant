@@ -1,8 +1,0 @@
-{
-  "track_id": "runner_integration_20251226",
-  "type": "feature",
-  "status": "new",
-  "created_at": "2025-12-26T14:20:27Z",
-  "updated_at": "2025-12-26T14:20:27Z",
-  "description": "实现后端 Runner 映射与执行流，包括 Graph JSON 到 Runner 的转换、图执行引擎、实时状态反馈以及 Schema 自动传播。"
-}

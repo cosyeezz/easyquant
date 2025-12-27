@@ -1,7 +1,7 @@
 # Plan: 项目清理与维护
 
 ## Phase 1: Automated Cleanup
-- [ ] Task: Execute commands to remove common temporary and cache files (pycache, etc).
+- [~] Task: Execute commands to remove common temporary and cache files (pycache, etc).
 - [ ] Task: Clean up old log files in the `logs/` directory.
 - [ ] Task: Conductor - User Manual Verification 'Automated Cleanup' (Protocol in workflow.md)
 
