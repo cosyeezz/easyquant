@@ -8,19 +8,12 @@ import re
 
 from server.storage.database import get_session
 from server.storage.models.workflow_node import WorkflowNode, WorkflowNodeVersion, VersionType
-from server.nodes.registry import registry as node_registry
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/workflow", tags=["Workflow"])
 
 
 # ==================== Schemas ====================
-
-@router.get("/definitions")
-async def get_node_definitions():
-    """获取所有已注册节点的定义 (从 NodeRegistry 扫描)"""
-    return node_registry.get_all_nodes()
-
 
 class WorkflowNodeVersionSchema(BaseModel):
     """版本信息 Schema"""
