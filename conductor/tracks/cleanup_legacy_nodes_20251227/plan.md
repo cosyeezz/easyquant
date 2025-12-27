@@ -15,12 +15,12 @@
 - [x] Task: Conductor - User Manual Verification 'Backend Cleanup' (Protocol in workflow.md)
 
 ## Phase 3: Frontend Cleanup (UI & Routes)
-- [~] Task: 编写前端单元测试，验证旧版路由已无法访问
-- [~] Task: 移除顶部/侧边导航栏中的“算子节点”菜单项
-- [ ] Task: 移除 Vite/React 路由配置中对应的旧版 Page 路由
-- [ ] Task: 删除旧版页面组件及相关的子组件
-- [ ] Task: 清理不再使用的 Service/Store 代码
-- [ ] Task: 执行 `npm run lint` 和 `npm test` 确保无编译或回归错误
+- [x] Task: 编写前端单元测试，验证旧版路由已无法访问 [4cd51be]
+- [x] Task: 移除顶部/侧边导航栏中的“算子节点”菜单项
+- [x] Task: 移除 Vite/React 路由配置中对应的旧版 Page 路由
+- [x] Task: 删除旧版页面组件及相关的子组件
+- [x] Task: 清理不再使用的 Service/Store 代码 [4cd51be]
+- [x] Task: 执行 `npm run lint` 和 `npm test` 确保无编译或回归错误 [4cd51be]
 - [ ] Task: Conductor - User Manual Verification 'Frontend Cleanup' (Protocol in workflow.md)
 
 ## Phase 4: Final Verification & Checkpoint
