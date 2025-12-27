@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+venv/
+.venv/
+env/
+ENV/
+
+# Build Outputs
+dist/
+build/
+out/
+.next/
+.vercel
+*.egg-info/
+*.so
+*.py[cod]
+
+# Logs and Caches
+logs/
+*.log
+__pycache__/
+.pytest_cache/
+.coverage
+htmlcov/
+.idea/
+.vscode/
+.DS_Store
+
+# Static Assets (to save tokens)
+pic/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.pdf
+*.zip
+*.tar.gz
+
+# Project Specific
+.gemini-clipboard/
+package-lock.json
+*.pid
+tmp/
+archive/
+
+# Don't ignore markdown or config files unless they are huge
+!README.md
+!GEMINI.md
+!.gitignore
