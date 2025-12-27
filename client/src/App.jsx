@@ -6,7 +6,6 @@ import ETLTaskList from './components/ETLTaskList'
 import ETLTaskEditor from './components/ETLTaskEditor'
 import DataTableList from './components/DataTableList'
 import DataTableEditor from './components/DataTableEditor'
-import WorkflowNodeList from './components/WorkflowNodeList'
 import LanguageSwitcher from './components/LanguageSwitcher'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useTheme } from './contexts/ThemeContext'
@@ -27,7 +26,6 @@ function App() {
 
   const tabs = [
     { id: 'tables', name: t('nav.schemas'), icon: Table2 },
-    { id: 'nodes', name: t('nav.nodes'), icon: Boxes },
     { id: 'etl', name: t('nav.pipelines'), icon: Database },
     { id: 'monitor', name: t('nav.monitor'), icon: Activity },
   ]
@@ -101,8 +99,7 @@ function App() {
             {tabs.map((tab) => {
               const isActive = activeTab === tab.id ||
                 (tab.id === 'tables' && activeTab.startsWith('table')) ||
-                (tab.id === 'etl' && activeTab.startsWith('etl')) ||
-                (tab.id === 'nodes' && activeTab === 'nodes')
+                (tab.id === 'etl' && activeTab.startsWith('etl'))
               return (
                 <button
                   key={tab.id}
@@ -132,7 +129,6 @@ function App() {
         {activeTab === 'table-edit' && <DataTableEditor tableId={editId} onNavigate={handleNavigate} />}
         {activeTab === 'etl' && <ETLTaskList onNavigate={handleNavigate} />}
         {activeTab === 'etl-edit' && <ETLTaskEditor taskId={editId} onNavigate={handleNavigate} />}
-        {activeTab === 'nodes' && <WorkflowNodeList />}
         {activeTab === 'monitor' && <ProcessMonitor />}
       </main>
     </div>

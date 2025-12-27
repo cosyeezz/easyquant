@@ -272,6 +272,7 @@ const translation = {
     'workflowTool': '工作流',
     '-': '全部',
     'all': '全部',
+    'system': '系统',
     'question-understand': '问题理解',
     'logic': '逻辑',
     'transform': '转换',
@@ -327,6 +328,7 @@ const translation = {
     'trigger-webhook': 'Webhook 触发器',
     'trigger-schedule': '定时触发器',
     'trigger-plugin': '插件触发器',
+    'process-scheduler': '进程调度器',
   },
   customWebhook: '自定义 Webhook',
   blocksAbout: {
@@ -355,6 +357,7 @@ const translation = {
     'trigger-webhook': 'Webhook 触发器接收来自第三方系统的 HTTP 推送以自动触发工作流。',
     'trigger-schedule': '基于时间的工作流触发器，按计划启动工作流',
     'trigger-plugin': '从外部平台事件启动工作流的第三方集成触发器',
+    'process-scheduler': '多进程编排调度器，支持通过消息队列解耦进程间通信，实现生产者/消费者模式的并行数据处理。',
   },
   difyTeam: 'Dify 团队',
   operator: {
