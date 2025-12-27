@@ -6,7 +6,7 @@
 - [ ] Task: Conductor - User Manual Verification 'Automated Cleanup' (Protocol in workflow.md)
 
 ## Phase 2: Manual Triage and Removal
-- [ ] Task: Identify and list `debug_*.py` or temporary scripts for removal.
+- [x] Task: Identify and list `debug_*.py` or temporary scripts for removal. [7ef775e]
 - [ ] Task: Remove confirmed unnecessary files.
 - [ ] Task: Conductor - User Manual Verification 'Manual Triage and Removal' (Protocol in workflow.md)
 
