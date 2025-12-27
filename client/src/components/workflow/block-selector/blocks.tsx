@@ -20,6 +20,7 @@ import {
   RiArrowRightSLine,
   RiArrowDownSLine,
   RiHistoryLine,
+  RiSettings4Line,
 } from '@remixicon/react'
 import BlockIcon from '../block-icon'
 import { BlockEnum } from '../types'
@@ -27,6 +28,7 @@ import type { NodeDefault, PluginDefaultValue } from '../types'
 import { BLOCK_CLASSIFICATIONS } from './constants'
 import { BlockClassificationEnum } from './types'
 import { useBlocks } from './hooks'
+import { useHooksStore } from '@/app/components/workflow/hooks-store'
 import Tooltip from '@/app/components/base/tooltip'
 import Badge from '@/app/components/base/badge'
 import cn from '@/utils/classnames'
@@ -40,7 +42,9 @@ type BlocksProps = {
 
 const ClassificationIcons: Record<string, React.ComponentType<any>> = {
   [BlockClassificationEnum.Default]: RiAppsLine,
+  [BlockClassificationEnum.System]: RiSettings4Line,
   [BlockClassificationEnum.Data]: RiDatabase2Line,
+  [BlockClassificationEnum.ETL]: RiDatabase2Line,
   [BlockClassificationEnum.Quant]: RiStockLine,
   [BlockClassificationEnum.QuestionUnderstand]: RiBrainLine,
   [BlockClassificationEnum.Logic]: RiGitMergeLine,
@@ -67,6 +71,7 @@ const Blocks = ({
       title: block.title,
       author: 'Dify',
       description: block.description,
+      ...(block as any), // Preserve extra fields like isBackend, parameters_schema
     },
     defaultValue: {},
     checkValid: () => ({ isValid: true }),
@@ -97,33 +102,16 @@ const Blocks = ({
   
   const isEmpty = Object.values(groups).every(list => !list.length)
 
-  // Split View Logic
-  const [activeClassification, setActiveClassification] = useState(BLOCK_CLASSIFICATIONS[0])
-  const [expandedNode, setExpandedNode] = useState<string | null>(null)
-  const hoverTimerRef = useRef<NodeJS.Timeout | null>(null)
+  // Accordion Logic
+  const [openCategories, setOpenCategories] = useState<string[]>([BLOCK_CLASSIFICATIONS[0]])
 
-  const handleMouseEnter = useCallback((classification: string) => {
-    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
-    hoverTimerRef.current = setTimeout(() => {
-      setActiveClassification(classification)
-    }, 80) // 80ms delay for smoother interaction
+  const toggleCategory = useCallback((classification: string) => {
+    setOpenCategories(prev => 
+      prev.includes(classification) 
+        ? prev.filter(c => c !== classification)
+        : [...prev, classification]
+    )
   }, [])
-
-  useEffect(() => {
-    return () => {
-      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
-    }
-  }, [])
-  
-  // Reset active classification when search text changes (if needed)
-  useEffect(() => {
-      if (searchText) {
-          // When searching, we don't strictly need activeClassification as we show flat list,
-          // but if we want to support categorization during search, we can keep it.
-          // For now, search results are flat.
-      }
-  }, [searchText])
-
 
   const renderNodeItem = useCallback((block: NodeDefault) => {
     const hasVersions = block.metaData.versions && block.metaData.versions.length > 0
@@ -157,7 +145,7 @@ const Blocks = ({
                 e.stopPropagation()
                 setExpandedNode(isExpanded ? null : block.metaData.type)
               } else {
-                onSelect(block.metaData.type)
+                onSelect(block.metaData.type, block.metaData.defaultValue)
               }
             }}
           >
@@ -227,29 +215,39 @@ const Blocks = ({
 
     if (!filteredList.length) return null
 
+    const isOpen = openCategories.includes(classification)
+    const Icon = ClassificationIcons[classification] || RiAppsLine
+
     return (
       <div
         key={classification}
-        className='mb-1 last-of-type:mb-0'
+        className='mb-1 last-of-type:mb-0 border-b border-divider-subtle last:border-0'
       >
+        <div 
+          className='flex h-9 items-center px-3 cursor-pointer hover:bg-state-base-hover transition-colors group'
+          onClick={() => toggleCategory(classification)}
+        >
+          <Icon className='w-4 h-4 mr-2 text-text-tertiary group-hover:text-text-secondary' />
+          <div className='grow text-xs font-semibold text-text-tertiary uppercase tracking-wider'>
+            {t(`workflow.tabs.${classification}`)}
+          </div>
+          {isOpen ? <RiArrowDownSLine className='w-4 h-4 text-text-tertiary' /> : <RiArrowRightSLine className='w-4 h-4 text-text-tertiary' />}
+        </div>
         {
-          isFlat && classification !== '-' && (
-            <div className='flex h-[22px] items-start px-3 text-xs font-medium text-text-tertiary'>
-              {t(`workflow.tabs.${classification}`)}
+          isOpen && (
+            <div className='pb-2 animate-in fade-in slide-in-from-top-1 duration-200'>
+              {filteredList.map(renderNodeItem)}
             </div>
           )
         }
-        {
-          filteredList.map(renderNodeItem)
-        }
       </div>
     )
-  }, [groups, renderNodeItem, t, store])
+  }, [groups, renderNodeItem, t, store, openCategories, toggleCategory])
 
-  // Search Mode: Flat List
+  // Search Mode: Flat List (remain unchanged or also use accordion if preferred, usually flat is better for search)
   if (searchText) {
       return (
-        <div className='flex h-[360px] w-[500px] flex-col overflow-hidden bg-components-panel-bg'>
+        <div className='flex h-[400px] w-[320px] flex-col overflow-hidden bg-components-panel-bg shadow-xl'>
           <div className='flex-1 overflow-y-auto p-1'>
             {
               isEmpty && (
@@ -257,45 +255,43 @@ const Blocks = ({
               )
             }
             {
-              !isEmpty && BLOCK_CLASSIFICATIONS.map(c => renderGroup(c, true))
+              !isEmpty && BLOCK_CLASSIFICATIONS.map(c => (
+                <div key={c}>
+                  {groups[c].length > 0 && (
+                     <div className='px-3 py-1 text-[10px] font-bold text-text-tertiary uppercase bg-background-section-burn mt-2 mb-1 rounded-sm'>
+                        {t(`workflow.tabs.${c}`)}
+                     </div>
+                  )}
+                  {groups[c].map(renderNodeItem)}
+                </div>
+              ))
             }
           </div>
         </div>
       )
   }
 
-  // Split View Mode (Default)
+  const onManageNodes = useHooksStore(s => s.onManageNodes)
+
+  // Accordion Mode (New Default)
   return (
-    <div className='flex h-[360px] w-[500px] overflow-hidden'>
-        {/* Left Sidebar: Categories */}
-        <div className='flex w-[160px] shrink-0 flex-col overflow-y-auto border-r border-divider-subtle bg-background-section-burn py-2'>
-            {BLOCK_CLASSIFICATIONS.map((classification) => {
-                 const isActive = activeClassification === classification
-                 const Icon = ClassificationIcons[classification] || RiAppsLine
-
-                 return (
-                     <div
-                        key={classification}
-                        className={cn(
-                            'group flex h-10 w-full cursor-pointer items-center gap-2.5 px-4 text-[13px] font-medium transition-all',
-                            isActive 
-                                ? 'bg-components-panel-bg text-text-accent' 
-                                : 'text-text-secondary hover:bg-state-base-hover hover:text-text-primary'
-                        )}
-                        onMouseEnter={() => handleMouseEnter(classification)}
-                     >
-                         <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-text-accent' : 'text-text-tertiary group-hover:text-text-secondary')} />
-                         <span className='truncate leading-none'>{t(`workflow.tabs.${classification}`)}</span>
-                         {isActive && <div className='absolute left-0 h-4 w-1 rounded-r-full bg-text-accent' />}
-                     </div>
-                 )
-            })}
+    <div className='flex h-[400px] w-[320px] flex-col overflow-hidden bg-components-panel-bg shadow-xl border border-divider-subtle rounded-lg'>
+        <div className='flex-1 overflow-y-auto scrollbar-thin'>
+            {BLOCK_CLASSIFICATIONS.map(c => renderGroup(c))}
         </div>
-
-        {/* Right Panel: Nodes */}
-        <div className='flex-1 overflow-y-auto bg-components-panel-bg p-3'>
-            <div className="animate-in fade-in slide-in-from-right-1 duration-200">
-                {renderGroup(activeClassification, false)}
+        <div className='shrink-0 p-3 border-t border-divider-subtle bg-background-section-burn flex items-center justify-between'>
+            <button 
+                className='text-xs font-medium text-text-accent hover:text-text-accent-highlight flex items-center gap-1 transition-colors'
+                onClick={(e) => {
+                    e.stopPropagation()
+                    onManageNodes?.()
+                }}
+            >
+                <RiSettings4Line className='w-3 h-3' />
+                Manage Nodes
+            </button>
+            <div className='text-[10px] text-text-tertiary italic'>
+                V2.0 Protocol
             </div>
         </div>
     </div>

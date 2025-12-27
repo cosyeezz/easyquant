@@ -277,6 +277,7 @@ function ETLTaskEditor({ taskId, onNavigate }) {
               hooksStore={{
                 availableNodesMetaData: mergedNodesMetaData, // UPDATED
                 readOnly: false,
+                onManageNodes: () => onNavigate('nodes'),
               }}
             />
          </EventEmitterContextProvider>

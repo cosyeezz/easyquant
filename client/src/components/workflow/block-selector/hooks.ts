@@ -7,19 +7,49 @@ import {
 import { useTranslation } from 'react-i18next'
 import { BLOCKS, START_BLOCKS } from './constants'
 import {
+  BlockClassificationEnum,
   TabsEnum,
   ToolTypeEnum,
 } from './types'
+import api from '@/services/api'
+import { BlockEnum } from '../types'
 
 export const useBlocks = () => {
   const { t } = useTranslation()
+  const [backendNodes, setBackendNodes] = useState<any[]>([])
 
-  return BLOCKS.map((block) => {
-    return {
-      ...block,
-      title: t(`workflow.blocks.${block.type}`),
+  useEffect(() => {
+    const fetchNodes = async () => {
+      try {
+        const data = await api.getNodeDefinitions()
+        // data is Record<category, node[]>
+        const allBackendNodes = Object.entries(data).flatMap(([cat, nodes]: [string, any]) => 
+          nodes.map((node: any) => ({
+            classification: cat,
+            type: node.name as BlockEnum,
+            title: node.name,
+            description: node.description,
+            isBackend: true,
+            parameters_schema: node.parameters_schema
+          }))
+        )
+        setBackendNodes(allBackendNodes)
+      } catch (e) {
+        console.error('Failed to fetch node definitions', e)
+      }
     }
-  })
+    fetchNodes()
+  }, [])
+
+  return useMemo(() => {
+    const localBlocks = BLOCKS.map((block) => {
+      return {
+        ...block,
+        title: t(`workflow.blocks.${block.type}`),
+      }
+    })
+    return [...localBlocks, ...backendNodes]
+  }, [t, backendNodes])
 }
 
 export const useStartBlocks = () => {
