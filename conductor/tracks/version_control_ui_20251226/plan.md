@@ -3,7 +3,7 @@
 ## Phase 1: Version History UI
 - [x] Task: Create a VersionHistory component to display list of node versions. [cdac714]
 - [x] Task: Integrate VersionHistory into the existing WorkflowNodeList page. [cdac714]
-- [~] Task: Conductor - User Manual Verification 'Version History UI' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Version History UI' (Protocol in workflow.md) [6af3821]
 
 ## Phase 2: Node Selector Versioning
 - [ ] Task: Modify NodeSelector to support hierarchical display (Node -> Versions).
