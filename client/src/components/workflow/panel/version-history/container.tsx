@@ -27,10 +27,11 @@ const VersionHistoryContainer: React.FC<VersionHistoryContainerProps> = ({ nodeI
       const res = await fetch(`/api/v1/workflow/nodes/${nodeId}/versions`)
       if (res.ok) {
         const data = await res.json()
-        setVersions(data)
+        setVersions(Array.isArray(data) ? data : [])
       }
     } catch (err) {
       console.error('Failed to fetch versions:', err)
+      setVersions([])
     } finally {
       setLoading(false)
     }
@@ -45,7 +46,6 @@ const VersionHistoryContainer: React.FC<VersionHistoryContainerProps> = ({ nodeI
     if (!version) return
 
     try {
-      // Using /rollback endpoint based on the previous implementation reference
       const res = await fetch(`/api/v1/workflow/nodes/${nodeId}/rollback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -53,21 +53,21 @@ const VersionHistoryContainer: React.FC<VersionHistoryContainerProps> = ({ nodeI
       })
       if (res.ok) {
         onRollback?.()
-        fetchVersions() // Refresh list if needed
+        fetchVersions() 
       }
     } catch (err) {
       console.error('Rollback failed:', err)
     }
   }
 
-  const mappedVersions = versions.map(v => ({
+  // Map API data to component props
+  const mappedVersions = (versions || []).map(v => ({
     id: v.id,
     version: v.version,
-    versionType: v.version_type,
     timestamp: new Date(v.published_at).getTime(),
     author: v.created_by || 'Unknown',
     message: v.changelog || (v.version_type === 'RELEASE' ? 'Release' : 'Snapshot'),
-    current: false
+    current: false 
   }))
 
   return (
