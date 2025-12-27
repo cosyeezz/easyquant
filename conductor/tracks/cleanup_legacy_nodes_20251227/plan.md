@@ -7,7 +7,7 @@
 - [x] Task: Conductor - User Manual Verification 'Discovery & Analysis' (Protocol in workflow.md)
 
 ## Phase 2: Backend Cleanup (API & DB)
-- [~] Task: 编写针对旧版 API 路由移除后的 404 验证测试
+- [x] Task: 编写针对旧版 API 路由移除后的 404 验证测试 [565b70f]
 - [x] Task: 移除旧版后端 API 路由配置 (v1/api 等)
 - [x] Task: 移除旧版 Pydantic 模型及相关的业务处理逻辑
 - [x] Task: 编写并执行数据库迁移脚本 (Alembic)，删除废弃的表或数据
