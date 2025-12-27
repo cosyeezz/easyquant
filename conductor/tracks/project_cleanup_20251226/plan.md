@@ -7,7 +7,7 @@
 
 ## Phase 2: Manual Triage and Removal
 - [x] Task: Identify and list `debug_*.py` or temporary scripts for removal. [7ef775e]
-- [ ] Task: Remove confirmed unnecessary files.
+- [x] Task: Remove confirmed unnecessary files. [1022c15]
 - [ ] Task: Conductor - User Manual Verification 'Manual Triage and Removal' (Protocol in workflow.md)
 
 ## Phase 3: Ignore Rules Optimization
