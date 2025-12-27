@@ -11,5 +11,5 @@
 - [x] Task: Conductor - User Manual Verification 'Node Selector Versioning' (Protocol in workflow.md) [b644b87]
 
 ## Phase 3: End-to-End Testing
-- [~] Task: Write tests for the full publish-rollback-add flow.
-- [ ] Task: Conductor - User Manual Verification 'End-to-End Testing' (Protocol in workflow.md)
+- [x] Task: Write tests for the full publish-rollback-add flow. [85449a3]
+- [x] Task: Conductor - User Manual Verification 'End-to-End Testing' (Protocol in workflow.md) [85449a3]

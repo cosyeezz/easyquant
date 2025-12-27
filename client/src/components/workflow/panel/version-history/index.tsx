@@ -64,7 +64,7 @@ const VersionHistory: React.FC<VersionHistoryProps> = ({ versions, onRestore }) 
           onClick={() => handleRestoreClick(v.id)}
           className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-medium text-eq-primary-500 hover:text-eq-primary-600 px-2 py-0.5 rounded hover:bg-eq-primary-500/10"
         >
-          恢复到草稿
+          {t('workflow.nodeList.restoreToDraft')}
         </button>
       </div>
     </div>
@@ -75,7 +75,7 @@ const VersionHistory: React.FC<VersionHistoryProps> = ({ versions, onRestore }) 
       <div className="flex items-center gap-2 mb-3 pb-2 border-b border-eq-border-subtle">
         <Clock className="w-3.5 h-3.5 text-eq-text-muted" />
         <span className="text-[10px] font-bold text-eq-text-muted uppercase tracking-widest">
-          版本历史
+          {t('workflow.nodeList.versionHistory')}
         </span>
         <span className="text-[10px] text-eq-text-muted font-mono bg-eq-bg-elevated px-1.5 py-0.5 rounded">
           {versions.length}
@@ -84,7 +84,7 @@ const VersionHistory: React.FC<VersionHistoryProps> = ({ versions, onRestore }) 
 
       {versions.length === 0 ? (
         <div className="text-center py-6 text-eq-text-muted text-xs">
-          暂无发布版本
+          {t('workflow.nodeList.noVersions')}
         </div>
       ) : (
         <div className="space-y-3">
@@ -97,7 +97,7 @@ const VersionHistory: React.FC<VersionHistoryProps> = ({ versions, onRestore }) 
               >
                 {releasesExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                 <Tag className="w-3 h-3 text-eq-success-text" />
-                <span className="text-[11px] font-semibold text-eq-success-text">发行版</span>
+                <span className="text-[11px] font-semibold text-eq-success-text">{t('workflow.nodeList.releaseVersion')}</span>
                 <span className="text-[10px] text-eq-text-muted ml-auto">{releases.length}</span>
               </button>
               {releasesExpanded && (
@@ -117,7 +117,7 @@ const VersionHistory: React.FC<VersionHistoryProps> = ({ versions, onRestore }) 
               >
                 {snapshotsExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                 <Package className="w-3 h-3 text-eq-warning-text" />
-                <span className="text-[11px] font-semibold text-eq-warning-text">快照版</span>
+                <span className="text-[11px] font-semibold text-eq-warning-text">{t('workflow.nodeList.snapshotVersion')}</span>
                 <span className="text-[10px] text-eq-text-muted ml-auto">{snapshots.length}</span>
               </button>
               {snapshotsExpanded && (
@@ -139,9 +139,9 @@ const VersionHistory: React.FC<VersionHistoryProps> = ({ versions, onRestore }) 
                 <AlertTriangle className="w-5 h-5 text-eq-warning-text" />
               </div>
               <div>
-                <h3 className="font-semibold text-eq-text-primary">恢复版本到草稿</h3>
+                <h3 className="font-semibold text-eq-text-primary">{t('workflow.nodeList.restoreConfirmTitle')}</h3>
                 <p className="text-xs text-eq-text-secondary mt-1">
-                  此操作会将选中版本的配置复制到当前草稿，覆盖现有草稿内容。已发布的版本不会受影响。
+                  {t('workflow.nodeList.restoreConfirmDesc')}
                 </p>
               </div>
             </div>
@@ -150,13 +150,13 @@ const VersionHistory: React.FC<VersionHistoryProps> = ({ versions, onRestore }) 
                 onClick={() => setConfirmRestore(null)}
                 className="px-3 py-1.5 text-xs font-medium text-eq-text-secondary hover:text-eq-text-primary rounded transition-colors"
               >
-                取消
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleConfirmRestore}
                 className="px-3 py-1.5 text-xs font-medium text-white bg-eq-warning-text hover:bg-orange-600 rounded transition-colors"
               >
-                确认恢复
+                {t('common.confirm')}
               </button>
             </div>
           </div>

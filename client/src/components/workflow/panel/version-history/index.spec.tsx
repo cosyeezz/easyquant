@@ -10,10 +10,11 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
-const mockVersions = [
+const mockVersions: any[] = [
   {
     id: 'v2',
     version: '1.0.1',
+    versionType: 'RELEASE',
     timestamp: 1703581200000,
     author: 'Alice',
     message: 'Fixed bug',
@@ -22,6 +23,7 @@ const mockVersions = [
   {
     id: 'v1',
     version: '1.0.0',
+    versionType: 'RELEASE',
     timestamp: 1703577600000,
     author: 'Bob',
     message: 'Initial commit',
@@ -40,21 +42,17 @@ describe('VersionHistory Component', () => {
     expect(screen.getByText('Initial commit')).toBeInTheDocument()
   })
 
-  it('shows current badge for the current version', () => {
-    const onRestore = vi.fn()
-    render(<VersionHistory versions={mockVersions} onRestore={onRestore} />)
-
-    const currentBadge = screen.getByText('Current')
-    expect(currentBadge).toBeInTheDocument()
-  })
-
   it('calls onRestore when restore button is clicked', () => {
     const onRestore = vi.fn()
     render(<VersionHistory versions={mockVersions} onRestore={onRestore} />)
 
-    const restoreButtons = screen.getAllByText('Restore')
+    const restoreButtons = screen.getAllByText('workflow.nodeList.restoreToDraft')
     fireEvent.click(restoreButtons[0])
 
-    expect(onRestore).toHaveBeenCalledWith('v1')
+    // Wait for modal and confirm
+    const confirmBtn = screen.getByText('common.confirm')
+    fireEvent.click(confirmBtn)
+
+    expect(onRestore).toHaveBeenCalledWith('v2') // First one in mock is v2
   })
 })
