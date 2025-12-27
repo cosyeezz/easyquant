@@ -38,7 +38,9 @@ import {
   Braces,
   CheckCircle2,
   AlertCircle,
-  Clock
+  Clock,
+  Archive,
+  RotateCcw
 } from 'lucide-react'
 import Select from '@/components/ui/Select'
 import VersionHistoryPanel from '@/components/workflow/panel/version-history/container'
@@ -1014,7 +1016,7 @@ const WorkflowNodeList = () => {
   const fetchNodes = async () => {
     try {
       setLoading(true)
-      const response = await fetch('http://localhost:8000/api/v1/workflow/nodes')
+      const response = await fetch('/api/v1/workflow/nodes')
       const data = await response.json()
       // Map draft fields to working fields for UI
       const normalizedData = data.map(node => ({
@@ -1075,8 +1077,8 @@ const WorkflowNodeList = () => {
     try {
       const isNew = !selectedNode.id
       const url = isNew
-        ? 'http://localhost:8000/api/v1/workflow/nodes'
-        : `http://localhost:8000/api/v1/workflow/nodes/${selectedNode.id}`
+        ? '/api/v1/workflow/nodes'
+        : `/api/v1/workflow/nodes/${selectedNode.id}`
 
       // Map UI fields to API draft fields
       const payload = {
@@ -1118,12 +1120,18 @@ const WorkflowNodeList = () => {
 
   const handleDelete = async (id) => {
     try {
-      await fetch(`http://localhost:8000/api/v1/workflow/nodes/${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/v1/workflow/nodes/${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const data = await res.json()
+        alert(data.detail || '删除失败')
+        return
+      }
       await fetchNodes()
       if (selectedNode?.id === id) setSelectedNode(null)
       setDeleteModal({ open: false, nodeId: null })
     } catch (error) {
       console.error('Delete failed:', error)
+      alert('删除失败: ' + error.message)
     }
   }
 
@@ -1131,7 +1139,7 @@ const WorkflowNodeList = () => {
     if (!publishModal.node?.id) return
     try {
       setPublishing(true)
-      const response = await fetch(`http://localhost:8000/api/v1/workflow/nodes/${publishModal.node.id}/publish`, {
+      const response = await fetch(`/api/v1/workflow/nodes/${publishModal.node.id}/publish`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ version_type: versionType, changelog })
@@ -1144,6 +1152,27 @@ const WorkflowNodeList = () => {
       console.error('Publish failed:', error)
     } finally {
       setPublishing(false)
+    }
+  }
+
+  const handleDeprecate = async (nodeId, deprecate = true) => {
+    try {
+      const endpoint = deprecate ? 'deprecate' : 'undeprecate'
+      const res = await fetch(`/api/v1/workflow/nodes/${nodeId}/${endpoint}`, { method: 'POST' })
+      if (res.ok) {
+        await fetchNodes()
+        const data = await res.json()
+        const normalizedNode = {
+          ...data,
+          parameters_schema: data.draft_parameters_schema || { type: 'object', properties: {}, required: [] },
+          outputs_schema: data.draft_outputs_schema || {},
+          ui_config: data.draft_ui_config || {},
+          handler_path: data.draft_handler_path || ''
+        }
+        setSelectedNode(normalizedNode)
+      }
+    } catch (error) {
+      console.error('Deprecate failed:', error)
     }
   }
 
@@ -1411,8 +1440,13 @@ const WorkflowNodeList = () => {
                           maxWidth="140px"
                           className={`text-xs font-medium ${
                             selectedNode?.id === node.id ? 'text-eq-text-primary' : 'text-eq-text-secondary'
-                          }`}
+                          } ${node.is_deprecated ? 'line-through opacity-60' : ''}`}
                         />
+                        {node.is_deprecated && (
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-600 flex-shrink-0">
+                            过期
+                          </span>
+                        )}
                         {node.latest_release ? (
                           <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-eq-success-bg text-eq-success-text border border-eq-success-border flex-shrink-0">
                             v{node.latest_release}
@@ -1491,6 +1525,23 @@ const WorkflowNodeList = () => {
                             >
                               <Send className="w-4 h-4" />
                             </button>
+                            {selectedNode.is_deprecated ? (
+                              <button
+                                onClick={() => handleDeprecate(selectedNode.id, false)}
+                                className="p-2 text-eq-warning-text hover:text-eq-primary-500 hover:bg-eq-bg-elevated rounded-lg transition-colors border border-transparent hover:border-eq-border-subtle"
+                                title="取消过期标记"
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                              </button>
+                            ) : selectedNode.latest_release ? (
+                              <button
+                                onClick={() => handleDeprecate(selectedNode.id, true)}
+                                className="p-2 text-eq-text-secondary hover:text-eq-warning-text hover:bg-eq-warning-bg rounded-lg transition-colors border border-transparent hover:border-eq-warning-border"
+                                title="标记为过期"
+                              >
+                                <Archive className="w-4 h-4" />
+                              </button>
+                            ) : null}
                             <button
                               onClick={() => setDeleteModal({ open: true, nodeId: selectedNode.id })}
                               className="p-2 text-eq-text-secondary hover:text-eq-danger-text hover:bg-eq-danger-bg rounded-lg transition-colors border border-transparent hover:border-eq-danger-border"
@@ -1717,24 +1768,36 @@ const WorkflowNodeList = () => {
                     </div>
                   </section>
 
-                                    {/* Version History Section */}
+                    {/* Version History Section */}
                   {selectedNode.id && !isEditing && (
                     <VersionHistoryPanel
                       nodeId={selectedNode.id}
                       onRollback={async () => {
-                        await fetchNodes()
-                        // Refresh selected node
-                        const res = await fetch(`http://localhost:8000/api/v1/workflow/nodes/${selectedNode.id}`)
-                        if (res.ok) {
-                          const data = await res.json()
-                          const normalizedNode = {
-                            ...data,
-                            parameters_schema: data.draft_parameters_schema || { type: 'object', properties: {}, required: [] },
-                            outputs_schema: data.draft_outputs_schema || {},
-                            ui_config: data.draft_ui_config || {},
-                            handler_path: data.draft_handler_path || ''
+                        console.log('Rolling back node:', selectedNode.id)
+                        try {
+                          // 1. Refresh global list
+                          await fetchNodes()
+                          
+                          // 2. Refresh detailed node data
+                          const res = await fetch(`/api/v1/workflow/nodes/${selectedNode.id}`)
+                          if (res.ok) {
+                            const data = await res.json()
+                            console.log('Refetched node data:', data)
+                            
+                            const normalizedNode = {
+                              ...data,
+                              parameters_schema: data.draft_parameters_schema || { type: 'object', properties: {}, required: [] },
+                              outputs_schema: data.draft_outputs_schema || {},
+                              ui_config: data.draft_ui_config || {},
+                              handler_path: data.draft_handler_path || ''
+                            }
+                            
+                            // 3. Force state update
+                            setSelectedNode(null) // Reset first to force re-render
+                            setTimeout(() => setSelectedNode(normalizedNode), 0)
                           }
-                          setSelectedNode(normalizedNode)
+                        } catch (err) {
+                          console.error('Failed to refresh node after rollback:', err)
                         }
                       }}
                     />
