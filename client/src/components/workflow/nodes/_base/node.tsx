@@ -255,6 +255,11 @@ const BaseNode: FC<BaseNodeProps> = ({
             <div>
               {data.title}
             </div>
+            {data.version && (
+              <div className='ml-1.5 flex h-[14px] items-center rounded-md border border-divider-subtle bg-background-section-burn px-1 text-[9px] font-bold text-text-tertiary font-mono'>
+                {data.version}
+              </div>
+            )}
             {
               data.type === BlockEnum.Iteration && (data as IterationNodeType).is_parallel && (
                 <Tooltip popupContent={

@@ -76,7 +76,12 @@ export type DataSourceDefaultValue = Omit<PluginCommonDefaultValue, 'provider_id
   plugin_unique_identifier?: string
 }
 
-export type PluginDefaultValue = ToolDefaultValue | DataSourceDefaultValue | TriggerDefaultValue
+export type CustomNodeDefaultValue = {
+  node_id: number
+  version: string
+}
+
+export type PluginDefaultValue = ToolDefaultValue | DataSourceDefaultValue | TriggerDefaultValue | CustomNodeDefaultValue
 
 export type ToolValue = {
   provider_name: string

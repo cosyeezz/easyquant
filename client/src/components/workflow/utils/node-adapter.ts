@@ -18,6 +18,11 @@ export type DbNodeDefinition = {
   outputs_schema: Record<string, any>
   ui_config: any
   handler_path: string
+  versions?: Array<{
+    version: string
+    version_type: 'SNAPSHOT' | 'RELEASE'
+    published_at: string
+  }>
 }
 
 const mapCategoryToClassification = (category: string): BlockClassificationEnum => {
@@ -65,6 +70,7 @@ export const convertDbNodeToNodeDefault = (dbNode: DbNodeDefinition): NodeDefaul
       author: 'User',
       description: dbNode.description,
       isStart: dbNode.category === 'input',
+      versions: dbNode.versions,
     },
     defaultValue,
     checkValid: (payload: any, t: any) => {

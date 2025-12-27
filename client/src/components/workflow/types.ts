@@ -335,6 +335,11 @@ export type NodeDefault<T = {}> = {
     isStart?: boolean
     isSingleton?: boolean
     isTypeFixed?: boolean
+    versions?: Array<{
+      version: string
+      version_type: 'SNAPSHOT' | 'RELEASE'
+      published_at: string
+    }>
   }
   defaultValue: Partial<T>
   defaultRunInputData?: Record<string, any>

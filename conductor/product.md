@@ -5,6 +5,7 @@ EasyQuant 是一个综合性的量化交易系统，旨在通过可视化的工�
 
 ## Core Features
 - **可视化策略编排 (Visual Orchestration):** 基于 Easy-Canvas 的节点编辑器，采用 "Dify/Coze" 风格的极简设计，支持拖拽式构建 ETL 流程和交易策略。
+- **列级元数据感知 (Column-Level Metadata Awareness):** 实现强大的 Schema 传播引擎，支持在节点连接时自动同步字段列表，并在配置面板提供智能字段选择器。
 - **事件驱动架构 (Event-Driven):** 后端基于 Python FastAPI，采用全链路事件追踪设计，确保系统的高可观测性。
 - **实时监控 (Real-Time Observability):** 通过 WebSocket 实现日志流、进程状态和交易事件的毫秒级前端推送。
 - **量化引擎 (Quant Engine):** 内置回测与实盘交易引擎，支持复杂的金融数据处理和策略执行。

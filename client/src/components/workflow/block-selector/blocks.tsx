@@ -17,10 +17,13 @@ import {
   RiGitMergeLine,
   RiCodeSSlashLine,
   RiToolsLine,
+  RiArrowRightSLine,
+  RiArrowDownSLine,
+  RiHistoryLine,
 } from '@remixicon/react'
 import BlockIcon from '../block-icon'
 import { BlockEnum } from '../types'
-import type { NodeDefault } from '../types'
+import type { NodeDefault, PluginDefaultValue } from '../types'
 import { BLOCK_CLASSIFICATIONS } from './constants'
 import { BlockClassificationEnum } from './types'
 import { useBlocks } from './hooks'
@@ -30,7 +33,7 @@ import cn from '@/utils/classnames'
 
 type BlocksProps = {
   searchText: string
-  onSelect: (type: BlockEnum) => void
+  onSelect: (type: BlockEnum, pluginDefaultValue?: PluginDefaultValue) => void
   availableBlocksTypes?: BlockEnum[]
   blocks?: NodeDefault[]
 }
@@ -96,6 +99,7 @@ const Blocks = ({
 
   // Split View Logic
   const [activeClassification, setActiveClassification] = useState(BLOCK_CLASSIFICATIONS[0])
+  const [expandedNode, setExpandedNode] = useState<string | null>(null)
   const hoverTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const handleMouseEnter = useCallback((classification: string) => {
@@ -121,45 +125,94 @@ const Blocks = ({
   }, [searchText])
 
 
-  const renderNodeItem = useCallback((block: NodeDefault) => (
-      <Tooltip
-        key={block.metaData.type}
-        position='right'
-        popupClassName='w-[200px] rounded-xl'
-        needsDelay={false}
-        popupContent={(
-          <div>
+  const renderNodeItem = useCallback((block: NodeDefault) => {
+    const hasVersions = block.metaData.versions && block.metaData.versions.length > 0
+    const isExpanded = expandedNode === block.metaData.type
+
+    return (
+      <div key={block.metaData.type} className='flex flex-col'>
+        <Tooltip
+          position='right'
+          popupClassName='w-[200px] rounded-xl'
+          needsDelay={false}
+          popupContent={(
+            <div>
+              <BlockIcon
+                size='md'
+                className='mb-2'
+                type={block.metaData.type}
+              />
+              <div className='system-md-medium mb-1 text-text-primary'>{block.metaData.title}</div>
+              <div className='system-xs-regular text-text-tertiary'>{block.metaData.description}</div>
+            </div>
+          )}
+        >
+          <div
+            className={cn(
+              'flex h-8 w-full cursor-pointer items-center rounded-lg px-3 hover:bg-state-base-hover group',
+              isExpanded && 'bg-state-base-hover'
+            )}
+            onClick={(e) => {
+              if (hasVersions) {
+                e.stopPropagation()
+                setExpandedNode(isExpanded ? null : block.metaData.type)
+              } else {
+                onSelect(block.metaData.type)
+              }
+            }}
+          >
             <BlockIcon
-              size='md'
-              className='mb-2'
+              className='mr-2 shrink-0'
               type={block.metaData.type}
             />
-            <div className='system-md-medium mb-1 text-text-primary'>{block.metaData.title}</div>
-            <div className='system-xs-regular text-text-tertiary'>{block.metaData.description}</div>
+            <div className='grow text-sm text-text-secondary'>{block.metaData.title}</div>
+            {
+              block.metaData.type === BlockEnum.LoopEnd && (
+                <Badge
+                  text={t('workflow.nodes.loop.loopNode')}
+                  className='ml-2 shrink-0'
+                />
+              )
+            }
+            {hasVersions && (
+              <div className='ml-2 shrink-0 flex items-center gap-1 opacity-40 group-hover:opacity-100 transition-opacity'>
+                <span className='text-[10px] font-mono'>{block.metaData.recommendedVersion}</span>
+                {isExpanded ? <RiArrowDownSLine className='w-3 h-3' /> : <RiArrowRightSLine className='w-3 h-3' />}
+              </div>
+            )}
+          </div>
+        </Tooltip>
+
+        {/* Version List */}
+        {hasVersions && isExpanded && (
+          <div className='ml-6 mt-1 mb-2 border-l-2 border-divider-subtle pl-2 space-y-1 animate-in fade-in slide-in-from-left-1 duration-200'>
+            {block.metaData.versions?.map((v) => (
+              <div
+                key={v.version}
+                className='flex items-center gap-2 h-7 px-2 rounded-md hover:bg-state-base-hover cursor-pointer'
+                onClick={() => onSelect(block.metaData.type, {
+                  node_id: (block.metaData as any).dbId,
+                  version: v.version
+                })}
+              >
+                <RiHistoryLine className='w-3 h-3 text-text-tertiary' />
+                <span className='text-[11px] font-mono text-text-secondary'>{v.version}</span>
+                <span className={cn(
+                  'text-[9px] px-1 rounded border',
+                  v.version_type === 'RELEASE' ? 'text-success-600 border-success-200 bg-success-50' : 'text-warning-600 border-warning-200 bg-warning-50'
+                )}>
+                  {v.version_type}
+                </span>
+                {v.version === block.metaData.recommendedVersion && (
+                  <span className='text-[9px] text-text-accent font-bold'>★</span>
+                )}
+              </div>
+            ))}
           </div>
         )}
-      >
-        <div
-          key={block.metaData.type}
-          className='flex h-8 w-full cursor-pointer items-center rounded-lg px-3 hover:bg-state-base-hover'
-          onClick={() => onSelect(block.metaData.type)}
-        >
-          <BlockIcon
-            className='mr-2 shrink-0'
-            type={block.metaData.type}
-          />
-          <div className='grow text-sm text-text-secondary'>{block.metaData.title}</div>
-          {
-            block.metaData.type === BlockEnum.LoopEnd && (
-              <Badge
-                text={t('workflow.nodes.loop.loopNode')}
-                className='ml-2 shrink-0'
-              />
-            )
-          }
-        </div>
-      </Tooltip>
-  ), [onSelect, t])
+      </div>
+    )
+  }, [onSelect, t, expandedNode])
 
   const renderGroup = useCallback((classification: string, isFlat = false) => {
     const list = groups[classification].sort((a, b) => (a.metaData.sort || 0) - (b.metaData.sort || 0))

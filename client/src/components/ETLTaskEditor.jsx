@@ -50,10 +50,29 @@ function ETLTaskEditor({ taskId, onNavigate }) {
   useEffect(() => {
     const fetchCustomNodes = async () => {
         try {
-            const response = await fetch('/api/v1/workflow/nodes')
+            const response = await fetch('/api/v1/workflow/published-nodes')
             if (response.ok) {
                 const dbNodes = await response.json()
-                const customDefaults = dbNodes.map(convertDbNodeToNodeDefault)
+                const customDefaults = dbNodes.map((dbNode) => {
+                    // Use recommended_version if available, otherwise latest
+                    const nodeDefault = convertDbNodeToNodeDefault({
+                        ...dbNode,
+                        // The adapter expects parameters_schema and outputs_schema
+                        // But /published-nodes doesn't return them directly for ALL versions
+                        // We might need to fetch full detail on selection, OR the API should return
+                        // the recommended version's schema.
+                        // For now, let's assume the adapter can handle partial data for selection UI
+                        parameters_schema: dbNode.parameters_schema || { properties: {}, required: [] },
+                        outputs_schema: dbNode.outputs_schema || {},
+                    })
+                    // Inject extra info for CustomNodeDefaultValue identification
+                    nodeDefault.metaData = {
+                        ...nodeDefault.metaData,
+                        dbId: dbNode.id,
+                        recommendedVersion: dbNode.recommended_version,
+                    }
+                    return nodeDefault
+                })
                 
                 // Merge with built-in defaults
                 // Create a new map to avoid mutating the original import
