@@ -5,7 +5,7 @@
 - [x] Task: Clean up old log files in the `logs/` directory. [d7e9ce7]
 - [ ] Task: Conductor - User Manual Verification 'Automated Cleanup' (Protocol in workflow.md)
 
-## Phase 2: Manual Triage and Removal
+## Phase 2: Manual Triage and Removal [checkpoint: 99fe9b0]
 - [x] Task: Identify and list `debug_*.py` or temporary scripts for removal. [7ef775e]
 - [x] Task: Remove confirmed unnecessary files. [1022c15]
 - [ ] Task: Conductor - User Manual Verification 'Manual Triage and Removal' (Protocol in workflow.md)
