@@ -24,6 +24,6 @@
 - [ ] Task: Conductor - User Manual Verification 'Frontend Cleanup' (Protocol in workflow.md)
 
 ## Phase 4: Final Verification & Checkpoint
-- [ ] Task: 全面手动测试，确保系统主功能（新版工作流编辑器）完全正常
-- [ ] Task: 检查代码库，确保无“算子节点”相关的残留注释或冗余代码
+- [x] Task: 全面手动测试，确保系统主功能（新版工作流编辑器）完全正常 [89c21c6]
+- [x] Task: 检查代码库，确保无“算子节点”相关的残留注释或冗余代码 [89c21c6]
 - [ ] Task: Conductor - User Manual Verification 'Final Verification' (Protocol in workflow.md)
