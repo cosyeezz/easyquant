@@ -6,7 +6,7 @@
 - [x] Task: 确认数据库表 `workflow_nodes` 的当前使用情况，判定是否可安全删除或仅清理数据
 - [x] Task: Conductor - User Manual Verification 'Discovery & Analysis' (Protocol in workflow.md)
 
-## Phase 2: Backend Cleanup (API & DB)
+## Phase 2: Backend Cleanup (API & DB) [checkpoint: 8f1d7f7]
 - [x] Task: 编写针对旧版 API 路由移除后的 404 验证测试 [565b70f]
 - [x] Task: 移除旧版后端 API 路由配置 (v1/api 等)
 - [x] Task: 移除旧版 Pydantic 模型及相关的业务处理逻辑
