@@ -6,9 +6,9 @@
 - [x] Task: Conductor - User Manual Verification 'Version History UI' (Protocol in workflow.md) [6af3821]
 
 ## Phase 2: Node Selector Versioning
-- [ ] Task: Modify NodeSelector to support hierarchical display (Node -> Versions).
-- [ ] Task: Implement version switching logic when adding a node to the canvas.
-- [ ] Task: Conductor - User Manual Verification 'Node Selector Versioning' (Protocol in workflow.md)
+- [x] Task: Modify NodeSelector to support hierarchical display (Node -> Versions). [09d78f7]
+- [x] Task: Implement version switching logic when adding a node to the canvas. [09d78f7]
+- [~] Task: Conductor - User Manual Verification 'Node Selector Versioning' (Protocol in workflow.md)
 
 ## Phase 3: End-to-End Testing
 - [ ] Task: Write tests for the full publish-rollback-add flow.
