@@ -2,8 +2,8 @@
 
 ## Phase 1: Backend Architecture Refactor
 - [x] Task: Create new package structure `server/nodes/{system,logic,etl,quant}/`. [5790fb3]
-- [x] Task: Implement `BaseNode` with `category` enum and `run()` interface. [96e0ba2]
-- [~] Task: Implement `NodeRegistry` to scan the new package structure.
+- [~] Task: Implement `BaseNode` with `category` enum and `run()` interface.
+- [ ] Task: Implement `NodeRegistry` to scan the new package structure.
 - [ ] Task: Migrate existing ETL logic (if any) to new `server/nodes/etl/` structure.
 - [ ] Task: Implement `ProcessSchedulerNode` (System) and `CsvReaderNode` (ETL) as verification samples with distinct parameters.
 - [ ] Task: Expose `GET /api/v1/nodes` returning grouped definitions.
