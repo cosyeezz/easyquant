@@ -43,6 +43,7 @@ class WorkflowNodeSchema(BaseModel):
     # 版本信息
     latest_snapshot: str | None
     latest_release: str | None
+    is_deprecated: bool = False
     # 版本列表
     versions: List[WorkflowNodeVersionSchema] = []
 
@@ -60,6 +61,7 @@ class WorkflowNodeListSchema(BaseModel):
     description: str | None
     latest_snapshot: str | None
     latest_release: str | None
+    is_deprecated: bool = False
     # 草稿配置
     draft_parameters_schema: Dict[str, Any]
     draft_outputs_schema: Dict[str, Any]
@@ -259,6 +261,46 @@ async def delete_node(node_id: int, session: AsyncSession = Depends(get_session)
     await session.delete(node)
     await session.commit()
     return {"status": "success"}
+
+
+@router.post("/nodes/{node_id}/deprecate", response_model=WorkflowNodeSchema)
+async def deprecate_node(node_id: int, session: AsyncSession = Depends(get_session)):
+    """标记节点为过期"""
+    stmt = select(WorkflowNode).where(WorkflowNode.id == node_id)
+    result = await session.execute(stmt)
+    node = result.scalar_one_or_none()
+
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    node.is_deprecated = True
+    await session.commit()
+
+    stmt = select(WorkflowNode).where(WorkflowNode.id == node_id).options(
+        selectinload(WorkflowNode.versions)
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one()
+
+
+@router.post("/nodes/{node_id}/undeprecate", response_model=WorkflowNodeSchema)
+async def undeprecate_node(node_id: int, session: AsyncSession = Depends(get_session)):
+    """取消节点过期标记"""
+    stmt = select(WorkflowNode).where(WorkflowNode.id == node_id)
+    result = await session.execute(stmt)
+    node = result.scalar_one_or_none()
+
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    node.is_deprecated = False
+    await session.commit()
+
+    stmt = select(WorkflowNode).where(WorkflowNode.id == node_id).options(
+        selectinload(WorkflowNode.versions)
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one()
 
 
 @router.post("/nodes/{node_id}/publish", response_model=VersionConfigSchema)

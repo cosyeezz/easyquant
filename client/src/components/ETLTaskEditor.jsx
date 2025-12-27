@@ -50,7 +50,7 @@ function ETLTaskEditor({ taskId, onNavigate }) {
   useEffect(() => {
     const fetchCustomNodes = async () => {
         try {
-            const response = await fetch('http://localhost:8000/api/v1/workflow/nodes')
+            const response = await fetch('/api/v1/workflow/nodes')
             if (response.ok) {
                 const dbNodes = await response.json()
                 const customDefaults = dbNodes.map(convertDbNodeToNodeDefault)

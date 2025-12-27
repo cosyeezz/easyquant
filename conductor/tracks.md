@@ -4,10 +4,10 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-## [ ] Track 1: 版本管理界面与画布集成
+## [~] Track 1: 版本管理界面与画布集成
 *Link: [./conductor/tracks/version_control_ui_20251226/](./conductor/tracks/version_control_ui_20251226/)*
 
-## [ ] Track 2: 元数据传播引擎实现 (Schema Propagation)
+## [x] Track 2: 元数据传播引擎实现 (Schema Propagation)
 *Link: [./conductor/tracks/schema_propagation_20251226/](./conductor/tracks/schema_propagation_20251226/)*
 
 ## [ ] Track 3: 核心 ETL 节点库扩充

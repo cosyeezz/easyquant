@@ -41,6 +41,9 @@ class WorkflowNode(Base):
     latest_snapshot = Column(String, nullable=True, comment="最新快照版本号 (e.g. '1.2.0-SNAPSHOT')")
     latest_release = Column(String, nullable=True, comment="最新发行版本号 (e.g. '1.1.0')")
 
+    # --- 状态 ---
+    is_deprecated = Column(Boolean, default=False, nullable=False, comment="是否已过期/废弃")
+
     # --- 审计字段 ---
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

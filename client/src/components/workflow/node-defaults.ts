@@ -33,7 +33,6 @@ export const nodes = [
   ParameterExtractorNodeDefault,
   IterationNodeDefault,
   DocExtractorNodeDefault,
-  ListOperatorNodeDefault,
   LoopNodeDefault,
   ColumnMappingNodeDefault,
 ]

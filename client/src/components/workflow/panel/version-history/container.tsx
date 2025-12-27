@@ -60,17 +60,14 @@ const VersionHistoryContainer: React.FC<VersionHistoryContainerProps> = ({ nodeI
     }
   }
 
-  // Map API data to component props
-  // Note: The API doesn't seem to return 'current' explicitly, or maybe the first one is current?
-  // For now, we assume the list doesn't explicitly mark 'current' active draft vs history.
-  // We'll just display them.
   const mappedVersions = versions.map(v => ({
     id: v.id,
     version: v.version,
+    versionType: v.version_type,
     timestamp: new Date(v.published_at).getTime(),
     author: v.created_by || 'Unknown',
     message: v.changelog || (v.version_type === 'RELEASE' ? 'Release' : 'Snapshot'),
-    current: false // We might need logic to determine if this is the currently active content
+    current: false
   }))
 
   return (
