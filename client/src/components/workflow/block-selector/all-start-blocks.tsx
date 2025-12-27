@@ -16,7 +16,6 @@ import StartBlocks from './start-blocks'
 import TriggerPluginList from './trigger-plugin/list'
 import { ENTRY_NODE_TYPES } from './constants'
 import cn from '@/utils/classnames'
-import Link from 'next/link'
 import { RiArrowRightUpLine } from '@remixicon/react'
 import { getMarketplaceUrl } from '@/utils/var'
 import Button from '@/app/components/base/button'
@@ -178,7 +177,7 @@ const AllStartBlocks = ({
               <div className='text-sm font-medium text-text-secondary'>
                 {t('workflow.tabs.noPluginsFound')}
               </div>
-              <Link
+              <a
                 href='https://github.com/langgenius/dify-plugins/issues/new?template=plugin_request.yaml'
                 target='_blank'
               >
@@ -189,21 +188,21 @@ const AllStartBlocks = ({
                 >
                   {t('workflow.tabs.requestToCommunity')}
                 </Button>
-              </Link>
+              </a>
             </div>
           )}
         </div>
 
         {shouldShowMarketplaceFooter && !shouldShowEmptyState && (
           // Footer - Same as Tools tab marketplace footer
-          <Link
+          <a
             className={marketplaceFooterClassName}
             href={getMarketplaceUrl('', { category: PluginCategoryEnum.trigger })}
             target='_blank'
           >
             <span>{t('plugin.findMoreInMarketplace')}</span>
             <RiArrowRightUpLine className='ml-0.5 h-3 w-3' />
-          </Link>
+          </a>
         )}
       </div>
     </div>
