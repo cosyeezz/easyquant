@@ -10,7 +10,7 @@
 - [x] Task: Remove confirmed unnecessary files. [1022c15]
 - [ ] Task: Conductor - User Manual Verification 'Manual Triage and Removal' (Protocol in workflow.md)
 
-## Phase 3: Ignore Rules Optimization
+## Phase 3: Ignore Rules Optimization [checkpoint: 323d63a]
 - [x] Task: Review and update `.gitignore` to prevent future clutter. [e64817b]
 - [x] Task: Review and update `.geminiignore` for better token efficiency. [31d85ff]
 - [ ] Task: Conductor - User Manual Verification 'Ignore Rules Optimization' (Protocol in workflow.md)
