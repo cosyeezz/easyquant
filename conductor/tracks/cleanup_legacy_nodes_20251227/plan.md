@@ -14,7 +14,7 @@
 - [x] Task: 运行所有后端测试确保无回归错误
 - [x] Task: Conductor - User Manual Verification 'Backend Cleanup' (Protocol in workflow.md)
 
-## Phase 3: Frontend Cleanup (UI & Routes)
+## Phase 3: Frontend Cleanup (UI & Routes) [checkpoint: 5fcd7aa]
 - [x] Task: 编写前端单元测试，验证旧版路由已无法访问 [4cd51be]
 - [x] Task: 移除顶部/侧边导航栏中的“算子节点”菜单项
 - [x] Task: 移除 Vite/React 路由配置中对应的旧版 Page 路由
